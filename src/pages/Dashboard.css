@@ -1,0 +1,342 @@
+.dashboard-wrapper {
+    display: flex;
+    min-height: 100vh;
+    background-color: #f8fafc;
+}
+
+.main-content {
+    flex: 1;
+    margin-left: 240px;
+    display: flex;
+    flex-direction: column;
+}
+
+.dashboard-content {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Welcome Section */
+.welcome-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.welcome-section h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a202c;
+    margin: 0;
+}
+
+.welcome-section p {
+    color: #718096;
+    font-size: 14px;
+}
+
+/* Filters Section */
+.filters-bar {
+    background: white;
+    padding: 16px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #f7fafc;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #edf2f7;
+    cursor: pointer;
+    min-width: 140px;
+    justify-content: space-between;
+}
+
+.filter-label {
+    font-size: 13px;
+    color: #4a5568;
+    font-weight: 500;
+}
+
+.clear-filters {
+    margin-left: auto;
+    color: #718096;
+    font-size: 13px;
+    font-weight: 600;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+/* KPI Grid */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+}
+
+.kpi-card {
+    background: white;
+    padding: 20px;
+    border-radius: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #edf2f7;
+}
+
+.kpi-card.blue {
+    background: #3182ce;
+    color: white;
+}
+
+.kpi-info h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #718096;
+    margin-bottom: 8px;
+}
+
+.kpi-card.blue .kpi-info h4 {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.kpi-trend {
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.trend-up {
+    color: #48bb78;
+}
+
+.kpi-card.blue .trend-up {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.kpi-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.kpi-card.blue .kpi-icon {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.kpi-card:not(.blue) .kpi-icon {
+    background: #f7fafc;
+    color: #3182ce;
+}
+
+/* Dashboard Detail Cards Grid */
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.detail-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #edf2f7;
+}
+
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.card-title h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #2d3748;
+}
+
+/* Specific Card Layouts User/PO/Vessel */
+.stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 10px;
+}
+
+.stat-label-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.stat-label {
+    font-size: 13px;
+    color: #4a5568;
+}
+
+.stat-count {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a202c;
+}
+
+/* SOC Expiry Specific */
+.soc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.soc-item {
+    padding: 12px;
+    border: 1px solid #edf2f7;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.vessel-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.vessel-details h5 {
+    font-size: 14px;
+    margin: 0;
+    color: #1a202c;
+}
+
+.vessel-details span {
+    font-size: 11px;
+    color: #718096;
+}
+
+.status-badge {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.status-overdue {
+    background: #fff5f5;
+    color: #e53e3e;
+}
+
+.status-warning {
+    background: #fffaf0;
+    color: #dd6b20;
+}
+
+.status-good {
+    background: #f0fff4;
+    color: #38a169;
+}
+
+/* Operational Overview Table */
+.table-container {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #edf2f7;
+    overflow: hidden;
+}
+
+.table-header {
+    padding: 20px;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.table-header h3 {
+    font-size: 18px;
+    margin-bottom: 4px;
+}
+
+.table-header p {
+    font-size: 13px;
+    color: #718096;
+}
+
+.overview-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.overview-table th {
+    text-align: left;
+    padding: 16px;
+    background: #f8fafc;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #718096;
+    font-weight: 700;
+}
+
+.overview-table td {
+    padding: 16px;
+    border-bottom: 1px solid #edf2f7;
+    font-size: 14px;
+    color: #2d3748;
+}
+
+.reminder-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    margin: 0 auto;
+}
+
+.reminder-1 {
+    background: #fffaf0;
+    color: #dd6b20;
+    border: 1px solid #feebc8;
+}
+
+.reminder-2 {
+    background: #fff5f5;
+    color: #e53e3e;
+    border: 1px solid #feb2b2;
+}
+
+.non-responsive {
+    background: #e53e3e;
+    color: white;
+}
