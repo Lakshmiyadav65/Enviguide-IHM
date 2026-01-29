@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
     Search, Plus, Layers, FileText, ShoppingCart,
-    BarChart2, FileCheck, Calendar, X, Check,
+    BarChart2, FileCheck, X, Check,
     FolderOpen, Ship as ShipIcon
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
@@ -48,10 +48,10 @@ const INITIAL_VESSELS: VesselData[] = [
         vesselClass: 'Registro Italiano Navale',
         imoNo: '9571648',
         registrationNumber: 'REG-123',
-        deliveryDate: '01/06/2013',
+        deliveryDate: '2013-06-01',
         deadweightTonnage: '34236',
         portOfRegistry: 'Panama - 44761PEXT',
-        socExpiryDate: '29/06/2028',
+        socExpiryDate: '2028-06-29',
         type: 'Bulk Carrier',
         shipManager: 'AQUARIUS BULKCARRIER',
         registeredOwner: 'SCARLET STREET CORP',
@@ -59,7 +59,7 @@ const INITIAL_VESSELS: VesselData[] = [
         vesselIhmClass: 'Registro Italiano Navale',
         classIdNo: 'CID-998',
         nameOfYard: 'SHANGHAI SHIPYARD',
-        keelLaidDate: '27/12/2011',
+        keelLaidDate: '2011-12-27',
         grossTonnage: '22414',
         teuUnits: '0',
         ihmReference: 'IHM Report: J-1109202',
@@ -77,10 +77,10 @@ const INITIAL_VESSELS: VesselData[] = [
         vesselClass: 'DNV',
         imoNo: '9308642',
         registrationNumber: 'REG-456',
-        deliveryDate: '15/08/2015',
+        deliveryDate: '2015-08-15',
         deadweightTonnage: '45000',
         portOfRegistry: 'Liberia',
-        socExpiryDate: '10/10/2030',
+        socExpiryDate: '2030-10-10',
         type: 'Container Ship',
         shipManager: 'GLOBAL MANAGERS',
         registeredOwner: 'OCEAN BLUE INC',
@@ -88,7 +88,7 @@ const INITIAL_VESSELS: VesselData[] = [
         vesselIhmClass: 'DNV',
         classIdNo: 'CID-777',
         nameOfYard: 'HYUNDAI HEAVY',
-        keelLaidDate: '05/02/2014',
+        keelLaidDate: '2014-02-05',
         grossTonnage: '30000',
         teuUnits: '5000',
         ihmReference: 'IHM Report: G-9922',
@@ -120,6 +120,7 @@ export default function Vessels() {
     const [isAdding, setIsAdding] = useState(false);
 
     const [formData, setFormData] = useState<VesselData>(INITIAL_VESSELS[0]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const filteredVessels = useMemo(() => {
         return vesselList.filter(v =>
@@ -143,6 +144,21 @@ export default function Vessels() {
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFormData(prev => ({ ...prev, image: reader.result as string }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const triggerFileSelect = () => {
+        fileInputRef.current?.click();
     };
 
     const handleSave = (e: React.FormEvent) => {
@@ -223,7 +239,14 @@ export default function Vessels() {
                                         <div className="image-preview luxury-border">
                                             <img src={formData.image} alt="Ship" />
                                         </div>
-                                        <div className="choose-file-btn">Choose file</div>
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            style={{ display: 'none' }}
+                                            accept="image/*"
+                                            onChange={handleFileChange}
+                                        />
+                                        <div className="choose-file-btn" onClick={triggerFileSelect}>Choose file</div>
                                         <p className="file-hint">Image should not exceed 10MB</p>
                                     </div>
                                 </div>
@@ -339,8 +362,16 @@ const DateGroup = ({ label, name, value, onChange }: { label: string, name: stri
     <div className="form-group">
         <label>{label}</label>
         <div className="date-input-wrapper">
-            <input type="text" name={name} className="form-control" value={value} onChange={onChange} />
-            <Calendar size={16} className="date-icon" />
+            <input
+                type="date"
+                name={name}
+                className="form-control"
+                value={value}
+                onChange={onChange}
+                onKeyDown={(e) => e.preventDefault()}
+                onClick={(e) => (e.target as HTMLInputElement).showPicker?.()}
+                style={{ cursor: 'pointer' }}
+            />
         </div>
     </div>
 );
