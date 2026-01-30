@@ -12,7 +12,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/vessels" element={<Vessels />} />
         <Route path="/vessels/:id" element={<Vessels />} />
-        <Route path="/decks" element={<Dashboard />} /> {/* Temporarily point to Dashboard as placeholder */}
+        <Route path="/decks" element={<Vessels />} />
         <Route path="/materials" element={<Dashboard />} />
         <Route path="/purchase-orders" element={<Dashboard />} />
         <Route path="/administration" element={<Dashboard />} />

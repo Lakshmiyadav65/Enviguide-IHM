@@ -1,9 +1,10 @@
 import { useState, useMemo, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import {
     Search, Plus, Layers, FileText, ShoppingCart,
     BarChart2, FileCheck, X, Check,
-    FolderOpen, Ship as ShipIcon
+    FolderOpen, Ship as ShipIcon,
+    BarChart3
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -40,6 +41,35 @@ interface VesselData {
 }
 
 const INITIAL_VESSELS: VesselData[] = [
+    {
+        name: 'MV Ocean Pioneer',
+        shipOwner: 'MARITIME SOLUTIONS',
+        fleet: 'Blue Fleet',
+        subFleet: 'Atlantic',
+        vesselClass: 'DNV',
+        imoNo: '9876543',
+        registrationNumber: 'REG-987',
+        deliveryDate: '2020-01-01',
+        deadweightTonnage: '50000',
+        portOfRegistry: 'Panama',
+        socExpiryDate: '2025-06-15',
+        type: 'Bulk Carrier',
+        shipManager: 'OCEAN MANAGERS',
+        registeredOwner: 'PIONEER SHIPPING',
+        flagState: 'Panama',
+        vesselIhmClass: 'DNV',
+        classIdNo: 'CID-111',
+        nameOfYard: 'GLOBAL YARD',
+        keelLaidDate: '2018-05-12',
+        grossTonnage: '35000',
+        teuUnits: '0',
+        ihmReference: 'IHM-P-2024',
+        signalLetters: 'PION',
+        buildersUniqueId: 'BUILD-P1',
+        mdStandard: 'IMO',
+        socReference: 'SOC-998',
+        image: 'https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&q=80&w=800'
+    },
     {
         name: 'ACOSTA',
         shipOwner: 'AQUARIUS BULKCARRIER',
@@ -97,7 +127,36 @@ const INITIAL_VESSELS: VesselData[] = [
         mdStandard: 'IHM Method',
         socReference: 'IHM-9988',
         image: 'https://images.unsplash.com/photo-1494412574743-01947f15b6b7?auto=format&fit=crop&q=80&w=800'
-    }
+    },
+    {
+        name: 'PACIFIC HORIZON',
+        shipOwner: 'PACIFIC TRADING',
+        fleet: 'Pacific',
+        subFleet: 'North',
+        vesselClass: 'ABS',
+        imoNo: '9234567',
+        registrationNumber: 'REG-567',
+        deliveryDate: '2010-05-20',
+        deadweightTonnage: '28000',
+        portOfRegistry: 'Singapore',
+        socExpiryDate: '2025-03-10',
+        type: 'Bulk Carrier',
+        shipManager: 'PACIFIC SHIP MGMT',
+        registeredOwner: 'HORIZON MARITIME',
+        flagState: 'Singapore',
+        vesselIhmClass: 'ABS',
+        classIdNo: 'CID-555',
+        nameOfYard: 'SINGAPORE YARD',
+        keelLaidDate: '2008-01-15',
+        grossTonnage: '18000',
+        teuUnits: '0',
+        ihmReference: 'IHM-PH-10',
+        signalLetters: 'PHOR',
+        buildersUniqueId: 'BUILD-P5',
+        mdStandard: 'Nil',
+        socReference: 'SOC-556',
+        image: 'https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&q=80&w=800'
+    },
 ];
 
 const EMPTY_FORM: VesselData = {
@@ -113,9 +172,10 @@ const EMPTY_FORM: VesselData = {
 
 export default function Vessels() {
     const { id } = useParams();
+    const location = useLocation();
     const [vesselList, setVesselList] = useState<VesselData[]>(INITIAL_VESSELS);
-    const [activeVesselName, setActiveVesselName] = useState('ACOSTA');
-    const [activeTab, setActiveTab] = useState('project');
+    const [activeVesselName, setActiveVesselName] = useState('MV Ocean Pioneer');
+    const [activeTab, setActiveTab] = useState(location.pathname === '/decks' ? 'decks' : 'project');
     const [searchTerm, setSearchTerm] = useState('');
     const [isAdding, setIsAdding] = useState(false);
 
@@ -194,6 +254,46 @@ export default function Vessels() {
                         <button className="add-vessel-btn" style={{ margin: '20px auto 0' }}>
                             Go Back to Ship
                         </button>
+                    </div>
+                </div>
+            );
+        }
+
+        if (activeTab === 'decks') {
+            return (
+                <div className="decks-empty-state">
+                    <div className="empty-state-card">
+                        <div className="empty-state-icon-wrapper">
+                            <div className="icon-circle">
+                                <Layers size={48} color="#00B0FA" />
+                            </div>
+                            <div className="warning-badge">!</div>
+                        </div>
+
+                        <h2>No Ship Added Yet</h2>
+                        <p className="description">
+                            Before you can manage decks and configure deck layouts,<br />
+                            you need to add a ship to your fleet first.
+                        </p>
+
+                        <div className="instruction-steps">
+                            <div className="step-item">
+                                <span className="step-number">1</span>
+                                <p>Click <strong>"Add New Ship"</strong> to create a ship profile</p>
+                            </div>
+                            <div className="step-item">
+                                <span className="step-number">2</span>
+                                <p>After adding the ship, return here to configure decks</p>
+                            </div>
+                        </div>
+
+                        <div className="empty-state-actions">
+                            <button className="btn-primary-blue">
+                                <ShipIcon size={20} /> Add New Ship
+                            </button>
+                        </div>
+
+                        <p className="help-text">Need help? Contact your administrator for assistance.</p>
                     </div>
                 </div>
             );
@@ -292,64 +392,70 @@ export default function Vessels() {
             <main className="main-content vessel-page-main">
                 <Header />
                 <div className="vessels-wrapper">
-                    {/* Full-width Tabs Header */}
-                    <nav className="content-tabs-full">
-                        <div className="tabs-scroll-container">
-                            {tabs.map(tab => (
-                                <div
-                                    key={tab.id}
-                                    className={`tab-item-p ${activeTab === tab.id ? 'active' : ''}`}
-                                    onClick={() => setActiveTab(tab.id)}
-                                >
-                                    <tab.icon size={18} />
-                                    <span>{tab.label}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </nav>
-
-                    <div className="vessels-content-layout">
-                        {/* Secondary Sidebar */}
-                        <aside className="secondary-sidebar">
-                            <div className="vessel-search-container">
-                                <div className="vessel-search-box">
-                                    <Search size={16} color="#94A3B8" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search vessels..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="vessel-list">
-                                {filteredVessels.map((vessel) => (
+                    <div className="vessels-main-header">
+                        {/* Full-width Tabs Header */}
+                        <nav className="content-tabs-inline">
+                            <div className="tabs-container-inline">
+                                {tabs.map(tab => (
                                     <div
-                                        key={vessel.name}
-                                        className={`vessel-item ${activeVesselName === vessel.name ? 'active' : ''}`}
-                                        onClick={() => handleVesselSelect(vessel)}
+                                        key={tab.id}
+                                        className={`tab-item-inline ${activeTab === tab.id ? 'active' : ''}`}
+                                        onClick={() => setActiveTab(tab.id)}
                                     >
-                                        <div className={`vessel-status-dot ${vessel.name === 'ACOSTA' ? 'v-active' : ''}`}></div>
-                                        <div className="vessel-info-block">
-                                            <h4>{vessel.name}</h4>
-                                            <p>IMO {vessel.imoNo}</p>
-                                        </div>
+                                        <tab.icon size={18} />
+                                        <span>{tab.label}</span>
                                     </div>
                                 ))}
                             </div>
+                        </nav>
+                    </div>
 
-                            <div className="sidebar-footer">
-                                <button className="add-vessel-btn-large" onClick={handleAddClick}>
-                                    <Plus size={20} />
-                                    Add Vessel
-                                </button>
-                            </div>
-                        </aside>
+                    <div className="vessels-content-layout">
+                        {/* Secondary Sidebar - Hidden on Decks tab */}
+                        {activeTab !== 'decks' && (
+                            <aside className="secondary-sidebar">
+                                <div className="vessel-search-container">
+                                    <div className="vessel-search-box">
+                                        <Search size={16} color="#94A3B8" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search vessels..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="vessel-list">
+                                    {filteredVessels.map((vessel) => (
+                                        <div
+                                            key={`${vessel.name}-${vessel.imoNo}`}
+                                            className={`vessel-item ${activeVesselName === vessel.name ? 'active' : ''}`}
+                                            onClick={() => handleVesselSelect(vessel)}
+                                        >
+                                            <div className="vessel-status-dot v-active"></div>
+                                            <div className="vessel-info-block">
+                                                <h4>{vessel.name}</h4>
+                                                <p>IMO {vessel.imoNo}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="sidebar-footer">
+                                    <button className="add-vessel-btn-large" onClick={handleAddClick}>
+                                        <Plus size={20} />
+                                        Add Vessel
+                                    </button>
+                                </div>
+                            </aside>
+                        )}
 
                         {/* Main Section */}
                         <div className="vessels-main">
-                            {renderContent()}
+                            <div className={`vessel-tab-content ${activeTab === 'decks' ? 'no-scroll' : ''}`}>
+                                {renderContent()}
+                            </div>
                         </div>
                     </div>
                 </div>
