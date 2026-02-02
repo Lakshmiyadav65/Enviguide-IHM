@@ -1,4 +1,4 @@
-import type { Vessel, DashboardStats, SOCAlert, PurchaseOrder } from '../types/index';
+import type { Vessel, DashboardStats, SOCAlert, PurchaseOrder, Material, Deck } from '../types/index';
 
 // Mock Vessels Data
 export const mockVessels: Vessel[] = [
@@ -199,5 +199,127 @@ export const mockPurchaseOrders: PurchaseOrder[] = [
         hmRed: 45,
         hmGreen: 444,
         status: 'non-responsive'
+    }
+];
+
+export const mockMaterials: Material[] = [
+    {
+        id: 'HAZ-901-ASB',
+        name: 'Asbestos Gasket',
+        ihmPart: 'PART I',
+        category: 'hazard',
+        completion: 65,
+        status: 'In Progress',
+        thresholdMessage: 'ABOVE LIMIT (0.1%)',
+        thresholdType: 'limit-exceeded',
+        zone: 'Engine Room',
+        thresholdValue: 0.12
+    },
+    {
+        id: 'HAZ-442-PB',
+        name: 'Lead-based Paint',
+        ihmPart: 'PART I',
+        category: 'safe',
+        completion: 100,
+        status: 'Certified',
+        thresholdMessage: 'Below Limit',
+        thresholdType: 'safe',
+        zone: 'Hull',
+        thresholdValue: 0.02
+    },
+    {
+        id: 'HAZ-105-PCB',
+        name: 'PCBs (Lubricants)',
+        ihmPart: 'PART II',
+        category: 'warning',
+        completion: 20,
+        status: 'Pending Survey',
+        thresholdMessage: 'Trace Amount',
+        thresholdType: 'trace',
+        zone: 'Pump Room',
+        thresholdValue: 0.05
+    },
+    {
+        id: 'HAZ-202-ODS',
+        name: 'Ozone Depleting Substances',
+        ihmPart: 'PART I',
+        category: 'hazard',
+        completion: 45,
+        status: 'Review Needed',
+        thresholdMessage: 'POTENTIAL RISK',
+        thresholdType: 'limit-exceeded',
+        zone: 'Accomodation',
+        thresholdValue: 0.8
+    },
+    {
+        id: 'HAZ-550-PFOS',
+        name: 'PFOS Connections',
+        ihmPart: 'PART I',
+        category: 'warning',
+        completion: 80,
+        status: 'Documentation',
+        thresholdMessage: 'Within Range',
+        thresholdType: 'trace',
+        zone: 'Deck',
+        thresholdValue: 0.08
+    },
+    {
+        id: 'MAT-101-GEN',
+        name: 'General Insulation',
+        ihmPart: 'PART III',
+        category: 'safe',
+        completion: 100,
+        status: 'Verified',
+        thresholdMessage: 'Non-Hazardous',
+        thresholdType: 'safe',
+        zone: 'Engine Room',
+        thresholdValue: 0.0
+    },
+    { id: 'HAZ-108-HG', name: 'Mercury Compounds', ihmPart: 'PART I', category: 'hazard', completion: 12, status: 'In Progress', thresholdMessage: 'Detected', thresholdType: 'limit-exceeded', zone: 'Engine Room', thresholdValue: 0.9 },
+    { id: 'HAZ-215-CAD', name: 'Cadmium Plating', ihmPart: 'PART I', category: 'warning', completion: 55, status: 'Review Needed', thresholdMessage: 'Near Limit', thresholdType: 'trace', zone: 'Hull', thresholdValue: 0.09 },
+    { id: 'HAZ-303-CR6', name: 'Hexavalent Chromium', ihmPart: 'PART I', category: 'safe', completion: 100, status: 'Certified', thresholdMessage: 'Below Limit', thresholdType: 'safe', zone: 'Deck', thresholdValue: 0.01 },
+    { id: 'HAZ-412-PBB', name: 'Polybrominated Biphenyls', ihmPart: 'PART I', category: 'hazard', completion: 0, status: 'Pending Survey', thresholdMessage: 'Unknown', thresholdType: 'limit-exceeded', zone: 'Accomodation', thresholdValue: 0.5 },
+    { id: 'HAZ-612-PB', name: 'Lead Storage Battery', ihmPart: 'PART II', category: 'hazard', completion: 30, status: 'In Progress', thresholdMessage: '150mg/kg', thresholdType: 'limit-exceeded', zone: 'Engine Room', thresholdValue: 0.15 },
+    { id: 'MAT-205-PVC', name: 'Polyvinyl Chloride', ihmPart: 'PART III', category: 'safe', completion: 100, status: 'Certified', thresholdMessage: 'Non-Hazardous', thresholdType: 'safe', zone: 'Accomodation', thresholdValue: 0.0 },
+    { id: 'HAZ-711-TBT', name: 'Tributyltin Compounds', ihmPart: 'PART I', category: 'hazard', completion: 10, status: 'Review Needed', thresholdMessage: 'Detected', thresholdType: 'limit-exceeded', zone: 'Hull', thresholdValue: 0.88 },
+    { id: 'HAZ-812-CN', name: 'Cyanide Compounds', ihmPart: 'PART II', category: 'warning', completion: 45, status: 'In Progress', thresholdMessage: 'Trace', thresholdType: 'trace', zone: 'Pump Room', thresholdValue: 0.04 },
+    { id: 'MAT-312-STL', name: 'Stainless Steel Fitting', ihmPart: 'PART III', category: 'safe', completion: 100, status: 'Verified', thresholdMessage: 'Safe', thresholdType: 'safe', zone: 'Deck', thresholdValue: 0.0 },
+    { id: 'HAZ-915-RAD', name: 'Radioactive Substances', ihmPart: 'PART I', category: 'hazard', completion: 5, status: 'Critical', thresholdMessage: 'HIGH LEVEL', thresholdType: 'limit-exceeded', zone: 'Engine Room', thresholdValue: 1.0 },
+    { id: 'HAZ-101-SCCP', name: 'SCCPs (Short Chain Chlorinated Paraffins)', ihmPart: 'PART I', category: 'warning', completion: 60, status: 'Verified', thresholdMessage: '0.01%', thresholdType: 'trace', zone: 'Deck', thresholdValue: 0.01 },
+    { id: 'HAZ-122-HBCDD', name: 'HBCDD (Polystyrene)', ihmPart: 'PART I', category: 'hazard', completion: 25, status: 'In Progress', thresholdMessage: 'Detected', thresholdType: 'limit-exceeded', zone: 'Accomodation', thresholdValue: 0.45 },
+    { id: 'MAT-442-OP', name: 'Optical Cable', ihmPart: 'PART III', category: 'safe', completion: 100, status: 'Certified', thresholdMessage: 'Safe', thresholdType: 'safe', zone: 'Bridge', thresholdValue: 0.0 },
+    { id: 'HAZ-552-FR', name: 'Fire Retardant Panels', ihmPart: 'PART I', category: 'warning', completion: 75, status: 'Verified', thresholdMessage: 'Trace', thresholdType: 'trace', zone: 'Accomodation', thresholdValue: 0.05 }
+];
+
+export const mockDecks: Deck[] = [
+    {
+        id: 'deck-001',
+        vesselId: '1',
+        name: 'Navigation Bridge Deck',
+        level: 5,
+        gaPlanUrl: 'https://images.unsplash.com/photo-1597423244036-ef5020e83f3c?auto=format&fit=crop&q=80&w=1600',
+        materials: []
+    },
+    {
+        id: 'deck-002',
+        vesselId: '1',
+        name: 'Upper Deck',
+        level: 4,
+        gaPlanUrl: 'https://images.unsplash.com/photo-1581093588402-4857474d5f04?auto=format&fit=crop&q=80&w=1600',
+        materials: []
+    },
+    {
+        id: 'deck-003',
+        vesselId: '1',
+        name: 'Main Deck',
+        level: 3,
+        materials: []
+    },
+    {
+        id: 'deck-004',
+        vesselId: '1',
+        name: 'Engine Room Top',
+        level: 2,
+        materials: []
     }
 ];

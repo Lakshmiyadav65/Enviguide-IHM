@@ -3,6 +3,7 @@ import { useState } from 'react';
 import './Header.css';
 
 interface HeaderProps {
+    title?: string;
     userName?: string;
     userRole?: string;
     selectedVessel?: {
@@ -13,6 +14,7 @@ interface HeaderProps {
 }
 
 export default function Header({
+    title,
     userName = 'John Administrator',
     userRole = 'Admin'
 }: HeaderProps) {
@@ -69,6 +71,9 @@ export default function Header({
             {showNotifications && (
                 <div className="notification-backdrop" onClick={() => setShowNotifications(false)} />
             )}
+            <div className="header-left">
+                {title && <h1 className="header-title-main">{title}</h1>}
+            </div>
             <div className="header-center">
                 <div className="search-bar">
                     <Search size={20} className="search-icon" />
@@ -93,7 +98,7 @@ export default function Header({
                     </button>
 
                     {showNotifications && (
-                        <div className="notification-card-overlay">
+                        <div className={`notification-card-overlay ${notifList.length === 0 ? 'is-empty' : ''}`}>
                             <div className="notification-card-header">
                                 <div className="header-title-row">
                                     <h3 className="notification-card-title">Recent Notifications</h3>

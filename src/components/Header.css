@@ -41,6 +41,15 @@
     flex: 0 0 auto;
 }
 
+.header-title-main {
+    font-size: 18px;
+    font-weight: 800;
+    color: #1E293B;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
 .vessel-selector-card {
     display: flex;
     align-items: center;
@@ -137,8 +146,13 @@
     justify-content: flex-end;
     gap: 20px;
     padding-right: 40px;
-    z-index: 10;
     position: relative;
+    transition: z-index 0.3s;
+    z-index: 10;
+}
+
+.dashboard-header.notifications-open .header-right {
+    z-index: 2000;
 }
 
 .notification-btn {
@@ -224,7 +238,7 @@
     position: relative;
     display: flex;
     align-items: center;
-    z-index: 15;
+    z-index: 1500;
 }
 
 /* Highlight the button itself when notifications are open */
@@ -241,26 +255,55 @@
     /* Cover sidebar area */
     right: 0;
     bottom: 0;
-    background: rgba(15, 23, 42, 0.3);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    z-index: 5;
-    /* Above header-background (1) and sidebar (1200, since parent is 1300) */
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 1400;
     animation: fadeIn 0.3s ease;
+}
+
+.dashboard-header.notifications-open .header-left,
+.dashboard-header.notifications-open .header-center,
+.dashboard-header.notifications-open .user-profile-container {
+    filter: blur(6px);
+    /* Stronger blur for better focus */
+    opacity: 0.2;
+    pointer-events: none;
+    transition: all 0.3s ease;
+}
+
+/* Ensure only the notification items stay sharp and clear on top */
+.dashboard-header.notifications-open .notification-container {
+    filter: none;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 2200;
+    /* Increased to ensure it wins */
 }
 
 .notification-card-overlay {
     position: absolute;
     top: calc(100% + 15px);
     right: 0;
-    width: 340px;
+    width: 400px;
+    /* Constant width as requested */
     background: #F4F7F9 !important;
     border-radius: 18px;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
-    z-index: 100;
+    z-index: 2100;
     overflow: hidden;
     animation: slideDownFade 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     border: 1px solid #E2E8F0;
+    min-height: 300px;
+    /* 20% taller than empty (250 * 1.2 = 300) */
+    display: flex;
+    flex-direction: column;
+}
+
+.notification-card-overlay.is-empty {
+    width: 400px;
+    /* Constant width */
+    min-height: 250px;
 }
 
 .notification-card-header {
@@ -310,7 +353,7 @@
 }
 
 .notification-card-content {
-    max-height: 380px;
+    max-height: 250px;
     /* Reduced size */
     overflow-y: auto;
     padding: 0;
@@ -333,13 +376,16 @@
 
 /* Empty State */
 .no-notifications {
-    padding: 30px 20px;
+    padding: 45px 20px;
+    /* Increased padding to hit the 250px min-height target */
     text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 12px;
     background: #F4F7F9;
+    flex: 1;
+    justify-content: center;
 }
 
 .no-notifications-icon-wrapper {

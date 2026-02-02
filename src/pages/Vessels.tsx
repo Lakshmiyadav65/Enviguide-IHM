@@ -1,14 +1,16 @@
 import { useState, useMemo, useRef } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import {
-    Search, Plus, Layers, FileText, ShoppingCart,
+    Search, Plus, Filter, Layers, FileText, ShoppingCart,
     BarChart2, FileCheck, Check, Edit2, X,
-    FolderOpen, Ship as ShipIcon, Pin, Upload, Eye, Trash2, Calendar, ChevronDown,
+    FolderOpen, Ship as ShipIcon, Pin, Upload, Eye, Trash2, Calendar, ChevronDown, ChevronUp,
     Download, AlertTriangle, ExternalLink, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import './Vessels.css';
+import MaterialsRecord from './MaterialsRecord';
+import PurchaseOrderView from './PurchaseOrderView';
 
 interface VesselData {
     name: string;
@@ -157,6 +159,35 @@ const INITIAL_VESSELS: VesselData[] = [
         socReference: 'SOC-556',
         image: 'https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&q=80&w=800'
     },
+    {
+        name: 'MV NORTH STAR',
+        shipOwner: 'NORTHERN SHIPPING',
+        fleet: 'Arctic',
+        subFleet: 'North',
+        vesselClass: 'DNV',
+        imoNo: '9876543',
+        registrationNumber: 'REG-999',
+        deliveryDate: '2022-11-30',
+        deadweightTonnage: '35000',
+        portOfRegistry: 'Oslo',
+        socExpiryDate: '2032-11-30',
+        type: 'Ice Breaker',
+        shipManager: 'ARCTIC MGMT',
+        registeredOwner: 'NORTH STAR AS',
+        flagState: 'Norway',
+        vesselIhmClass: 'DNV',
+        classIdNo: 'CID-999',
+        nameOfYard: 'VARD YARD',
+        keelLaidDate: '2021-01-10',
+        grossTonnage: '25000',
+        teuUnits: '0',
+        ihmReference: 'IHM-NS-01',
+        signalLetters: 'NSTR',
+        buildersUniqueId: 'B-STAR-1',
+        mdStandard: 'IHM v2',
+        socReference: 'SOC-NS-01',
+        image: 'https://images.unsplash.com/photo-1544441893-675973e31985?auto=format&fit=crop&q=80&w=800'
+    },
 ];
 
 const EMPTY_FORM: VesselData = {
@@ -179,9 +210,10 @@ export default function Vessels() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [isFilterExpanded, setIsFilterExpanded] = useState(true);
 
     const [vesselDocuments, setVesselDocuments] = useState<{ [key: string]: any[] }>({
-        'MV Ocean Pioneer': Array.from({ length: 28 }, (_, i) => ({
+        'MV Ocean Pioneer': Array.from({ length: 45 }, (_, i) => ({
             id: i + 1,
             name: [
                 'International Air Pollution Prevention Cert',
@@ -191,15 +223,19 @@ export default function Vessels() {
                 'Safety Equipment Inventory',
                 'Load Line Certificate',
                 'Crew List Declaration',
-                'Waste Management Plan'
-            ][i % 8] + (i > 7 ? ` - Part ${Math.floor(i / 8) + 1}` : ''),
-            type: ['Certificate', 'Manual', 'Drawing', 'Declaration', 'Certificate', 'Certificate', 'Declaration', 'Manual'][i % 8],
+                'Waste Management Plan',
+                'Emergency Towing Booklet',
+                'Ship Energy Efficiency Management Plan',
+                'SOPEP Manual',
+                'Stability Booklet'
+            ][i % 12] + (i > 11 ? ` - Part ${Math.floor(i / 12) + 1}` : ''),
+            type: ['Certificate', 'Manual', 'Drawing', 'Declaration', 'Certificate', 'Certificate', 'Declaration', 'Manual', 'Manual', 'Manual', 'Manual', 'Manual'][i % 12],
             uploadedBy: i % 2 === 0 ? 'John Admin' : 'M. Smith',
             date: 'Oct 12, 2023',
-            status: i % 5 === 0 ? 'Expiring' : 'Active',
+            status: i % 7 === 0 ? 'Expiring' : 'Active',
             initials: i % 2 === 0 ? 'JA' : 'MS'
         })),
-        'ACOSTA': Array.from({ length: 15 }, (_, i) => ({
+        'ACOSTA': Array.from({ length: 32 }, (_, i) => ({
             id: i + 1,
             name: [
                 'Registry Certificate Panama',
@@ -209,15 +245,19 @@ export default function Vessels() {
                 'Ship Security Plan',
                 'Navigation Equipment Certificate',
                 'Radio License Certificate',
-                'Tonnage Certificate'
-            ][i % 8] + (i > 7 ? ` - Rev ${Math.floor(i / 8) + 1}` : ''),
-            type: ['Certificate', 'Manual', 'Manual', 'Certificate', 'Manual', 'Certificate', 'Certificate', 'Certificate'][i % 8],
+                'Tonnage Certificate',
+                'Cargo Securing Manual',
+                'Grain Loading Manual',
+                'Safety Management System',
+                'Technical Specification GA'
+            ][i % 12] + (i > 11 ? ` - Rev ${Math.floor(i / 12) + 1}` : ''),
+            type: ['Certificate', 'Manual', 'Manual', 'Certificate', 'Manual', 'Certificate', 'Certificate', 'Certificate', 'Manual', 'Manual', 'Manual', 'Drawing'][i % 12],
             uploadedBy: i % 3 === 0 ? 'Admin' : i % 3 === 1 ? 'J. Smith' : 'M. Brown',
             date: ['Jan 10, 2024', 'Feb 15, 2024', 'Mar 20, 2024'][i % 3],
-            status: i % 6 === 0 ? 'Expiring' : 'Active',
+            status: i % 8 === 0 ? 'Expiring' : 'Active',
             initials: i % 3 === 0 ? 'AD' : i % 3 === 1 ? 'JS' : 'MB'
         })),
-        'AFIF': Array.from({ length: 10 }, (_, i) => ({
+        'AFIF': Array.from({ length: 25 }, (_, i) => ({
             id: i + 1,
             name: [
                 'International Oil Pollution Prevention Certificate',
@@ -227,15 +267,17 @@ export default function Vessels() {
                 'Oil Record Book',
                 'Garbage Management Plan',
                 'ISPS Security Certificate',
-                'Class Certificate'
-            ][i % 8] + (i > 7 ? ` - Part ${i - 7}` : ''),
-            type: ['Certificate', 'Certificate', 'Manual', 'Manual', 'Manual', 'Manual', 'Certificate', 'Certificate'][i % 8],
+                'Class Certificate',
+                'Life Saving Appliance Plan',
+                'Engine Log Book'
+            ][i % 10] + (i > 9 ? ` - Vol ${Math.floor(i / 10) + 1}` : ''),
+            type: ['Certificate', 'Certificate', 'Manual', 'Manual', 'Manual', 'Manual', 'Certificate', 'Certificate', 'Drawing', 'Manual'][i % 10],
             uploadedBy: i % 2 === 0 ? 'K. Wilson' : 'R. Davis',
             date: ['Nov 05, 2023', 'Dec 12, 2023'][i % 2],
-            status: i % 4 === 0 ? 'Expiring' : 'Active',
+            status: i % 9 === 0 ? 'Expiring' : 'Active',
             initials: i % 2 === 0 ? 'KW' : 'RD'
         })),
-        'PACIFIC HORIZON': Array.from({ length: 12 }, (_, i) => ({
+        'PACIFIC HORIZON': Array.from({ length: 28 }, (_, i) => ({
             id: i + 1,
             name: [
                 'Continuous Synopsis Record',
@@ -245,13 +287,33 @@ export default function Vessels() {
                 'Emergency Response Procedures',
                 'Maintenance Schedule',
                 'Inspection Reports',
-                'Training Records'
-            ][i % 8] + (i > 7 ? ` - ${2024 - Math.floor(i / 8)}` : ''),
-            type: ['Certificate', 'Certificate', 'Declaration', 'Certificate', 'Manual', 'Manual', 'Drawing', 'Manual'][i % 8],
+                'Training Records',
+                'Shipboard Oil Pollution Emergency Plan',
+                'Medical Chest Certificate'
+            ][i % 10] + (i > 9 ? ` - ${2024 - Math.floor(i / 10)}` : ''),
+            type: ['Certificate', 'Certificate', 'Declaration', 'Certificate', 'Manual', 'Manual', 'Drawing', 'Manual', 'Manual', 'Certificate'][i % 10],
             uploadedBy: i % 3 === 0 ? 'S. Anderson' : i % 3 === 1 ? 'T. Martinez' : 'L. Taylor',
             date: ['Aug 22, 2023', 'Sep 18, 2023', 'Oct 30, 2023'][i % 3],
-            status: i % 5 === 0 ? 'Expiring' : 'Active',
+            status: i % 10 === 0 ? 'Expiring' : 'Active',
             initials: i % 3 === 0 ? 'SA' : i % 3 === 1 ? 'TM' : 'LT'
+        })),
+        'MV NORTH STAR': Array.from({ length: 20 }, (_, i) => ({
+            id: i + 1,
+            name: [
+                'Ice Class Certificate',
+                'Polar Code Compliance Document',
+                'Heated Tank Plan',
+                'Winterization Manual',
+                'Ice Breaker Operational Manual',
+                'Registry Norway',
+                'Safe Manning Polar',
+                'Arctic Navigation Chart List'
+            ][i % 8] + (i > 7 ? ` - Part ${Math.floor(i / 8) + 1}` : ''),
+            type: ['Certificate', 'Certificate', 'Drawing', 'Manual', 'Manual', 'Certificate', 'Certificate', 'Drawing'][i % 8],
+            uploadedBy: i % 2 === 0 ? 'O. Nilsen' : 'E. Johansen',
+            date: 'Dec 05, 2023',
+            status: 'Active',
+            initials: i % 2 === 0 ? 'ON' : 'EJ'
         }))
     });
 
@@ -274,14 +336,6 @@ export default function Vessels() {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const docInputRef = useRef<HTMLInputElement>(null);
-
-    const filteredVessels = useMemo(() => {
-        return vesselList.filter(v =>
-            v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            v.imoNo.includes(searchTerm)
-        );
-    }, [vesselList, searchTerm]);
-
 
 
     const activeVesselData = useMemo(() => {
@@ -622,7 +676,7 @@ export default function Vessels() {
                                         <button className="preview-icon-btn" onClick={() => setSelectedDoc(null)}><X size={20} /></button>
                                     </div>
                                 </div>
-                                <div className="preview-content">
+                                <div className="preview-panel-content">
                                     <div className="preview-document-card fit-content">
                                         <div className="doc-header-visual">
                                             <div className={`doc-visual-icon ${selectedDoc.type.toLowerCase()}`}>
@@ -763,12 +817,22 @@ export default function Vessels() {
             );
         }
 
+        if (activeTab === 'purchase') {
+            const activeVessel = vesselList.find(v => v.name === activeVesselName);
+            return <PurchaseOrderView vesselName={activeVesselName} imo={activeVessel?.imoNo || ''} />;
+        }
+
+        if (activeTab === 'materials') {
+            return <MaterialsRecord vesselName={activeVesselName} />;
+        }
+
         return (
             <div className="form-scroll-area">
-                <div className="vessel-form-card premium-shadow">
-                    <form onSubmit={handleSave}>
-                        <div className="form-grid">
-                            <div className="form-col">
+                <div className="vessel-form-card-premium">
+                    <form onSubmit={handleSave} className="vessel-edit-form-modern">
+                        <div className="form-grid-three-col">
+                            {/* Column 1 */}
+                            <div className="form-column">
                                 <FormGroup label="Name" name="name" value={formData.name} onChange={handleInputChange} required readOnly={!isEditing} />
                                 <FormGroup label="Ship Owner" name="shipOwner" value={formData.shipOwner} onChange={handleInputChange} required readOnly={!isEditing} />
                                 <FormGroup label="Fleet" name="fleet" value={formData.fleet} onChange={handleInputChange} readOnly={!isEditing} />
@@ -782,7 +846,8 @@ export default function Vessels() {
                                 <DateGroup label="SOC Expiry Date" name="socExpiryDate" value={formData.socExpiryDate} onChange={handleInputChange} readOnly={!isEditing} />
                             </div>
 
-                            <div className="form-col">
+                            {/* Column 2 */}
+                            <div className="form-column">
                                 <FormGroup label="Type" name="type" value={formData.type} onChange={handleInputChange} readOnly={!isEditing} />
                                 <FormGroup label="Ship Manager" name="shipManager" value={formData.shipManager} onChange={handleInputChange} readOnly={!isEditing} />
                                 <FormGroup label="Registered Owner" name="registeredOwner" value={formData.registeredOwner} onChange={handleInputChange} readOnly={!isEditing} />
@@ -796,105 +861,55 @@ export default function Vessels() {
                                 <FormGroup label="Initial IHM Reference" name="ihmReference" value={formData.ihmReference} onChange={handleInputChange} readOnly={!isEditing} />
                             </div>
 
-                            <div className="form-col">
-                                <div className="form-group">
+                            {/* Column 3 */}
+                            <div className="form-column">
+                                <div className="image-upload-modern">
                                     <label>Choose file</label>
-                                    <div
-                                        className={`file-upload-container ${isDraggingFile ? 'dragging' : ''} ${!isEditing ? 'readonly' : ''}`}
-                                        onDragOver={handleDragOver}
-                                        onDragLeave={handleDragLeave}
-                                        onDrop={handleDrop}
-                                    >
-                                        <div className="file-preview-box">
-                                            <img src={formData.image} alt="File Preview" />
-                                        </div>
-                                        <input
-                                            type="file"
-                                            ref={fileInputRef}
-                                            style={{ display: 'none' }}
-                                            onChange={handleFileChange}
-                                            disabled={!isEditing}
-                                        />
-                                        <div
-                                            className={`choose-file-btn-alt ${!isEditing ? 'disabled' : ''}`}
-                                            onClick={isEditing ? triggerFileSelect : undefined}
-                                        >
-                                            Choose file
-                                        </div>
-                                        <p className="file-limit-text">Image should not exceed 10MB</p>
+                                    <div className="image-preview-container-modern">
+                                        <img src={formData.image} alt="Vessel preview" />
+                                        {isEditing && (
+                                            <div className="upload-overlay-modern" onClick={triggerFileSelect}>
+                                                <Plus size={24} />
+                                                <span>Choose file</span>
+                                            </div>
+                                        )}
                                     </div>
+                                    {isEditing && <span className="upload-hint">Image should not exceed 10MB</span>}
+                                    <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" style={{ display: 'none' }} />
                                 </div>
+
                                 <FormGroup label="Signal Letters" name="signalLetters" value={formData.signalLetters} onChange={handleInputChange} readOnly={!isEditing} />
                                 <FormGroup label="Builders unique id of ship" name="buildersUniqueId" value={formData.buildersUniqueId} onChange={handleInputChange} readOnly={!isEditing} />
-                                <div className="form-group">
-                                    <label>MD Standard</label>
-                                    <div className="radio-group-modern">
-                                        {['IMO', 'IHM Method', 'Nil'].map(standard => (
-                                            <label key={standard} className={`radio-item-modern ${!isEditing ? 'disabled' : ''}`}>
-                                                <input
-                                                    type="radio"
-                                                    name="mdStandard"
-                                                    checked={formData.mdStandard === standard}
-                                                    onChange={isEditing ? () => setFormData(prev => ({ ...prev, mdStandard: standard })) : undefined}
-                                                    disabled={!isEditing}
-                                                />
-                                                <span>{standard}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
+
+                                <RadioGroup
+                                    label="MD Standard"
+                                    name="mdStandard"
+                                    options={['IMO', 'IHM Method', 'Nil']}
+                                    value={formData.mdStandard}
+                                    onChange={handleInputChange}
+                                    readOnly={!isEditing}
+                                />
+
                                 <FormGroup label="SOC Reference" name="socReference" value={formData.socReference} onChange={handleInputChange} readOnly={!isEditing} />
                             </div>
                         </div>
 
-                        <div className="form-actions-circular">
-                            {isAdding ? (
-                                <div className="edit-actions-group">
-                                    <button
-                                        type="button"
-                                        className="action-btn-text cancel-btn"
-                                        onClick={() => handleVesselSelect(vesselList[0])}
-                                    >
+                        <div className="vessel-form-actions-premium">
+                            {!isEditing ? (
+                                <button type="button" className="edit-btn-premium" onClick={() => setIsEditing(true)}>
+                                    <Edit2 size={18} />
+                                    <span>EDIT DETAILS</span>
+                                </button>
+                            ) : (
+                                <div className="actions-group-premium">
+                                    <button type="button" className="cancel-btn-premium" onClick={() => { setIsEditing(false); setIsAdding(false); setFormData(activeVesselData || INITIAL_VESSELS[0]); }}>
                                         CANCEL
                                     </button>
-                                    <button type="submit" className="action-btn-text save-btn">
-                                        SAVE
+                                    <button type="submit" className="save-btn-premium">
+                                        <Check size={18} />
+                                        SAVE CHANGES
                                     </button>
                                 </div>
-                            ) : (
-                                <>
-                                    {!isEditing ? (
-                                        <button
-                                            type="button"
-                                            className="action-btn-text edit-btn-premium"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                setIsEditing(true);
-                                            }}
-                                        >
-                                            <Edit2 size={16} />
-                                            EDIT
-                                        </button>
-                                    ) : (
-                                        <div className="edit-actions-group">
-                                            <button
-                                                type="button"
-                                                className="action-btn-text cancel-btn"
-                                                onClick={() => {
-                                                    setIsEditing(false);
-                                                    const vessel = vesselList.find(v => v.name === activeVesselName) || vesselList[0];
-                                                    setFormData(vessel);
-                                                }}
-                                            >
-                                                CANCEL
-                                            </button>
-                                            <button type="submit" className="action-btn-text save-btn">
-                                                SAVE CHANGES
-                                            </button>
-                                        </div>
-                                    )}
-                                </>
                             )}
                         </div>
                     </form>
@@ -904,16 +919,16 @@ export default function Vessels() {
     };
 
     return (
-        <div className="dashboard-wrapper vessels-page-container">
+        <div className="vessels-page-container">
             <Sidebar />
-            <main className="main-content vessel-page-main">
-                <Header />
-                <div className="vessels-wrapper">
-                    <div className="vessels-main-header">
-                        {/* Full-width Tabs Header */}
-                        <nav className="content-tabs-inline">
-                            <div className="tabs-container-inline">
-                                {tabs.map(tab => (
+            <main className="vessel-page-main">
+                <Header title="FLEET MANAGEMENT" />
+
+                <div className="vessels-layout-wrapper">
+                    <div className="vessels-top-nav">
+                        <nav className="fleet-tabs-inline">
+                            <div className="tabs-scroll-area">
+                                {tabs.map((tab) => (
                                     <div
                                         key={tab.id}
                                         className={`tab-item-inline ${activeTab === tab.id ? 'active' : ''}`}
@@ -929,48 +944,164 @@ export default function Vessels() {
 
                     <div className="vessels-content-layout">
                         {/* Secondary Sidebar - Hidden on Decks & Documents tabs */}
-                        {activeTab !== 'decks' && activeTab !== 'documents' && (
+                        {activeTab !== 'decks' && activeTab !== 'documents' && activeTab !== 'materials' && (
                             <aside className="secondary-sidebar">
-                                <div className="vessel-search-container">
-                                    <div className="vessel-search-box">
-                                        <Search size={16} color="#94A3B8" />
-                                        <input
-                                            type="text"
-                                            placeholder="Search vessels..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
+                                {activeTab === 'purchase' ? (
+                                    <>
+                                        <div className="sidebar-filters-wrapper">
+                                            <div className="sticky-filter-section">
+                                                <div className="vessel-sidebar-filter card-style" onClick={() => setIsFilterExpanded(!isFilterExpanded)}>
+                                                    <Filter size={14} />
+                                                    <span>FILTER</span>
+                                                    {isFilterExpanded ? <ChevronUp size={14} style={{ marginLeft: 'auto', color: '#64748b' }} /> : <ChevronDown size={14} style={{ marginLeft: 'auto', color: '#64748b' }} />}
+                                                </div>
 
-                                <div className="vessel-list">
-                                    {filteredVessels.map((vessel) => (
-                                        <div
-                                            key={`${vessel.name}-${vessel.imoNo}`}
-                                            className={`vessel-item ${activeVesselName === vessel.name ? 'active' : ''}`}
-                                            onClick={() => handleVesselSelect(vessel)}
-                                        >
-                                            <div className="vessel-status-dot v-active"></div>
-                                            <div className="vessel-info-block">
-                                                <h4>{vessel.name}</h4>
-                                                <p>IMO {vessel.imoNo}</p>
+                                                {isFilterExpanded && (
+                                                    <div className="sidebar-filter-content-direct">
+                                                        <div className="filter-section">
+                                                            <div className="filter-section-title">SUPPLIER</div>
+                                                            <div className="filter-checkbox-group">
+                                                                <label className="filter-checkbox-item">
+                                                                    <input type="checkbox" />
+                                                                    <span>RMS Marine Service</span>
+                                                                </label>
+                                                                <label className="filter-checkbox-item">
+                                                                    <input type="checkbox" />
+                                                                    <span>Jotun Cosco</span>
+                                                                </label>
+                                                                <label className="filter-checkbox-item">
+                                                                    <input type="checkbox" />
+                                                                    <span>STOP AEVE</span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="filter-section">
+                                                            <div className="filter-section-title">DATE RANGE</div>
+                                                            <div className="filter-date-inputs">
+                                                                <div className="filter-date-field">
+                                                                    <label>FROM</label>
+                                                                    <div className="date-input-with-icon">
+                                                                        <input type="date" defaultValue="2023-10-24" />
+                                                                        <Calendar size={14} className="calendar-icon-overlay" />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="filter-date-field">
+                                                                    <label>TO</label>
+                                                                    <div className="date-input-with-icon">
+                                                                        <input type="date" />
+                                                                        <Calendar size={14} className="calendar-icon-overlay" />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="filter-section">
+                                                            <div className="filter-section-title">COMPLIANCE STATUS</div>
+                                                            <div className="filter-radio-group">
+                                                                <label className="filter-radio-item">
+                                                                    <input type="radio" name="compliance" defaultChecked />
+                                                                    <span>All Statuses</span>
+                                                                </label>
+                                                                <label className="filter-radio-item">
+                                                                    <input type="radio" name="compliance" />
+                                                                    <span>Verified</span>
+                                                                </label>
+                                                                <label className="filter-radio-item">
+                                                                    <input type="radio" name="compliance" />
+                                                                    <span>Not Verified</span>
+                                                                </label>
+                                                                <label className="filter-radio-item">
+                                                                    <input type="radio" name="compliance" />
+                                                                    <span>MD Pending</span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                    ))}
-                                </div>
 
-                                <div className="sidebar-footer">
-                                    <button className="add-vessel-btn-large" onClick={handleAddClick}>
-                                        <Plus size={20} />
-                                        Add Vessel
-                                    </button>
-                                </div>
+                                        <div className="sidebar-dark-content-area" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                                            <div className="vessel-search-container dark-mode" style={{ paddingTop: '20px' }}>
+                                                <div className="vessel-search-box light">
+                                                    <Search size={16} color="#94A3B8" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search vessels..."
+                                                        value={searchTerm}
+                                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="vessel-list dark-mode">
+                                                {vesselList.filter(v =>
+                                                    v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                    v.imoNo.includes(searchTerm)
+                                                ).map((vessel) => (
+                                                    <div
+                                                        key={`${vessel.name}-${vessel.imoNo}`}
+                                                        className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
+                                                        onClick={() => handleVesselSelect(vessel)}
+                                                    >
+                                                        <div className="vessel-status-dot v-active"></div>
+                                                        <div className="vessel-info-block">
+                                                            <h4>{vessel.name}</h4>
+                                                            <p>IMO {vessel.imoNo}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="vessel-search-container light-mode" style={{ marginTop: '20px' }}>
+                                            <div className="vessel-search-box light">
+                                                <Search size={16} color="#94A3B8" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search vessels..."
+                                                    value={searchTerm}
+                                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="vessel-list light-mode">
+                                            {vesselList.filter(v =>
+                                                v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                v.imoNo.includes(searchTerm)
+                                            ).map((vessel) => (
+                                                <div
+                                                    key={`${vessel.name}-${vessel.imoNo}`}
+                                                    className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
+                                                    onClick={() => handleVesselSelect(vessel)}
+                                                >
+                                                    <div className="vessel-status-dot v-active"></div>
+                                                    <div className="vessel-info-block">
+                                                        <h4>{vessel.name}</h4>
+                                                        <p>IMO {vessel.imoNo}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="sidebar-footer dark-bg">
+                                            <button className="add-vessel-btn-large" onClick={handleAddClick}>
+                                                <Plus size={20} />
+                                                Add Vessel
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
                             </aside>
                         )}
 
                         {/* Main Section */}
                         <div className="vessels-main">
-                            <div className={`vessel-tab-content ${activeTab === 'decks' ? 'no-scroll' : ''}`}>
+                            <div className={`vessel-tab-content ${activeTab === 'purchase' ? 'no-scroll' : ''}`}>
                                 {renderContent()}
                             </div>
                         </div>
@@ -989,35 +1120,58 @@ export default function Vessels() {
 
 // Helper Components
 const FormGroup = ({ label, name, value, onChange, required, readOnly }: { label: string, name: string, value: string, onChange: (e: any) => void, required?: boolean, readOnly?: boolean }) => (
-    <div className="form-group">
+    <div className="form-group-modern">
         <label>{label} {required && <span className="required">*</span>}</label>
         <input
             type="text"
             name={name}
-            className={`form-control ${readOnly ? 'read-only' : ''}`}
+            className={`form-control-modern ${readOnly ? 'read-only' : ''}`}
             value={value}
             onChange={onChange}
             readOnly={readOnly}
+            placeholder={`Enter ${label.toLowerCase()}`}
         />
     </div>
 );
 
 const DateGroup = ({ label, name, value, onChange, readOnly }: { label: string, name: string, value: string, onChange: (e: any) => void, readOnly?: boolean }) => (
-    <div className="form-group">
+    <div className="form-group-modern">
         <label>{label}</label>
-        <div className="date-input-wrapper">
+        <div className="date-input-wrapper-modern">
             <input
                 type="date"
                 name={name}
-                className={`form-control ${readOnly ? 'read-only' : ''}`}
+                className={`form-control-modern ${readOnly ? 'read-only' : ''}`}
                 value={value}
                 onChange={onChange}
                 onKeyDown={(e) => e.preventDefault()}
                 onClick={(e) => !readOnly && (e.target as HTMLInputElement).showPicker?.()}
                 style={{ cursor: readOnly ? 'default' : 'pointer' }}
                 readOnly={readOnly}
-                required
             />
+            <Calendar className="date-icon-modern" size={16} />
+        </div>
+    </div>
+);
+
+const RadioGroup = ({ label, name, options, value, onChange, readOnly }: { label: string, name: string, options: string[], value: string, onChange: (e: any) => void, readOnly?: boolean }) => (
+    <div className="form-group-modern">
+        <label>{label}</label>
+        <div className="radio-group-container">
+            {options.map(opt => (
+                <label key={opt} className={`radio-option ${readOnly ? 'disabled' : ''}`}>
+                    <input
+                        type="radio"
+                        name={name}
+                        value={opt}
+                        checked={value === opt}
+                        onChange={onChange}
+                        disabled={readOnly}
+                    />
+                    <span className="radio-custom"></span>
+                    <span className="radio-text">{opt}</span>
+                </label>
+            ))}
         </div>
     </div>
 );

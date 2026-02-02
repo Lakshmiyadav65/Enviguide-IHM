@@ -61,16 +61,25 @@ export interface PurchaseOrder {
 export interface Material {
     id: string;
     name: string;
-    vesselId: string;
-    ihmPart: 'I' | 'II' | 'III';
+    vesselId?: string; // Optional for mock data flexibility
+    ihmPart: string; // Changed to string to match 'PART I', 'PART II' usage or mapping
+    category: 'hazard' | 'safe' | 'warning';
+    completion: number;
+    status: string; // Generalized status
+    thresholdMessage?: string;
+    thresholdType?: 'limit-exceeded' | 'safe' | 'trace';
+    thresholdValue?: number;
+    zone?: string;
+    deckCoordinates?: { x: number; y: number };
+
+    // Legacy/Back-end fields (keeping them optional/available)
     hazardType?: string;
-    quantity: number;
-    unit: string;
+    quantity?: number;
+    unit?: string;
     deckId?: string;
     compartment?: string;
     equipment?: string;
-    mdStatus: 'pending' | 'received' | 'approved';
-    status: 'active' | 'archived';
+    mdStatus?: 'pending' | 'received' | 'approved';
 }
 
 export interface Deck {
