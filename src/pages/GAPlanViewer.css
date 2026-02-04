@@ -83,11 +83,32 @@
 .viewer-icon-box {
     width: 36px;
     height: 36px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
+    background: #00B0FA;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 176, 250, 0.3);
+}
+
+.viewer-icon-box svg {
+    animation: sailing 3s ease-in-out infinite;
+}
+
+@keyframes sailing {
+
+    0%,
+    100% {
+        transform: translateY(0) rotate(0deg);
+    }
+
+    25% {
+        transform: translateY(-2px) rotate(-5deg);
+    }
+
+    75% {
+        transform: translateY(1px) rotate(5deg);
+    }
 }
 
 .viewer-title-text h3 {

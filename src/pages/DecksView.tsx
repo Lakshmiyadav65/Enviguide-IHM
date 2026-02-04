@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
     Upload,
     Plus,
@@ -11,7 +11,8 @@ import {
     Layers,
     FileText,
     Settings,
-    ExternalLink
+    ExternalLink,
+    X
 } from 'lucide-react';
 import GAPlanViewer from './GAPlanViewer';
 import './DecksView.css';
@@ -35,18 +36,44 @@ interface MappedSection {
 export default function DecksView({ vesselName }: { vesselName: string }) {
     const [uploadedFile, setUploadedFile] = useState<string | null>(null);
     const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [isViewerOpen, setIsViewerOpen] = useState(false);
     const [expandedDeckId, setExpandedDeckId] = useState<string | null>(null);
     const [mappedSections, setMappedSections] = useState<MappedSection[]>([]);
+
+    // Initial state is now empty for all vessels
+    useEffect(() => {
+        // Reset state when vessel changes
+        setUploadedFile(null);
+        setUploadedFileUrl(null);
+        setMappedSections([]);
+    }, [vesselName]);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            setUploadedFile(file.name);
-            const url = URL.createObjectURL(file);
-            setUploadedFileUrl(url);
+            setIsUploading(true);
+            setUploadProgress(0);
+
+            // Simulate upload
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.floor(Math.random() * 15) + 5;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        setIsUploading(false);
+                        setUploadedFile(file.name);
+                        const url = URL.createObjectURL(file);
+                        setUploadedFileUrl(url);
+                    }, 500);
+                }
+                setUploadProgress(progress);
+            }, 300);
         }
     };
 
@@ -58,6 +85,53 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
 
     const toggleExpand = (id: string) => {
         setExpandedDeckId(expandedDeckId === id ? null : id);
+    };
+
+    // Component to show a technical cropped preview of the deck - "Tight Crop"
+    const DeckPreview = ({ rect, fileUrl }: { rect: Rect, fileUrl: string }) => {
+        const containerSize = 56;
+
+        // Use 'contain' logic to fit selection within the 56px square
+        const scaleX = containerSize / rect.width;
+        const scaleY = containerSize / rect.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        // Size of the selection area at this scale
+        const scaledW = rect.width * scale;
+        const scaledH = rect.height * scale;
+
+        return (
+            <div className="deck-technical-preview-outer" style={{
+                width: containerSize,
+                height: containerSize,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#F2F4F7',
+                overflow: 'hidden'
+            }}>
+                <div style={{
+                    width: `${scaledW}px`,
+                    height: `${scaledH}px`,
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}>
+                    <img
+                        src={fileUrl}
+                        alt="Deck Preview"
+                        style={{
+                            position: 'absolute',
+                            left: `${-rect.x * scale}px`,
+                            top: `${-rect.y * scale}px`,
+                            width: `${1000 * scale}px`,
+                            height: 'auto',
+                            maxWidth: 'none',
+                            pointerEvents: 'none'
+                        }}
+                    />
+                </div>
+            </div>
+        );
     };
 
     if (isViewerOpen && uploadedFileUrl) {
@@ -76,17 +150,48 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
         <div className={`decks-view-container ${!uploadedFile ? 'no-scroll' : ''}`}>
             {/* GA Plans Upload Section */}
             <div className="ga-upload-card-refined">
-                {uploadedFile ? (
+                {isUploading ? (
+                    <div className="ga-upload-loading-row">
+                        <div className="ga-upload-label">
+                            <Upload size={18} color="#00B0FA" />
+                            <span>GA Plans Upload</span>
+                        </div>
+                        <div className="ga-progress-container">
+                            <div className="ga-progress-bar-bg">
+                                <div className="ga-progress-bar-fill" style={{ width: `${uploadProgress}%` }}></div>
+                                <div className="ga-progress-text-overlay">
+                                    <span>Uploading: <strong>GA_Plan_Main_Deck.pdf</strong></span>
+                                </div>
+                            </div>
+                            <span className="ga-progress-percentage">{uploadProgress}%</span>
+                        </div>
+                        <div className="ga-upload-extra-actions">
+                            <button className="ga-extra-btn" onClick={() => setIsUploading(false)}><X size={18} /></button>
+                            <button className="ga-extra-btn"><Settings size={18} /></button>
+                            <button className="ga-extra-btn"><ExternalLink size={18} /></button>
+                        </div>
+                    </div>
+                ) : uploadedFile ? (
                     <div className="ga-upload-success-row">
-                        <div className="ga-file-info">
-                            <div className="check-icon-circle">
-                                <CheckCircle size={16} />
+                        <div className="ga-upload-label">
+                            <Upload size={18} color="#00B0FA" />
+                            <span>GA Plans Upload</span>
+                        </div>
+                        <div className="ga-file-info-pill">
+                            <div className="check-icon-circle-mini">
+                                <CheckCircle size={14} />
                             </div>
                             <span className="ga-filename"><strong>{uploadedFile}</strong> Uploaded</span>
                         </div>
-                        <button className="ga-remove-btn" onClick={removeUploadedFile} title="Remove plan">
-                            <Trash2 size={18} />
-                        </button>
+                        <div className="ga-upload-extra-actions">
+                            <button className="ga-remove-btn-plain" onClick={removeUploadedFile} title="Remove plan">
+                                <Trash2 size={18} />
+                            </button>
+                            <button className="ga-extra-btn"><Settings size={18} /></button>
+                            <button className="ga-extra-btn highlight" onClick={() => setIsViewerOpen(true)} title="Open Viewer">
+                                <ExternalLink size={18} />
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <div className="ga-upload-initial-row">
@@ -100,8 +205,7 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                             <Upload size={16} className="dropzone-icon" />
                         </div>
                         <div className="ga-upload-extra-actions">
-                            <button className="ga-extra-btn"><Settings size={18} /></button>
-                            <button className="ga-extra-btn"><ExternalLink size={18} /></button>
+                            {/* Icons removed in initial state per request */}
                         </div>
                     </div>
                 )}
@@ -115,8 +219,8 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                         <span className="deck-count-badge">{mappedSections.length}</span>
                     </div>
                     <button
-                        className={`add-deck-btn ${!uploadedFile ? 'disabled' : ''}`}
-                        disabled={!uploadedFile}
+                        className={`add-deck-btn ${(!uploadedFile || isUploading) ? 'disabled' : ''}`}
+                        disabled={!uploadedFile || isUploading}
                         onClick={() => setIsViewerOpen(true)}
                     >
                         <Plus size={18} />
@@ -125,30 +229,47 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                 </div>
 
                 <div className="decks-list">
-                    {!uploadedFile ? (
+                    {!uploadedFile && !isUploading ? (
                         <div className="no-decks-centered-state-integrated">
                             <div className="deck-empty-visual-canvas">
-                                <div className="deck-blueprint-illustration">
-                                    <div className="blueprint-line h-1"></div>
-                                    <div className="blueprint-line h-2"></div>
-                                    <div className="blueprint-compass">
-                                        <Compass size={40} strokeWidth={1} />
+                                <div className="deck-blueprint-illustration-premium">
+                                    <div className="blueprint-spinner-inner">
+                                        <div className="dual-ring-spinner"></div>
                                     </div>
-                                    <div className="blueprint-line h-3"></div>
-                                    <div className="blueprint-line h-4"></div>
-                                    <div className="plus-floating-circle">
-                                        <Plus size={18} />
+                                    <div className="plus-floating-mini">
+                                        <Plus size={14} />
                                     </div>
                                 </div>
                             </div>
-                            <h4 className="empty-state-title-large">No Active Decks</h4>
+                            <h4 className="empty-state-title-large">No Active Decks for {vesselName}</h4>
                             <p className="empty-state-subtitle-large">
-                                Upload a GA Plan to start mapping your vessel decks and material logs.
+                                Upload a GA Plan for <strong>{vesselName}</strong> to start mapping vessel decks and material logs.
                             </p>
-                            <button className="upload-first-plan-btn-hero" onClick={() => fileInputRef.current?.click()}>
+                            {/* Preparing workspace indicator removed from initial state per request */}
+                            <button className="upload-first-plan-btn-premium" onClick={() => fileInputRef.current?.click()}>
                                 <FileText size={18} />
                                 Upload First Plan
                             </button>
+                        </div>
+                    ) : isUploading ? (
+                        <div className="no-decks-centered-state-integrated">
+                            <div className="deck-empty-visual-canvas">
+                                <div className="deck-blueprint-illustration-premium">
+                                    <div className="blueprint-spinner-inner active">
+                                        <div className="dual-ring-spinner animate"></div>
+                                    </div>
+                                    <div className="plus-floating-mini">
+                                        <Plus size={14} />
+                                    </div>
+                                </div>
+                            </div>
+                            <h4 className="empty-state-title-large">Uploading Plan...</h4>
+                            <p className="empty-state-subtitle-large">
+                                Please wait while we process your GA Plan for mapping.
+                            </p>
+                            <div className="preparing-workspace-indicator active">
+                                PREPARING WORKSPACE...
+                            </div>
                         </div>
                     ) : mappedSections.length === 0 ? (
                         <div className="no-decks-centered-state">
@@ -159,12 +280,9 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                             </div>
                             <h4 className="empty-state-title">No Decks Mapped Yet</h4>
                             <p className="empty-state-subtitle">
-                                You have uploaded the GA Plan. Now select areas on the plan to create decks and material logs.
+                                You have uploaded the GA Plan. Now use the <strong>Viewer tool</strong> to create decks and material logs.
                             </p>
-                            <button className="open-drawing-tool-btn" onClick={() => setIsViewerOpen(true)}>
-                                <Plus size={16} />
-                                Open Drawing Tool to Map Decks
-                            </button>
+                            {/* Open Drawing Tool button removed per request */}
                         </div>
                     ) : (
                         <>
@@ -172,7 +290,11 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                                 <div key={deck.id} className="deck-row-card">
                                     <div className="deck-row-header" onClick={() => toggleExpand(deck.id)}>
                                         <div className="deck-row-icon-box">
-                                            {deck.title.toLowerCase().includes('tank') ? <Layers size={21} /> : <Compass size={21} />}
+                                            {uploadedFileUrl ? (
+                                                <DeckPreview rect={deck.rect} fileUrl={uploadedFileUrl} />
+                                            ) : (
+                                                deck.title.toLowerCase().includes('tank') ? <Layers size={21} /> : <Compass size={21} />
+                                            )}
                                         </div>
                                         <div className="deck-row-main-info">
                                             <h4>{deck.title}</h4>

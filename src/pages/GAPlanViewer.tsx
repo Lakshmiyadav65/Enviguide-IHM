@@ -77,10 +77,11 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
 
         if (activeTool === 'crop') {
             const rect = wrapperRef.current?.getBoundingClientRect();
-            if (rect) {
-                // Important: coordinates are relative to the wrapper which is the 100% zoom reference
-                const x = (e.clientX - rect.left) / (zoom / 100);
-                const y = (e.clientY - rect.top) / (zoom / 100);
+            if (rect && rect.width > 0) {
+                // Use a unified scale factor relative to our target 1000px width
+                const scaleFactor = 1000 / rect.width;
+                const x = (e.clientX - rect.left) * scaleFactor;
+                const y = (e.clientY - rect.top) * scaleFactor;
                 setStartPoint({ x, y });
                 setIsDrawing(true);
                 setCurrentSelection(null);
@@ -100,15 +101,16 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
 
         if (isDrawing && activeTool === 'crop') {
             const rect = wrapperRef.current?.getBoundingClientRect();
-            if (rect) {
-                const currentX = (e.clientX - rect.left) / (zoom / 100);
-                const currentY = (e.clientY - rect.top) / (zoom / 100);
+            if (rect && rect.width > 0) {
+                const scaleFactor = 1000 / rect.width;
+                const currentX = (e.clientX - rect.left) * scaleFactor;
+                const currentY = (e.clientY - rect.top) * scaleFactor;
 
                 setCurrentSelection({
                     x: Math.min(startPoint.x, currentX),
                     y: Math.min(startPoint.y, currentY),
-                    width: Math.abs(currentX - startPoint.x),
-                    height: Math.abs(currentY - startPoint.y)
+                    width: Math.max(1, Math.abs(currentX - startPoint.x)),
+                    height: Math.max(1, Math.abs(currentY - startPoint.y))
                 });
             }
         }
@@ -169,31 +171,38 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
         setActiveTool('crop');
     };
 
-    // Perfect Cropped Thumbnail Logic
+    // Unified Precise Thumbnail Logic - "Perfect Aspect Ratio"
     const CropThumbnail = ({ rect }: { rect: Rect }) => {
-        const containerW = 252;
-        const containerH = 142;
+        const containerW = 252; // Fixed width for sidebar cards
 
-        const IMG_W = 1000;
+        // Calculate the height needed to maintain the exact aspect ratio of the selection
+        const aspectRatio = rect.height / rect.width;
+        const dynamicH = containerW * aspectRatio;
 
-        // Exact fit
-        const scaleX = containerW / rect.width;
-        const scaleY = containerH / rect.height;
-        const scale = Math.min(scaleX, scaleY);
-
-        const tx = -rect.x * scale + (containerW - rect.width * scale) / 2;
-        const ty = -rect.y * scale + (containerH - rect.height * scale) / 2;
+        // The scale is simply container width / selection width
+        const scale = containerW / rect.width;
 
         return (
-            <div className="section-thumbnail-box" style={{ width: containerW, height: containerH }}>
+            <div className="section-thumbnail-box" style={{
+                width: `${containerW}px`,
+                height: `${dynamicH}px`,
+                background: 'white',
+                overflow: 'hidden',
+                position: 'relative',
+                borderRadius: '6px',
+                border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
                 <img
                     src={fileUrl}
                     alt="crop"
-                    className="section-thumb-img-technical"
                     style={{
-                        width: IMG_W,
-                        transform: `translate(${tx}px, ${ty}px) scale(${scale})`,
-                        transformOrigin: '0 0'
+                        position: 'absolute',
+                        left: `${-rect.x * scale}px`,
+                        top: `${-rect.y * scale}px`,
+                        width: `${1000 * scale}px`,
+                        height: 'auto',
+                        maxWidth: 'none',
+                        pointerEvents: 'none'
                     }}
                 />
             </div>
@@ -246,7 +255,6 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                 >
                     <div
                         className="ga-plan-wrapper"
-                        ref={wrapperRef}
                         style={{
                             transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom / 100}) rotate(${rotation}deg)`,
                             transformOrigin: 'center center'
@@ -254,64 +262,69 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                     >
                         <div className="ga-plan-title-overlay">GENERAL ARRANGEMENT</div>
 
-                        {isPdf ? (
-                            <iframe
-                                src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                                title="GA Plan PDF"
-                                className="ga-plan-frame"
-                                style={{ width: '1200px', height: '800px', border: 'none' }}
-                            />
-                        ) : (
-                            <img src={fileUrl} alt="GA Plan" className="ga-plan-image" style={{ width: '1000px' }} />
-                        )}
+                        <div
+                            className="ga-drawing-coordinate-reference"
+                            ref={wrapperRef}
+                            style={{ position: 'relative', width: '1000px' }}
+                        >
+                            {isPdf ? (
+                                <iframe
+                                    src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                                    title="GA Plan PDF"
+                                    className="ga-plan-frame"
+                                    style={{ width: '1000px', height: '700px', border: 'none', display: 'block' }}
+                                />
+                            ) : (
+                                <img src={fileUrl} alt="GA Plan" className="ga-plan-image" style={{ width: '1000px', display: 'block' }} />
+                            )}
 
-                        {/* Mapped Sections mark on drawing */}
-                        {mappedSections.map(section => (
-                            section.isVisible && (
+                            {/* Rest of the marks... */}
+                            {mappedSections.map(section => (
+                                section.isVisible && (
+                                    <div
+                                        key={section.id}
+                                        className="drawn-selection"
+                                        style={{
+                                            left: section.rect.x,
+                                            top: section.rect.y,
+                                            width: section.rect.width,
+                                            height: section.rect.height
+                                        }}
+                                    >
+                                        <div className="selection-tag">{section.title}</div>
+                                    </div>
+                                )
+                            ))}
+
+                            {currentSelection && (
                                 <div
-                                    key={section.id}
-                                    className="drawn-selection"
+                                    className="ga-selection-box"
                                     style={{
-                                        left: section.rect.x,
-                                        top: section.rect.y,
-                                        width: section.rect.width,
-                                        height: section.rect.height
+                                        left: currentSelection.x,
+                                        top: currentSelection.y,
+                                        width: currentSelection.width,
+                                        height: currentSelection.height
                                     }}
                                 >
-                                    <div className="selection-tag">{section.title}</div>
+                                    {!isDrawing && (
+                                        <div className="selection-input-container">
+                                            <input
+                                                type="text"
+                                                placeholder="Enter Title..."
+                                                value={newSelectionTitle}
+                                                onChange={(e) => setNewSelectionTitle(e.target.value)}
+                                                className="selection-input"
+                                                autoFocus
+                                                onKeyDown={(e) => e.key === 'Enter' && addSelection()}
+                                            />
+                                            <button className="input-save-btn" onClick={addSelection}>
+                                                <CheckCircle size={14} />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                            )
-                        ))}
-
-                        {/* Current Selection box */}
-                        {currentSelection && (
-                            <div
-                                className="ga-selection-box"
-                                style={{
-                                    left: currentSelection.x,
-                                    top: currentSelection.y,
-                                    width: currentSelection.width,
-                                    height: currentSelection.height
-                                }}
-                            >
-                                {!isDrawing && (
-                                    <div className="selection-input-container">
-                                        <input
-                                            type="text"
-                                            placeholder="Enter Title..."
-                                            value={newSelectionTitle}
-                                            onChange={(e) => setNewSelectionTitle(e.target.value)}
-                                            className="selection-input"
-                                            autoFocus
-                                            onKeyDown={(e) => e.key === 'Enter' && addSelection()}
-                                        />
-                                        <button className="input-save-btn" onClick={addSelection}>
-                                            <CheckCircle size={14} />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
 
                     {/* Bottom Left Toolbar */}
