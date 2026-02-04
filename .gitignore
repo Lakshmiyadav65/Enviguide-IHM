@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Temporary lock fixes
+public/ga_plan_illustration.png
+public/ga_plan_minimal.png
