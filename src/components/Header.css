@@ -12,8 +12,12 @@
     right: 0;
     z-index: 1300;
     /* Above sidebar 1200 */
-    transition: background 0.3s ease;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     gap: 0;
+}
+
+body:has(.sidebar.collapsed) .dashboard-header {
+    left: 80px;
 }
 
 .header-background {
@@ -353,7 +357,7 @@
 }
 
 .notification-card-content {
-    max-height: 250px;
+    max-height: 275px;
     /* Reduced size */
     overflow-y: auto;
     padding: 0;

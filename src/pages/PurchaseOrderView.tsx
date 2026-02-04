@@ -1,6 +1,6 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { ShoppingCart, Plus, ChevronDown, Info, MoreVertical, X, Upload, Save, Eye, Edit2, Trash2, File, Package, FileCheck, AlertCircle, Check, Filter } from 'lucide-react';
+import { ShoppingCart, Plus, ChevronDown, Info, MoreVertical, X, Upload, Save, Eye, Edit2, Trash2, File, Package, FileCheck, AlertCircle, Check } from 'lucide-react';
 
 import './PurchaseOrderView.css';
 
@@ -197,7 +197,19 @@ const VESSEL_SPECIFIC_POS: Record<string, SupplierPO[]> = {
 };
 
 
-export default function PurchaseOrderView({ vesselName, imo }: { vesselName: string, imo: string }) {
+export default function PurchaseOrderView({
+    vesselName,
+    imo,
+    filterDateFrom = '',
+    filterDateTo = '',
+    filterCompliance = 'All'
+}: {
+    vesselName: string;
+    imo: string;
+    filterDateFrom?: string;
+    filterDateTo?: string;
+    filterCompliance?: string;
+}) {
     const suppliersData = useMemo(() => VESSEL_SPECIFIC_POS[vesselName] || [], [vesselName]);
     const [suppliers, setSuppliers] = useState<SupplierPO[]>(suppliersData);
     const [expandedSuppliers, setExpandedSuppliers] = useState<string[]>([]);
@@ -207,10 +219,7 @@ export default function PurchaseOrderView({ vesselName, imo }: { vesselName: str
     const [showToast, setShowToast] = useState(false);
     const [lastSavedPO, setLastSavedPO] = useState('');
 
-    const [filterDateFrom, setFilterDateFrom] = useState('');
-    const [filterDateTo, setFilterDateTo] = useState('');
-    const [filterCompliance, setFilterCompliance] = useState('All');
-    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    /* Internal filter state removed in favor of props from parent */
 
     useEffect(() => {
         setSuppliers(suppliersData);
@@ -252,20 +261,19 @@ export default function PurchaseOrderView({ vesselName, imo }: { vesselName: str
     }, [suppliers, filterDateFrom, filterDateTo, filterCompliance]);
 
     // Auto-expand/collapse based on filter state
-    // We use a ref to track if we've already auto-expanded during this session of filtering to avoid fighting user toggles
     useEffect(() => {
         const isFiltering = filterDateFrom || filterDateTo || filterCompliance !== 'All';
 
         if (isFiltering) {
             // If we are filtering, expand all found suppliers so the user sees results immediately
-            // We map the *filtered* suppliers' IDs
             const visibleIds = filteredSuppliers.map(s => s.id);
             setExpandedSuppliers(visibleIds);
         } else {
             // If filters are cleared, collapse all
             setExpandedSuppliers([]);
         }
-    }, [filterDateFrom, filterDateTo, filterCompliance, filteredSuppliers.length]); // Depend on filter criteria changes
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filterDateFrom, filterDateTo, filterCompliance]); // Only depend on filter criteria, not filtered results
 
     // Form states
     const [formData, setFormData] = useState({
@@ -435,6 +443,7 @@ export default function PurchaseOrderView({ vesselName, imo }: { vesselName: str
                 </div>
             )}
 
+            {/* Removed Filter Button from header as per request */}
             <div className="po-header-row">
                 <div className="po-title-section">
                     <h2>Purchase Orders – {vesselName}</h2>
@@ -443,64 +452,15 @@ export default function PurchaseOrderView({ vesselName, imo }: { vesselName: str
                     </span>
                 </div>
                 <div className="po-actions-right">
-                    <button className={`filter-btn ${isFilterOpen || filterDateFrom || filterDateTo || filterCompliance !== 'All' ? 'active' : ''}`} onClick={() => setIsFilterOpen(!isFilterOpen)}>
-                        <Filter size={16} />
-                        <span>Filters</span>
-                        {(filterDateFrom || filterDateTo || filterCompliance !== 'All') && <div className="filter-badge" />}
-                    </button>
                     <button className="add-po-btn" onClick={() => setIsAddDrawerOpen(true)}>
                         <Plus size={18} /> Add Purchase Order
                     </button>
                 </div>
             </div>
 
-            {isFilterOpen && (
-                <div className="filter-bar-container">
-                    <div className="filter-group">
-                        <label>From Date:</label>
-                        <input
-                            type="date"
-                            value={filterDateFrom}
-                            onChange={(e) => setFilterDateFrom(e.target.value)}
-                            className="filter-input"
-                        />
-                    </div>
-                    <div className="filter-group">
-                        <label>To Date:</label>
-                        <input
-                            type="date"
-                            value={filterDateTo}
-                            onChange={(e) => setFilterDateTo(e.target.value)}
-                            className="filter-input"
-                        />
-                    </div>
-                    <div className="filter-group">
-                        <label>Compliance:</label>
-                        <select
-                            value={filterCompliance}
-                            onChange={(e) => setFilterCompliance(e.target.value)}
-                            className="filter-select"
-                        >
-                            <option value="All">All Statuses</option>
-                            <option value="Verified">Verified</option>
-                            <option value="Not Verified">Not Verified</option>
-                            <option value="MD Pending">MD Pending</option>
-                        </select>
-                    </div>
-                    {(filterDateFrom || filterDateTo || filterCompliance !== 'All') && (
-                        <button
-                            className="clear-filters-btn"
-                            onClick={() => {
-                                setFilterDateFrom('');
-                                setFilterDateTo('');
-                                setFilterCompliance('All');
-                            }}
-                        >
-                            Clear Filters
-                        </button>
-                    )}
-                </div>
-            )}
+
+
+
 
 
             {hasPOs ? (

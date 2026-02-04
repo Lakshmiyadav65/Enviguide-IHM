@@ -1,192 +1,234 @@
 import { useState, useRef } from 'react';
 import {
-    Plus, Upload, Layers, MapPin, ZoomIn, ZoomOut, Move,
-    FileText, AlertCircle,
-    ChevronRight, Layout, Maximize
+    Upload,
+    Plus,
+    CheckCircle,
+    Trash2,
+    Edit3,
+    ChevronDown,
+    ChevronUp,
+    Compass,
+    Layers,
+    FileText,
+    Settings,
+    ExternalLink
 } from 'lucide-react';
+import GAPlanViewer from './GAPlanViewer';
 import './DecksView.css';
 
-interface Deck {
+interface Rect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+interface MappedSection {
     id: string;
-    name: string;
-    level: string;
-    gaPlanUrl: string | null;
-    materialsCount: number;
-    hazardsCount: number;
-    status: 'Active' | 'Draft' | 'Archived';
-    lastUpdated: string;
+    title: string;
+    sectionId: string;
+    rect: Rect;
+    itemsCount: number;
+    isVisible?: boolean;
 }
 
-const MOCK_DECKS: Deck[] = [
-    {
-        id: 'deck-001',
-        name: 'Navigation Bridge Deck',
-        level: 'Level 05',
-        gaPlanUrl: 'https://images.unsplash.com/photo-1597423244036-ef5020e83f3c?auto=format&fit=crop&q=80&w=1600',
-        materialsCount: 12,
-        hazardsCount: 2,
-        status: 'Active',
-        lastUpdated: 'Oct 24, 2023'
-    },
-    {
-        id: 'deck-002',
-        name: 'Upper Deck',
-        level: 'Level 04',
-        gaPlanUrl: 'https://images.unsplash.com/photo-1581093588402-4857474d5f04?auto=format&fit=crop&q=80&w=1600',
-        materialsCount: 45,
-        hazardsCount: 5,
-        status: 'Active',
-        lastUpdated: 'Nov 12, 2023'
-    },
-    {
-        id: 'deck-003',
-        name: 'Main Deck',
-        level: 'Level 03',
-        gaPlanUrl: null,
-        materialsCount: 0,
-        hazardsCount: 0,
-        status: 'Draft',
-        lastUpdated: 'Jan 15, 2024'
-    },
-    {
-        id: 'deck-004',
-        name: 'Engine Room Top',
-        level: 'Level 02',
-        gaPlanUrl: null,
-        materialsCount: 8,
-        hazardsCount: 1,
-        status: 'Active',
-        lastUpdated: 'Dec 05, 2023'
-    }
-];
+export default function DecksView({ vesselName }: { vesselName: string }) {
+    const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+    const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+    const [isViewerOpen, setIsViewerOpen] = useState(false);
+    const [expandedDeckId, setExpandedDeckId] = useState<string | null>(null);
+    const [mappedSections, setMappedSections] = useState<MappedSection[]>([]);
 
-interface DecksViewProps {
-    vesselName: string;
-}
-
-export default function DecksView({ vesselName }: DecksViewProps) {
-    const [decks] = useState<Deck[]>(MOCK_DECKS);
-    const [selectedDeckId, setSelectedDeckId] = useState<string>(MOCK_DECKS[0].id);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-    const [zoomLevel, setZoomLevel] = useState(1);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const selectedDeck = decks.find(d => d.id === selectedDeckId);
-
-    const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.2, 3));
-    const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.2, 0.5));
-
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            // Mock upload
-            alert(`File ${file.name} allocated to ${selectedDeck?.name}`);
+            setUploadedFile(file.name);
+            const url = URL.createObjectURL(file);
+            setUploadedFileUrl(url);
         }
     };
 
+    const removeUploadedFile = () => {
+        if (uploadedFileUrl) URL.revokeObjectURL(uploadedFileUrl);
+        setUploadedFile(null);
+        setUploadedFileUrl(null);
+    };
+
+    const toggleExpand = (id: string) => {
+        setExpandedDeckId(expandedDeckId === id ? null : id);
+    };
+
+    if (isViewerOpen && uploadedFileUrl) {
+        return (
+            <GAPlanViewer
+                filename={uploadedFile || ''}
+                fileUrl={uploadedFileUrl}
+                onClose={() => setIsViewerOpen(false)}
+                mappedSections={mappedSections as any}
+                onUpdateSections={setMappedSections as any}
+            />
+        );
+    }
+
     return (
-        <div className="decks-view-container">
-            {/* Sidebar List */}
-            <div className={`decks-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
-                <div className="decks-sidebar-header">
-                    <h3>Review Decks</h3>
-                    <button className="add-deck-btn-icon" title="Add New Deck">
+        <div className={`decks-view-container ${!uploadedFile ? 'no-scroll' : ''}`}>
+            {/* GA Plans Upload Section */}
+            <div className="ga-upload-card-refined">
+                {uploadedFile ? (
+                    <div className="ga-upload-success-row">
+                        <div className="ga-file-info">
+                            <div className="check-icon-circle">
+                                <CheckCircle size={16} />
+                            </div>
+                            <span className="ga-filename"><strong>{uploadedFile}</strong> Uploaded</span>
+                        </div>
+                        <button className="ga-remove-btn" onClick={removeUploadedFile} title="Remove plan">
+                            <Trash2 size={18} />
+                        </button>
+                    </div>
+                ) : (
+                    <div className="ga-upload-initial-row">
+                        <div className="ga-upload-label">
+                            <Upload size={18} color="#00B0FA" />
+                            <span>GA Plans Upload</span>
+                        </div>
+                        <div className="ga-upload-dropzone-right" onClick={() => fileInputRef.current?.click()}>
+                            <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".pdf,.png,.jpg,.jpeg" style={{ display: 'none' }} />
+                            <span className="dropzone-text">Choose file or drag & drop GA Plans here (PDF, PNG, JPEG up to 50MB)</span>
+                            <Upload size={16} className="dropzone-icon" />
+                        </div>
+                        <div className="ga-upload-extra-actions">
+                            <button className="ga-extra-btn"><Settings size={18} /></button>
+                            <button className="ga-extra-btn"><ExternalLink size={18} /></button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Active Decks Section Card - Always Visible Template */}
+            <div className="active-decks-section-card">
+                <div className="active-decks-header">
+                    <div className="active-decks-title">
+                        <h3>Active Decks</h3>
+                        <span className="deck-count-badge">{mappedSections.length}</span>
+                    </div>
+                    <button
+                        className={`add-deck-btn ${!uploadedFile ? 'disabled' : ''}`}
+                        disabled={!uploadedFile}
+                        onClick={() => setIsViewerOpen(true)}
+                    >
                         <Plus size={18} />
+                        Add New Deck
                     </button>
                 </div>
 
                 <div className="decks-list">
-                    {decks.map(deck => (
-                        <div
-                            key={deck.id}
-                            className={`deck-item-card ${selectedDeckId === deck.id ? 'active' : ''}`}
-                            onClick={() => setSelectedDeckId(deck.id)}
-                        >
-                            <div className="deck-card-icon">
-                                <Layers size={20} />
-                            </div>
-                            <div className="deck-card-info">
-                                <span className="deck-name">{deck.name}</span>
-                                <span className="deck-meta">{deck.level} • {deck.materialsCount} Materials</span>
-                            </div>
-                            <div className="deck-status-indicator">
-                                {deck.hazardsCount > 0 && (
-                                    <div className="hazard-dot" title={`${deck.hazardsCount} Hazards`}></div>
-                                )}
-                            </div>
-                            <ChevronRight size={16} className="arrow-indicator" />
-                        </div>
-                    ))}
-                </div>
-
-                <div className="decks-sidebar-footer">
-                    <button className="collapse-btn" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-                        <Layout size={16} /> {isSidebarOpen ? 'Hide Sidebar' : ''}
-                    </button>
-                </div>
-            </div>
-
-            {/* Main Viewer Area */}
-            <div className="deck-viewer-area">
-                <div className="viewer-toolbar">
-                    <div className="toolbar-left">
-                        <h2 className="selected-deck-title">{selectedDeck?.name || 'Select a Deck'}</h2>
-                        <span className="deck-level-badge">{selectedDeck?.level}</span>
-                    </div>
-                    <div className="toolbar-right">
-                        <div className="zoom-controls">
-                            <button onClick={handleZoomOut}><ZoomOut size={18} /></button>
-                            <span className="zoom-val">{Math.round(zoomLevel * 100)}%</span>
-                            <button onClick={handleZoomIn}><ZoomIn size={18} /></button>
-                        </div>
-                        <div className="divider-v"></div>
-                        <button className="tool-btn"><Move size={18} /> Pan</button>
-                        <button className="tool-btn active"><MapPin size={18} /> Markers</button>
-                        <button className="tool-btn primary" onClick={() => fileInputRef.current?.click()}>
-                            <Upload size={16} /> Upload GA Plan
-                        </button>
-                    </div>
-                </div>
-
-                <div className="viewer-viewport">
-                    {selectedDeck?.gaPlanUrl ? (
-                        <div className="ga-plan-wrapper" style={{ transform: `scale(${zoomLevel})` }}>
-                            <img
-                                src={selectedDeck.gaPlanUrl}
-                                alt="GA Plan"
-                                className="ga-plan-image"
-                            />
-                            {/* Mock Markers */}
-                            <div className="map-marker" style={{ top: '30%', left: '40%' }}>
-                                <div className="marker-pin hazard">
-                                    <AlertCircle size={14} color="white" />
-                                </div>
-                                <div className="marker-tooltip">Asbestos Detect</div>
-                            </div>
-                            <div className="map-marker" style={{ top: '55%', left: '60%' }}>
-                                <div className="marker-pin safe">
-                                    <div className="dot"></div>
+                    {!uploadedFile ? (
+                        <div className="no-decks-centered-state-integrated">
+                            <div className="deck-empty-visual-canvas">
+                                <div className="deck-blueprint-illustration">
+                                    <div className="blueprint-line h-1"></div>
+                                    <div className="blueprint-line h-2"></div>
+                                    <div className="blueprint-compass">
+                                        <Compass size={40} strokeWidth={1} />
+                                    </div>
+                                    <div className="blueprint-line h-3"></div>
+                                    <div className="blueprint-line h-4"></div>
+                                    <div className="plus-floating-circle">
+                                        <Plus size={18} />
+                                    </div>
                                 </div>
                             </div>
+                            <h4 className="empty-state-title-large">No Active Decks</h4>
+                            <p className="empty-state-subtitle-large">
+                                Upload a GA Plan to start mapping your vessel decks and material logs.
+                            </p>
+                            <button className="upload-first-plan-btn-hero" onClick={() => fileInputRef.current?.click()}>
+                                <FileText size={18} />
+                                Upload First Plan
+                            </button>
+                        </div>
+                    ) : mappedSections.length === 0 ? (
+                        <div className="no-decks-centered-state">
+                            <div className="empty-compass-container">
+                                <div className="compass-icon-refined">
+                                    <Compass size={32} />
+                                </div>
+                            </div>
+                            <h4 className="empty-state-title">No Decks Mapped Yet</h4>
+                            <p className="empty-state-subtitle">
+                                You have uploaded the GA Plan. Now select areas on the plan to create decks and material logs.
+                            </p>
+                            <button className="open-drawing-tool-btn" onClick={() => setIsViewerOpen(true)}>
+                                <Plus size={16} />
+                                Open Drawing Tool to Map Decks
+                            </button>
                         </div>
                     ) : (
-                        <div className="empty-viewer-state">
-                            <div className="empty-icon-circle">
-                                <FileText size={48} color="#94A3B8" />
+                        <>
+                            {mappedSections.map((deck, idx) => (
+                                <div key={deck.id} className="deck-row-card">
+                                    <div className="deck-row-header" onClick={() => toggleExpand(deck.id)}>
+                                        <div className="deck-row-icon-box">
+                                            {deck.title.toLowerCase().includes('tank') ? <Layers size={21} /> : <Compass size={21} />}
+                                        </div>
+                                        <div className="deck-row-main-info">
+                                            <h4>{deck.title}</h4>
+                                            <span className="deck-section-tag">{deck.sectionId || `SECTION 0${idx + 1}`}</span>
+                                        </div>
+                                        <div className="items-in-log-badge">
+                                            {deck.itemsCount || 0} ITEMS IN LOG
+                                        </div>
+                                        <div className="deck-row-actions">
+                                            <button className="action-icon-btn"><Edit3 size={18} /></button>
+                                            <button className="action-icon-btn" onClick={(e) => { e.stopPropagation(); setMappedSections(prev => prev.filter(s => s.id !== deck.id)); }}><Trash2 size={18} /></button>
+                                            <div className="action-icon-btn">
+                                                {expandedDeckId === deck.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {expandedDeckId === deck.id && (
+                                        <div className="deck-log-expanded">
+                                            <div className="log-title-row">
+                                                <div className="log-header-left">
+                                                    <FileText size={16} color="#00B0FA" />
+                                                    <span className="log-title-text">MATERIAL LOG FOR {deck.title}</span>
+                                                </div>
+                                                <a href="#" className="view-all-materials-link">View All Materials</a>
+                                            </div>
+
+                                            <div className="material-log-content-box">
+                                                {deck.itemsCount > 0 ? (
+                                                    <div className="material-items-preview">
+                                                        <div className="preview-placeholder">
+                                                            <CheckCircle size={16} color="#12B76A" />
+                                                            <span>Showing {deck.itemsCount} materials from log.</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="no-materials-placeholder">
+                                                        <p>No materials logged for this section yet.</p>
+                                                        <button className="add-material-btn-mini">
+                                                            <Plus size={14} /> Add Material
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+
+                            <div className="add-plan-section-container">
+                                <button className="add-plan-section-dashed-refined" onClick={() => setIsViewerOpen(true)}>
+                                    <Plus size={20} />
+                                    Add New Plan Section
+                                </button>
                             </div>
-                            <h3>No GA Plan Uploaded</h3>
-                            <p>Upload a General Arrangement (GA) plan for this deck<br />to start mapping materials.</p>
-                            <button className="upload-cta-btn" onClick={() => fileInputRef.current?.click()}>
-                                <Upload size={18} /> Select Plan File
-                            </button>
-                            <input
-                                type="file"
-                                ref={fileInputRef}
-                                style={{ display: 'none' }}
-                                onChange={handleFileUpload}
-                                accept="image/*,.pdf"
-                            />
-                        </div>
+                        </>
                     )}
                 </div>
             </div>

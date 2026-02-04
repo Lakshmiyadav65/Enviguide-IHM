@@ -9,9 +9,64 @@
     position: fixed;
     left: 0;
     top: 0;
-    z-index: 1200;
+    z-index: 1350;
     /* Higher than header to ensure logo is visible */
     border-right: 1px solid var(--border-color);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.sidebar.collapsed {
+    width: 80px;
+}
+
+.sidebar.collapsed:not(.locked):hover {
+    width: 280px;
+}
+
+/* Toggle Button */
+.sidebar-toggle-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-left: auto;
+    transition: all 0.2s;
+}
+
+.sidebar-toggle-btn:hover {
+    background: var(--bg-gray-100);
+    color: var(--primary-blue);
+}
+
+.sidebar.collapsed:not(:hover) .sidebar-toggle-btn {
+    display: none;
+}
+
+.sidebar.collapsed:not(:hover) .logo-text,
+.sidebar.collapsed:not(:hover) .nav-label,
+.sidebar.collapsed:not(:hover) .nav-chevron {
+    display: none;
+    opacity: 0;
+}
+
+.sidebar.collapsed:not(:hover) .nav-item {
+    justify-content: center;
+    padding: 12px;
+}
+
+.sidebar.collapsed:not(:hover) .submenu {
+    display: none;
+}
+
+.sidebar.collapsed:not(:hover) .sidebar-logo {
+    justify-content: center;
 }
 
 @media (max-width: 768px) {
@@ -90,9 +145,8 @@
 
 /* Active State (Top Level) */
 .nav-item.active {
-    background: var(--primary-blue);
-    color: white;
-    box-shadow: 0 4px 6px -1px rgba(0, 176, 250, 0.2);
+    background: var(--primary-blue-subtle);
+    color: var(--primary-blue);
 }
 
 .nav-item.active:hover {
@@ -101,9 +155,10 @@
 }
 
 /* Expanded State (Parent of Submenu) */
-.nav-item.expanded {
-    background: var(--primary-blue);
-    color: white;
+.nav-item.expanded,
+.nav-item.active {
+    background: var(--primary-blue-subtle);
+    color: var(--primary-blue);
 }
 
 .nav-item.expanded:hover {

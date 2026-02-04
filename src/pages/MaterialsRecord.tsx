@@ -206,11 +206,6 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                     <X size={18} className="toast-close" onClick={() => setShowToast(false)} style={{ cursor: 'pointer', marginLeft: '12px', opacity: 0.6 }} />
                 </div>
             )}
-            <div className="breadcrumb-export-row">
-                <button className="export-record-btn-top">
-                    <Download size={16} /> Export Record
-                </button>
-            </div>
 
             <div className="materials-header">
                 <div className="materials-filters">
@@ -254,6 +249,10 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                         }}
                     >
                         <Filter size={18} />
+                    </button>
+
+                    <button className="export-record-btn-top">
+                        <Download size={16} /> Export Record
                     </button>
                 </div>
 

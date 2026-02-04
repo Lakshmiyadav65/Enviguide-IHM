@@ -11,6 +11,7 @@ import Header from '../components/Header';
 import './Vessels.css';
 import MaterialsRecord from './MaterialsRecord';
 import PurchaseOrderView from './PurchaseOrderView';
+import DecksView from './DecksView';
 
 interface VesselData {
     name: string;
@@ -210,7 +211,12 @@ export default function Vessels() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [isFilterExpanded, setIsFilterExpanded] = useState(true);
+    const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+
+    // Purchase Order Filters Lifted State
+    const [poFilterDateFrom, setPoFilterDateFrom] = useState('');
+    const [poFilterDateTo, setPoFilterDateTo] = useState('');
+    const [poFilterCompliance, setPoFilterCompliance] = useState('All');
 
     const [vesselDocuments, setVesselDocuments] = useState<{ [key: string]: any[] }>({
         'MV Ocean Pioneer': Array.from({ length: 45 }, (_, i) => ({
@@ -489,7 +495,7 @@ export default function Vessels() {
     };
 
     const tabs = [
-        { id: 'project', label: 'PROJECT', icon: FileCheck },
+        { id: 'project', label: 'Project', icon: FileCheck },
         { id: 'decks', label: 'Decks', icon: Layers },
         { id: 'documents', label: 'Documents', icon: FolderOpen },
         { id: 'materials', label: 'Materials Record', icon: FileText },
@@ -778,48 +784,20 @@ export default function Vessels() {
         }
 
         if (activeTab === 'decks') {
-            return (
-                <div className="decks-empty-state">
-                    <div className="empty-state-card">
-                        <div className="empty-state-icon-wrapper">
-                            <div className="icon-circle">
-                                <Layers size={48} color="#00B0FA" />
-                            </div>
-                            <div className="warning-badge">!</div>
-                        </div>
-
-                        <h2>No Ship Added Yet</h2>
-                        <p className="description">
-                            Before you can manage decks and configure deck layouts,<br />
-                            you need to add a ship to your fleet first.
-                        </p>
-
-                        <div className="instruction-steps">
-                            <div className="step-item">
-                                <span className="step-number">1</span>
-                                <p>Click <strong>"Add New Ship"</strong> to create a ship profile</p>
-                            </div>
-                            <div className="step-item">
-                                <span className="step-number">2</span>
-                                <p>After adding the ship, return here to configure decks</p>
-                            </div>
-                        </div>
-
-                        <div className="empty-state-actions">
-                            <button className="btn-primary-blue" onClick={handleAddClick}>
-                                <ShipIcon size={20} /> Add New Ship
-                            </button>
-                        </div>
-
-                        <p className="help-text">Need help? Contact your administrator for assistance.</p>
-                    </div>
-                </div>
-            );
+            return <DecksView vesselName={activeVesselName} />;
         }
 
         if (activeTab === 'purchase') {
             const activeVessel = vesselList.find(v => v.name === activeVesselName);
-            return <PurchaseOrderView vesselName={activeVesselName} imo={activeVessel?.imoNo || ''} />;
+            return (
+                <PurchaseOrderView
+                    vesselName={activeVesselName}
+                    imo={activeVessel?.imoNo || ''}
+                    filterDateFrom={poFilterDateFrom}
+                    filterDateTo={poFilterDateTo}
+                    filterCompliance={poFilterCompliance}
+                />
+            );
         }
 
         if (activeTab === 'materials') {
@@ -959,37 +937,27 @@ export default function Vessels() {
                                                 {isFilterExpanded && (
                                                     <div className="sidebar-filter-content-direct">
                                                         <div className="filter-section">
-                                                            <div className="filter-section-title">SUPPLIER</div>
-                                                            <div className="filter-checkbox-group">
-                                                                <label className="filter-checkbox-item">
-                                                                    <input type="checkbox" />
-                                                                    <span>RMS Marine Service</span>
-                                                                </label>
-                                                                <label className="filter-checkbox-item">
-                                                                    <input type="checkbox" />
-                                                                    <span>Jotun Cosco</span>
-                                                                </label>
-                                                                <label className="filter-checkbox-item">
-                                                                    <input type="checkbox" />
-                                                                    <span>STOP AEVE</span>
-                                                                </label>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="filter-section">
                                                             <div className="filter-section-title">DATE RANGE</div>
                                                             <div className="filter-date-inputs">
                                                                 <div className="filter-date-field">
                                                                     <label>FROM</label>
                                                                     <div className="date-input-with-icon">
-                                                                        <input type="date" defaultValue="2023-10-24" />
+                                                                        <input
+                                                                            type="date"
+                                                                            value={poFilterDateFrom}
+                                                                            onChange={(e) => setPoFilterDateFrom(e.target.value)}
+                                                                        />
                                                                         <Calendar size={14} className="calendar-icon-overlay" />
                                                                     </div>
                                                                 </div>
                                                                 <div className="filter-date-field">
                                                                     <label>TO</label>
                                                                     <div className="date-input-with-icon">
-                                                                        <input type="date" />
+                                                                        <input
+                                                                            type="date"
+                                                                            value={poFilterDateTo}
+                                                                            onChange={(e) => setPoFilterDateTo(e.target.value)}
+                                                                        />
                                                                         <Calendar size={14} className="calendar-icon-overlay" />
                                                                     </div>
                                                                 </div>
@@ -1000,19 +968,39 @@ export default function Vessels() {
                                                             <div className="filter-section-title">COMPLIANCE STATUS</div>
                                                             <div className="filter-radio-group">
                                                                 <label className="filter-radio-item">
-                                                                    <input type="radio" name="compliance" defaultChecked />
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="compliance"
+                                                                        checked={poFilterCompliance === 'All'}
+                                                                        onChange={() => setPoFilterCompliance('All')}
+                                                                    />
                                                                     <span>All Statuses</span>
                                                                 </label>
                                                                 <label className="filter-radio-item">
-                                                                    <input type="radio" name="compliance" />
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="compliance"
+                                                                        checked={poFilterCompliance === 'Verified'}
+                                                                        onChange={() => setPoFilterCompliance('Verified')}
+                                                                    />
                                                                     <span>Verified</span>
                                                                 </label>
                                                                 <label className="filter-radio-item">
-                                                                    <input type="radio" name="compliance" />
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="compliance"
+                                                                        checked={poFilterCompliance === 'Not Verified'}
+                                                                        onChange={() => setPoFilterCompliance('Not Verified')}
+                                                                    />
                                                                     <span>Not Verified</span>
                                                                 </label>
                                                                 <label className="filter-radio-item">
-                                                                    <input type="radio" name="compliance" />
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="compliance"
+                                                                        checked={poFilterCompliance === 'MD Pending'}
+                                                                        onChange={() => setPoFilterCompliance('MD Pending')}
+                                                                    />
                                                                     <span>MD Pending</span>
                                                                 </label>
                                                             </div>

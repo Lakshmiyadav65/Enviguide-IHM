@@ -1,8 +1,8 @@
 @import url('./MaterialsRecordEmpty.css');
 
 .materials-container {
-    padding: 0 0 24px 0;
-    /* Allow page to scroll naturally */
+    padding: 0;
+    /* Handled by parent container */
     height: auto;
     min-height: 100vh;
     display: flex;
@@ -43,15 +43,17 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 16px;
+    height: 42px;
+    padding: 0 16px;
     background: white;
     border: 1px solid #E2E8F0;
-    border-radius: 6px;
+    border-radius: 8px;
     color: #334155;
     font-weight: 600;
     font-size: 13px;
     cursor: pointer;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .export-record-btn-top:hover {
@@ -299,9 +301,6 @@
     border-bottom: 1px solid #e2e8f0;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    position: sticky;
-    top: 0;
-    z-index: 10;
 }
 
 .materials-table td {

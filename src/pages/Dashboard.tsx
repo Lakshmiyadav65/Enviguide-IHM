@@ -1,4 +1,3 @@
-
 import {
     Ship,
     FileText,
@@ -41,89 +40,82 @@ export default function Dashboard() {
                     {/* 2. Filters Row */}
                     <div className="filters-row">
                         <button className="filter-btn">
-                            <Filter size={14} /> Filters
+                            <Filter size={16} /> Filters
                         </button>
                         <button className="filter-btn">
-                            Yearly <ChevronDown size={14} />
+                            Yearly <ChevronDown size={16} />
                         </button>
                         <button className="filter-btn">
-                            Ship Manager <ChevronDown size={14} />
+                            Ship Owner <ChevronDown size={16} />
                         </button>
                         <button className="filter-btn">
-                            Ship Owner <ChevronDown size={14} />
+                            Ship Manager <ChevronDown size={16} />
                         </button>
                         <button className="filter-btn">
-                            Supplier <ChevronDown size={14} />
+                            Supplier <ChevronDown size={16} />
                         </button>
                         <button className="filter-btn">
-                            Vessel <ChevronDown size={14} />
+                            Vessel <ChevronDown size={16} />
                         </button>
                         <button className="clear-filters">Clear Filters</button>
                     </div>
 
                     {/* 3. KPI Cards */}
                     <div className="kpi-grid">
-                        {/* Card 1: Total Vessels */}
                         <div className="kpi-card blue-gradient">
                             <div className="kpi-top">
                                 <span className="kpi-label">Total Vessels</span>
                                 <div className="kpi-icon-box">
-                                    <Ship size={20} />
+                                    <Ship size={24} />
                                 </div>
                             </div>
                             <div className="kpi-value">24</div>
                         </div>
 
-                        {/* Card 2: Active POs */}
-                        <div className="kpi-card white">
+                        <div className="kpi-card">
                             <div className="kpi-top">
                                 <span className="kpi-label">Active POs</span>
-                                <div className="kpi-icon-box blue">
-                                    <FileText size={20} />
+                                <div className="kpi-icon-box">
+                                    <FileText size={24} color="#00B0FA" />
                                 </div>
                             </div>
                             <div className="kpi-middle">
                                 <div className="kpi-value">156</div>
                                 <div className="kpi-trend up">
-                                    <TrendingUp size={14} /> 12%
+                                    <TrendingUp size={16} /> 12%
                                 </div>
                             </div>
                         </div>
 
-                        {/* Card 3: Compliance Rate */}
-                        <div className="kpi-card white">
+                        <div className="kpi-card">
                             <div className="kpi-top">
                                 <span className="kpi-label">Compliance Rate</span>
                                 <div className="kpi-icon-box green">
-                                    <TrendingUp size={20} />
+                                    <TrendingUp size={24} />
                                 </div>
                             </div>
                             <div className="kpi-middle">
                                 <div className="kpi-value">94%</div>
                                 <div className="kpi-trend up">
-                                    <TrendingUp size={14} /> 3%
+                                    <TrendingUp size={16} /> 3%
                                 </div>
                             </div>
                         </div>
 
-                        {/* Card 4: Pending Actions */}
-                        <div className="kpi-card white">
+                        <div className="kpi-card">
                             <div className="kpi-top">
                                 <span className="kpi-label">Pending Actions</span>
                                 <div className="kpi-icon-box orange">
-                                    <AlertTriangle size={20} />
+                                    <AlertTriangle size={24} />
                                 </div>
                             </div>
                             <div className="kpi-value">18</div>
                         </div>
                     </div>
 
-                    {/* 4. Content Split (Left Wider, Right Narrower) */}
+                    {/* 4. Content Split */}
                     <div className="content-split">
-
-                        {/* LEFT COLUMN */}
                         <div className="left-column">
-
                             {/* Users Overview */}
                             <div className="section-card">
                                 <div className="card-title">
@@ -164,29 +156,27 @@ export default function Dashboard() {
                                         <ShoppingCart size={18} />
                                     </div>
                                     <h3>Purchase Orders</h3>
-                                </div>
-
-                                <div className="po-header-row">
-                                    <div className="po-total-label">
-                                        <Package size={16} /> Total Line Items
+                                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <Package size={16} color="#667085" />
+                                        <span style={{ fontSize: 13, color: '#667085' }}>Total Line Items</span>
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: '#101828' }}>1,247</span>
                                     </div>
-                                    <div className="po-total-val">1,247</div>
                                 </div>
 
                                 <div className="po-status-row">
                                     <div className="po-status-card po-pending">
                                         <div className="po-s-label">
-                                            <Clock size={12} style={{ display: 'inline', marginRight: 4 }} /> Pending
+                                            <Clock size={14} /> Pending
                                         </div>
                                         <div className="po-s-val">34</div>
-                                        <div style={{ fontSize: 11, color: '#C2410C', opacity: 0.8 }}>MDs</div>
+                                        <div style={{ fontSize: 12, color: '#B54708', fontWeight: 600 }}>MDs</div>
                                     </div>
                                     <div className="po-status-card po-received">
                                         <div className="po-s-label">
-                                            <UserCheck size={12} style={{ display: 'inline', marginRight: 4 }} /> Received
+                                            <UserCheck size={14} /> Received
                                         </div>
                                         <div className="po-s-val">189</div>
-                                        <div style={{ fontSize: 11, color: '#047857', opacity: 0.8 }}>MDs</div>
+                                        <div style={{ fontSize: 12, color: '#027A48', fontWeight: 600 }}>MDs</div>
                                     </div>
                                 </div>
 
@@ -214,11 +204,10 @@ export default function Dashboard() {
                                     </div>
                                     <h3>Recent Activity</h3>
                                 </div>
-
                                 <div className="activity-list">
                                     <div className="activity-item">
                                         <div className="act-icon green">
-                                            <Ship size={18} />
+                                            <Ship size={20} />
                                         </div>
                                         <div className="act-content">
                                             <h4>Vessel Onboarded</h4>
@@ -228,7 +217,7 @@ export default function Dashboard() {
                                     </div>
                                     <div className="activity-item">
                                         <div className="act-icon blue">
-                                            <FileText size={18} />
+                                            <FileText size={20} />
                                         </div>
                                         <div className="act-content">
                                             <h4>PO Updated</h4>
@@ -238,7 +227,7 @@ export default function Dashboard() {
                                     </div>
                                     <div className="activity-item">
                                         <div className="act-icon green">
-                                            <Package size={18} />
+                                            <Package size={20} />
                                         </div>
                                         <div className="act-content">
                                             <h4>Materials Received</h4>
@@ -248,7 +237,7 @@ export default function Dashboard() {
                                     </div>
                                     <div className="activity-item">
                                         <div className="act-icon blue">
-                                            <Users size={18} />
+                                            <Users size={20} />
                                         </div>
                                         <div className="act-content">
                                             <h4>New User Registration</h4>
@@ -257,18 +246,14 @@ export default function Dashboard() {
                                         </div>
                                     </div>
                                 </div>
-
                                 <div style={{ textAlign: 'center' }}>
-                                    <a href="#" className="view-all-link">View All Activity &rarr;</a>
+                                    <a href="#" className="view-all-link">View All Activity →</a>
                                 </div>
                             </div>
-
                         </div>
 
-                        {/* RIGHT COLUMN */}
                         <div className="right-column">
-
-                            {/* Vessels Summary */}
+                            {/* Vessels */}
                             <div className="section-card">
                                 <div className="card-title">
                                     <div className="title-icon blue-bg">
@@ -276,33 +261,24 @@ export default function Dashboard() {
                                     </div>
                                     <h3>Vessels</h3>
                                 </div>
-
                                 <div className="vessels-color-grid">
                                     <div className="v-color-card v-green">
-                                        <div className="v-top">
-                                            <TrendingUp size={14} /> Onboarded
-                                        </div>
+                                        <div className="v-top"><TrendingUp size={14} /> Onboarded</div>
                                         <div className="v-count">8</div>
-                                        <div className="v-sub">New</div>
+                                        <div className="v-sub">• New</div>
                                     </div>
                                     <div className="v-color-card v-red">
-                                        <div className="v-top">
-                                            <AlertTriangle size={14} /> Expired
-                                        </div>
+                                        <div className="v-top"><AlertTriangle size={14} /> Expired</div>
                                         <div className="v-count">3</div>
                                         <div className="v-sub">SOC</div>
                                     </div>
                                     <div className="v-color-card v-blue">
-                                        <div className="v-top">
-                                            <ArrowUpRight size={14} /> From Deck
-                                        </div>
+                                        <div className="v-top"><ArrowUpRight size={14} /> From Deck</div>
                                         <div className="v-count">145</div>
                                         <div className="v-sub">Items moved</div>
                                     </div>
                                     <div className="v-color-card v-purple">
-                                        <div className="v-top">
-                                            <ArrowUpRight size={14} /> To Ashore
-                                        </div>
+                                        <div className="v-top"><ArrowUpRight size={14} /> To Ashore</div>
                                         <div className="v-count">67</div>
                                         <div className="v-sub">Items moved</div>
                                     </div>
@@ -317,78 +293,33 @@ export default function Dashboard() {
                                     </div>
                                     <div>
                                         <h3>SOC Expiry</h3>
-                                        <div style={{ fontSize: 11, color: '#94A3B8', fontWeight: 400 }}>Statement of Compliance</div>
+                                        <div style={{ fontSize: 11, color: '#98A2B3' }}>Statement of Compliance</div>
                                     </div>
                                 </div>
-
                                 <div className="soc-list">
-                                    <div className="soc-item">
-                                        <div className="soc-left">
-                                            <div className="soc-icon">
-                                                <Ship size={20} />
+                                    {[
+                                        { name: 'MV Nordic Star', imo: '9123456', date: '2024-08-20', badge: '45 days overdue', type: 'red' },
+                                        { name: 'MV Atlantic Voyager', imo: '9654321', date: '2024-12-01', badge: '38 days left', type: 'orange' },
+                                        { name: 'MV Pacific Horizon', imo: '9234567', date: '2025-03-10', badge: '127 days left', type: 'green' },
+                                        { name: 'MV Ocean Pioneer', imo: '9876543', date: '2025-06-15', badge: '254 days left', type: 'green' }
+                                    ].map((v, i) => (
+                                        <div key={i} className="soc-item">
+                                            <div className="soc-left">
+                                                <div className="soc-icon"><Ship size={20} /></div>
+                                                <div className="soc-info">
+                                                    <h4>{v.name}</h4>
+                                                    <p>IMO: {v.imo}</p>
+                                                </div>
                                             </div>
-                                            <div className="soc-info">
-                                                <h4>MV Nordic Star</h4>
-                                                <p>IMO: 9123456</p>
-                                            </div>
-                                        </div>
-                                        <div className="soc-right">
-                                            <span className="soc-date-label">Expiry Date</span>
-                                            <span className="soc-date-val">2024-08-20</span>
-                                            <span className="soc-badge badge-red">45 days overdue</span>
-                                        </div>
-                                    </div>
-                                    <div className="soc-item">
-                                        <div className="soc-left">
-                                            <div className="soc-icon">
-                                                <Ship size={20} />
-                                            </div>
-                                            <div className="soc-info">
-                                                <h4>MV Atlantic Voyager</h4>
-                                                <p>IMO: 9654321</p>
+                                            <div className="soc-right">
+                                                <span className="soc-date-label">Expiry Date</span>
+                                                <span className="soc-date-val">{v.date}</span>
+                                                <span className={`soc-badge badge-${v.type}`}>{v.badge}</span>
                                             </div>
                                         </div>
-                                        <div className="soc-right">
-                                            <span className="soc-date-label">Expiry Date</span>
-                                            <span className="soc-date-val">2024-12-01</span>
-                                            <span className="soc-badge badge-orange">38 days left</span>
-                                        </div>
-                                    </div>
-                                    <div className="soc-item">
-                                        <div className="soc-left">
-                                            <div className="soc-icon">
-                                                <Ship size={20} />
-                                            </div>
-                                            <div className="soc-info">
-                                                <h4>MV Pacific Horizon</h4>
-                                                <p>IMO: 9234567</p>
-                                            </div>
-                                        </div>
-                                        <div className="soc-right">
-                                            <span className="soc-date-label">Expiry Date</span>
-                                            <span className="soc-date-val">2025-03-10</span>
-                                            <span className="soc-badge badge-green">127 days left</span>
-                                        </div>
-                                    </div>
-                                    <div className="soc-item">
-                                        <div className="soc-left">
-                                            <div className="soc-icon">
-                                                <Ship size={20} />
-                                            </div>
-                                            <div className="soc-info">
-                                                <h4>MV Ocean Pioneer</h4>
-                                                <p>IMO: 9876543</p>
-                                            </div>
-                                        </div>
-                                        <div className="soc-right">
-                                            <span className="soc-date-label">Expiry Date</span>
-                                            <span className="soc-date-val">2025-06-15</span>
-                                            <span className="soc-badge badge-green">254 days left</span>
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
                             </div>
-
                         </div>
                     </div>
 
@@ -398,62 +329,47 @@ export default function Dashboard() {
                             <h3>Operational Overview</h3>
                             <p>Track purchase orders and supplier responses across vessels</p>
                         </div>
-                        <table className="ops-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: 40 }}></th>
-                                    <th>IMO Number</th>
-                                    <th>Vessel Name</th>
-                                    <th>Total POs</th>
-                                    <th>Line Items</th>
-                                    <th style={{ textAlign: 'center' }}><span className="th-dot orange"></span>Reminder 1</th>
-                                    <th style={{ textAlign: 'center' }}><span className="th-dot red"></span>Reminder 2</th>
-                                    <th style={{ textAlign: 'center' }}><span className="th-dot dark-red"></span>Non-Responsive</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td><div className="chevron-cell"><ChevronRight size={16} /></div></td>
-                                    <td className="row-imo">9876543</td>
-                                    <td className="row-name">MV Ocean Pioneer</td>
-                                    <td>45</td>
-                                    <td>320</td>
-                                    <td><div className="reminder-badge rem-1">5</div></td>
-                                    <td><div className="reminder-badge rem-2">2</div></td>
-                                    <td><div className="reminder-badge non-resp">1</div></td>
-                                </tr>
-                                <tr>
-                                    <td><div className="chevron-cell"><ChevronRight size={16} /></div></td>
-                                    <td className="row-imo">9654321</td>
-                                    <td className="row-name">MV Atlantic Voyager</td>
-                                    <td>38</td>
-                                    <td>275</td>
-                                    <td><div className="reminder-badge rem-0">0</div></td>
-                                    <td><div className="reminder-badge rem-2">3</div></td>
-                                    <td><div className="reminder-badge non-resp">2</div></td>
-                                </tr>
-                                <tr>
-                                    <td><div className="chevron-cell"><ChevronRight size={16} /></div></td>
-                                    <td className="row-imo">9123456</td>
-                                    <td className="row-name">MV Nordic Star</td>
-                                    <td>52</td>
-                                    <td>410</td>
-                                    <td><div className="reminder-badge rem-1">3</div></td>
-                                    <td><div className="reminder-badge rem-2">1</div></td>
-                                    <td><div className="reminder-badge rem-good">0</div></td>
-                                </tr>
-                                <tr>
-                                    <td><div className="chevron-cell"><ChevronRight size={16} /></div></td>
-                                    <td className="row-imo">9234567</td>
-                                    <td className="row-name">MV Pacific Horizon</td>
-                                    <td>29</td>
-                                    <td>185</td>
-                                    <td><div className="reminder-badge rem-1">12</div></td>
-                                    <td><div className="reminder-badge rem-2">8</div></td>
-                                    <td><div className="reminder-badge non-resp">3</div></td>
-                                </tr>
-                            </tbody>
-                        </table>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table className="ops-table">
+                                <thead>
+                                    <tr>
+                                        <th style={{ width: 60 }}></th>
+                                        <th>IMO NUMBER</th>
+                                        <th>VESSEL NAME</th>
+                                        <th>TOTAL POS</th>
+                                        <th>LINE ITEMS</th>
+                                        <th><div className="th-inner"><div className="th-dot orange"></div>REMINDER 1</div></th>
+                                        <th><div className="th-inner"><div className="th-dot red"></div>REMINDER 2</div></th>
+                                        <th><div className="th-inner"><div className="th-dot dark-red"></div>NON-RESPONSIVE</div></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {[
+                                        { imo: '9876543', name: 'MV Ocean Pioneer', pos: 45, items: 320, r1: 5, r2: 2, non: 1 },
+                                        { imo: '9654321', name: 'MV Atlantic Voyager', pos: 38, items: 275, r1: 0, r2: 3, non: 2 },
+                                        { imo: '9123456', name: 'MV Nordic Star', pos: 52, items: 410, r1: 3, r2: 1, non: 0 },
+                                        { imo: '9234567', name: 'MV Pacific Horizon', pos: 29, items: 185, r1: 12, r2: 8, non: 3 }
+                                    ].map((v, i) => (
+                                        <tr key={i}>
+                                            <td><div className="chevron-cell"><ChevronRight size={18} /></div></td>
+                                            <td className="row-imo">{v.imo}</td>
+                                            <td className="row-name">{v.name}</td>
+                                            <td>{v.pos}</td>
+                                            <td>{v.items}</td>
+                                            <td><div className={v.r1 > 0 ? 'reminder-badge rem-1' : 'reminder-badge rem-0'}>{v.r1}</div></td>
+                                            <td><div className={v.r2 > 0 ? 'reminder-badge rem-2' : 'reminder-badge rem-0'}>{v.r2}</div></td>
+                                            <td>
+                                                {v.non > 0 ? (
+                                                    <div className="reminder-badge non-resp">{v.non}</div>
+                                                ) : (
+                                                    <div className="reminder-badge rem-good">0</div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                 </div>

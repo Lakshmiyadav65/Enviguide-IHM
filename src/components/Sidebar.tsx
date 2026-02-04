@@ -11,13 +11,16 @@ import {
     Database,
     Upload,
     Mail,
-    ChevronDown
+    ChevronDown,
+    ChevronLeft
 } from 'lucide-react';
 import './Sidebar.css';
 export default function Sidebar() {
     const location = useLocation();
     const [expandedItem, setExpandedItem] = useState<string>('');
     const [activeFocus, setActiveFocus] = useState<string | null>(null);
+    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isLocked, setIsLocked] = useState(false);
 
     // Sync expanded state with route
     useEffect(() => {
@@ -53,6 +56,13 @@ export default function Sidebar() {
     ];
 
     const toggleSubmenu = (label: string) => {
+        if (isCollapsed) {
+            setIsCollapsed(false);
+            setExpandedItem(label);
+            setActiveFocus(label);
+            return;
+        }
+
         if (expandedItem === label) {
             setExpandedItem('');
             setActiveFocus(null);
@@ -64,7 +74,7 @@ export default function Sidebar() {
 
 
     return (
-        <aside className="sidebar">
+        <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isLocked ? 'locked' : ''}`}>
             <div className="sidebar-header">
                 <div className="sidebar-logo">
                     <div className="logo-icon">
@@ -75,6 +85,18 @@ export default function Sidebar() {
                         <p style={{ margin: 0, fontSize: '12px', color: 'var(--primary-blue)' }}>Maritime Safety</p>
                     </div>
                 </div>
+                <button
+                    className="sidebar-toggle-btn"
+                    onClick={() => {
+                        if (!isCollapsed) {
+                            setIsLocked(true);
+                            setTimeout(() => setIsLocked(false), 500);
+                        }
+                        setIsCollapsed(!isCollapsed);
+                    }}
+                >
+                    <ChevronLeft size={20} />
+                </button>
             </div>
 
             <nav className="sidebar-nav">
@@ -109,7 +131,10 @@ export default function Sidebar() {
                                 <Link
                                     to={item.path}
                                     className={`nav-item ${isActive ? 'active' : ''}`}
-                                    onClick={() => setActiveFocus(null)}
+                                    onClick={() => {
+                                        setActiveFocus(null);
+                                        if (isCollapsed) setIsCollapsed(false);
+                                    }}
                                 >
                                     <item.icon size={20} className="nav-icon" />
                                     <span className="nav-label">{item.label}</span>
@@ -123,7 +148,10 @@ export default function Sidebar() {
                                             key={child.path}
                                             to={child.path}
                                             className={`nav-item sub-item ${location.pathname === child.path || (child.label === 'Ship' && location.pathname === '/vessels') ? 'sub-active' : ''}`}
-                                            onClick={() => setActiveFocus(null)}
+                                            onClick={() => {
+                                                setActiveFocus(null);
+                                                if (isCollapsed) setIsCollapsed(false);
+                                            }}
                                         >
                                             <child.icon size={18} className="nav-icon" />
                                             <span className="nav-label">{child.label}</span>

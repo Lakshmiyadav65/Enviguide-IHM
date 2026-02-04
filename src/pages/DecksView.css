@@ -1,436 +1,544 @@
 .decks-view-container {
-    display: flex;
-    height: calc(100vh - 120px);
-    /* Adjust based on header/nav height */
     width: 100%;
-    background-color: #f8fafc;
-    overflow: hidden;
-    position: relative;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-}
-
-/* Sidebar Styling */
-.decks-sidebar {
-    width: 320px;
-    background: white;
-    border-right: 1px solid #e2e8f0;
+    min-height: calc(100vh - 120px);
+    height: auto;
     display: flex;
     flex-direction: column;
-    transition: width 0.3s ease;
-    z-index: 10;
-}
-
-.decks-sidebar.closed {
-    width: 60px;
-}
-
-.decks-sidebar.closed .deck-card-info,
-.decks-sidebar.closed .deck-status-indicator,
-.decks-sidebar.closed .arrow-indicator,
-.decks-sidebar.closed h3,
-.decks-sidebar.closed .add-deck-btn-icon {
-    display: none;
-}
-
-.decks-sidebar.closed .deck-item-card {
-    justify-content: center;
-    padding: 16px 0;
-}
-
-.decks-sidebar-header {
-    padding: 20px;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.decks-sidebar-header h3 {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 700;
-    color: #1e293b;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.add-deck-btn-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    border: 1px solid #e2e8f0;
-    background: white;
-    color: #64748b;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.add-deck-btn-icon:hover {
-    background: #f1f5f9;
-    color: #00b0fa;
-    border-color: #00b0fa;
-}
-
-.decks-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.deck-item-card {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: 1px solid transparent;
-}
-
-.deck-item-card:hover {
+    gap: 32px;
+    padding: 32px;
     background: #f8fafc;
 }
 
-.deck-item-card.active {
-    background: #eff6ff;
-    border-color: #bfdbfe;
+.decks-view-container.no-scroll {
+    overflow: hidden;
+    height: calc(100vh - 120px);
 }
 
-.deck-card-icon {
-    color: #64748b;
-    margin-right: 12px;
+/* 1. GA Plans Upload Refined */
+.ga-upload-card-refined {
+    background: #FFFFFF;
+    border: 1px solid #EAECF0;
+    border-radius: 12px;
+    padding: 12px 24px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
 }
 
-.deck-item-card.active .deck-card-icon {
-    color: #00b0fa;
-}
-
-.deck-card-info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.deck-name {
-    font-size: 14px;
-    font-weight: 600;
-    color: #1e293b;
-}
-
-.deck-meta {
-    font-size: 12px;
-    color: #94a3b8;
-    margin-top: 2px;
-}
-
-.deck-status-indicator {
-    margin-right: 8px;
-}
-
-.hazard-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #ef4444;
-    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
-}
-
-.arrow-indicator {
-    color: #cbd5e1;
-}
-
-.deck-item-card.active .arrow-indicator {
-    color: #3b82f6;
-}
-
-.decks-sidebar-footer {
-    padding: 16px;
-    border-top: 1px solid #e2e8f0;
-}
-
-.collapse-btn {
+.ga-upload-initial-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: none;
-    border: none;
-    color: #64748b;
-    font-size: 13px;
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 6px;
-    width: 100%;
+    gap: 24px;
 }
 
-.collapse-btn:hover {
-    background: #f1f5f9;
-    color: #1e293b;
-}
-
-/* Viewer Area */
-.deck-viewer-area {
-    flex: 1;
+.ga-upload-label {
     display: flex;
-    flex-direction: column;
-    background: #f1f5f9;
-    position: relative;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #101828;
+    white-space: nowrap;
 }
 
-.viewer-toolbar {
-    height: 64px;
-    background: white;
-    border-bottom: 1px solid #e2e8f0;
+.ga-upload-dropzone-right {
+    flex: 1;
+    height: 44px;
+    border: 1px dashed #D0D5DD;
+    border-radius: 100px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
-    z-index: 5;
-}
-
-.toolbar-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.selected-deck-title {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 700;
-    color: #1e293b;
-}
-
-.deck-level-badge {
-    background: #f1f5f9;
-    color: #64748b;
-    font-size: 12px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-weight: 600;
-    border: 1px solid #e2e8f0;
-}
-
-.toolbar-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.zoom-controls {
-    display: flex;
-    align-items: center;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    padding: 2px;
-}
-
-.zoom-controls button {
-    background: white;
-    border: 1px solid #e2e8f0;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
     cursor: pointer;
-    color: #64748b;
-}
-
-.zoom-controls button:hover {
-    background: #f1f5f9;
-    color: #1e293b;
-}
-
-.zoom-val {
-    min-width: 48px;
-    text-align: center;
-    font-size: 13px;
-    font-weight: 600;
-    color: #1e293b;
-}
-
-.divider-v {
-    width: 1px;
-    height: 24px;
-    background: #e2e8f0;
-}
-
-.tool-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    border: 1px solid #e2e8f0;
     background: white;
-    color: #64748b;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
     transition: all 0.2s;
 }
 
-.tool-btn:hover {
-    border-color: #cbd5e1;
-    color: #1e293b;
+.ga-upload-dropzone-right:hover {
+    border-color: #00B0FA;
+    background: #F0F9FF;
 }
 
-.tool-btn.active {
-    background: #eff6ff;
-    color: #3b82f6;
-    border-color: #bfdbfe;
+.dropzone-text {
+    font-size: 13px;
+    color: #667085;
+    font-weight: 500;
 }
 
-.tool-btn.primary {
-    background: #00b0fa;
-    color: white;
-    border-color: #00b0fa;
+.dropzone-icon {
+    color: #98A2B3;
 }
 
-.tool-btn.primary:hover {
-    background: #009ce0;
+.ga-upload-extra-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-/* Viewport */
-.viewer-viewport {
-    flex: 1;
-    overflow: auto;
+.ga-extra-btn {
+    background: transparent;
+    border: none;
+    color: #98A2B3;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.ga-extra-btn:hover {
+    color: #101828;
+}
+
+/* GA Upload Success State */
+.ga-upload-success-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ga-file-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.check-icon-circle {
+    width: 24px;
+    height: 24px;
+    background: #F0F9FF;
+    color: #00B0FA;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-    background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
-    background-size: 20px 20px;
 }
 
-.ga-plan-wrapper {
-    position: relative;
-    transition: transform 0.2s ease-out;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+.ga-filename {
+    font-size: 14px;
+    color: #344054;
 }
 
-.ga-plan-image {
-    max-width: 100%;
-    display: block;
-    background: white;
-}
-
-/* Markers */
-.map-marker {
-    position: absolute;
-    transform: translate(-50%, -100%);
-    cursor: pointer;
-    z-index: 10;
-}
-
-.marker-pin {
+.ga-remove-btn {
+    background: #FEF3F2;
+    color: #F04438;
+    border: 1px solid #FEE4E2;
     width: 32px;
     height: 32px;
-    border-radius: 50% 50% 50% 0;
-    background: #ef4444;
-    position: relative;
-    transform: rotate(-45deg);
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
 }
 
-.marker-pin svg {
-    transform: rotate(45deg);
+/* 2. Active Decks Section Card */
+.active-decks-section-card {
+    background: #FFFFFF;
+    border: 1px solid #EAECF0;
+    border-radius: 20px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    padding: 0;
+    overflow: hidden;
+    min-height: 500px;
+    display: flex;
+    flex-direction: column;
 }
 
-.marker-pin.safe {
-    background: #10b981;
+.active-decks-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px;
 }
 
-.marker-pin.safe .dot {
-    width: 10px;
-    height: 10px;
-    background: white;
-    border-radius: 50%;
+.active-decks-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
-.marker-tooltip {
-    position: absolute;
-    bottom: 110%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1e293b;
-    color: white;
-    padding: 6px 12px;
-    border-radius: 4px;
-    font-size: 12px;
+.active-decks-title h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #101828;
+    margin: 0;
+}
+
+.deck-count-badge {
+    background: #F2F4F7;
+    color: #667085;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 100px;
+}
+
+.add-deck-btn {
+    height: 40px;
+    padding: 0 16px;
+    background: #F2F4F7;
+    color: #94A3B8;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
     font-weight: 600;
-    white-space: nowrap;
-    opacity: 0;
-    transition: opacity 0.2s;
-    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: not-allowed;
 }
 
-.map-marker:hover .marker-tooltip {
-    opacity: 1;
+.add-deck-btn:not(.disabled) {
+    background: #101828;
+    color: white;
+    cursor: pointer;
 }
 
-/* Empty State */
-.empty-viewer-state {
+/* 3. Empty States inside the card */
+.no-decks-centered-state-integrated {
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 48px;
-    max-width: 400px;
+    padding: 60px 40px;
 }
 
-.empty-icon-circle {
-    width: 96px;
-    height: 96px;
+.deck-empty-visual-canvas {
+    margin-bottom: 32px;
+}
+
+.deck-blueprint-illustration {
+    width: 180px;
+    height: 120px;
+    background: #F9FAFB;
+    border-radius: 12px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.blueprint-compass {
+    color: #EAECF0;
+    z-index: 2;
+}
+
+.blueprint-line {
+    position: absolute;
+    background: #F2F4F7;
+    height: 2px;
+}
+
+.blueprint-line.h-1 {
+    width: 40px;
+    left: 20px;
+    top: 40px;
+}
+
+.blueprint-line.h-2 {
+    width: 25px;
+    left: 20px;
+    top: 52px;
+}
+
+.blueprint-line.h-3 {
+    width: 40px;
+    right: 20px;
+    top: 40px;
+}
+
+.blueprint-line.h-4 {
+    width: 25px;
+    right: 20px;
+    top: 52px;
+}
+
+.plus-floating-circle {
+    position: absolute;
+    bottom: -10px;
+    right: -10px;
+    width: 36px;
+    height: 36px;
+    background: white;
     border-radius: 50%;
-    background: #f1f5f9;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #D0D5DD;
+}
+
+.empty-state-title-large {
+    font-size: 20px;
+    font-weight: 700;
+    color: #101828;
+    margin-bottom: 8px;
+}
+
+.empty-state-subtitle-large {
+    font-size: 14px;
+    color: #667085;
+    max-width: 400px;
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.upload-first-plan-btn-hero {
+    height: 48px;
+    padding: 0 24px;
+    background: #F0F9FF;
+    color: #00B0FA;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.upload-first-plan-btn-hero:hover {
+    background: #E0F2FE;
+}
+
+/* Case where GA is uploaded but no decks yet (Post-Upload Empty) */
+.no-decks-centered-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px 40px;
+    gap: 0;
+    /* Removing fixed gap to use margins for precision */
+}
+
+.empty-compass-container {
+    width: 64px;
+    height: 64px;
+    background: #F9FAFB;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-bottom: 24px;
 }
 
-.empty-viewer-state h3 {
-    margin: 0 0 12px;
-    font-size: 20px;
+.compass-icon-refined {
+    color: #D0D5DD;
+}
+
+.empty-state-title {
+    font-size: 18px;
     font-weight: 700;
-    color: #1e293b;
+    color: #101828;
+    margin: 0 0 12px 0;
 }
 
-.empty-viewer-state p {
-    margin: 0 0 32px;
-    color: #64748b;
+.empty-state-subtitle {
+    font-size: 14px;
+    color: #667085;
+    max-width: 440px;
     line-height: 1.5;
+    margin: 0 0 24px 0;
 }
 
-.upload-cta-btn {
-    padding: 12px 24px;
-    background: #00b0fa;
-    color: white;
-    border: none;
-    border-radius: 8px;
+.open-drawing-tool-btn {
+    width: fit-content;
+    height: 40px;
+    padding: 0 16px;
+    background: white;
+    border: 1px solid #D0D5DD;
+    color: #101828;
+    border-radius: 6px;
+    font-size: 14px;
     font-weight: 600;
     display: flex;
     align-items: center;
     gap: 8px;
     cursor: pointer;
-    transition: background 0.2s;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+    transition: all 0.2s;
 }
 
-.upload-cta-btn:hover {
-    background: #009ce0;
+.open-drawing-tool-btn:hover {
+    background: #F9FAFB;
+    border-color: #98A2B3;
+}
+
+/* 4. Deck Card List (Striped/List inside Active Decks Card) */
+.decks-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.deck-row-card {
+    background: white;
+    border-bottom: 1px solid #EAECF0;
+}
+
+.deck-row-card:last-child {
+    border-bottom: none;
+}
+
+.deck-row-header {
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    cursor: pointer;
+}
+
+.deck-row-icon-box {
+    width: 56px;
+    height: 56px;
+    background: #F9FAFB;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #98A2B3;
+}
+
+.deck-row-main-info {
+    flex: 1;
+}
+
+.deck-row-main-info h4 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #101828;
+    margin-bottom: 2px;
+}
+
+.deck-section-tag {
+    font-size: 10px;
+    font-weight: 700;
+    color: #98A2B3;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.items-in-log-badge {
+    background: #F0F9FF;
+    color: #00B0FA;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 12px;
+    border-radius: 4px;
+}
+
+.deck-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-left: 20px;
+    border-left: 1px solid #EAECF0;
+}
+
+.action-icon-btn {
+    background: transparent;
+    border: none;
+    color: #98A2B3;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.action-icon-btn:hover {
+    color: #101828;
+}
+
+/* 5. Material Log Expanded */
+.deck-log-expanded {
+    background: white;
+    padding: 24px 32px;
+    border-top: 1px solid #EAECF0;
+}
+
+.log-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.log-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.log-title-text {
+    font-size: 11px;
+    font-weight: 800;
+    color: #00B0FA;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.view-all-materials-link {
+    font-size: 13px;
+    font-weight: 700;
+    color: #00B0FA;
+    text-decoration: none;
+}
+
+.material-log-content-box {
+    background: white;
+    border: 1px solid #EAECF0;
+    border-radius: 12px;
+    padding: 40px;
+    max-width: 440px;
+}
+
+.no-materials-placeholder p {
+    font-size: 15px;
+    font-weight: 700;
+    color: #101828;
+    margin-bottom: 12px;
+}
+
+.add-material-btn-mini {
+    height: 32px;
+    padding: 0 12px;
+    background: white;
+    border: 1px solid #D0D5DD;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+/* 6. Footer Add Section */
+.add-plan-section-container {
+    padding: 24px;
+    border-top: 1px solid #EAECF0;
+}
+
+.add-plan-section-dashed-refined {
+    width: 100%;
+    height: 60px;
+    background: transparent;
+    border: 1px dashed #D0D5DD;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #98A2B3;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-plan-section-dashed-refined:hover {
+    border-color: #00B0FA;
+    background: #F0F9FF;
+    color: #00B0FA;
 }

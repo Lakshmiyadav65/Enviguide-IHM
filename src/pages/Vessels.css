@@ -31,6 +31,12 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body:has(.sidebar.collapsed) .vessel-page-main {
+    margin-left: 80px;
+    width: calc(100% - 80px);
 }
 
 .vessel-page-main .dashboard-header {
@@ -784,13 +790,14 @@
 }
 
 
-/* Enable scrolling for the actual tab content */
+/* Disable scrolling and make it a flex container to fill height */
 .vessel-tab-content {
     flex: 1;
-    overflow: visible;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     scroll-behavior: smooth;
-    padding: 20px 20px 40px 20px;
-    /* Reduced padding to bring scrollbar to border */
+    padding: 20px;
 }
 
 .vessel-tab-content.no-scroll {
