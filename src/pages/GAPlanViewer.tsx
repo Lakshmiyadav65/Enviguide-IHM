@@ -1,20 +1,19 @@
 import React, { useState, useRef } from 'react';
 import {
-    MoveLeft,
     Hand,
     Maximize,
     RotateCw,
     RotateCcw,
     History,
     CheckCircle,
-    Ship,
     Trash2,
-    Plus,
-    Search,
-    Minus,
     ChevronLeft,
     ChevronRight,
-    Square
+    Crop,
+    ZoomIn,
+    ZoomOut,
+    Pencil,
+    Ship
 } from 'lucide-react';
 import './GAPlanViewer.css';
 
@@ -78,7 +77,6 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
         if (activeTool === 'crop') {
             const rect = wrapperRef.current?.getBoundingClientRect();
             if (rect && rect.width > 0) {
-                // Use a unified scale factor relative to our target 1000px width
                 const scaleFactor = 1000 / rect.width;
                 const x = (e.clientX - rect.left) * scaleFactor;
                 const y = (e.clientY - rect.top) * scaleFactor;
@@ -165,21 +163,30 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
         onUpdateSections((prev: MappedSection[]) => prev.filter((s: MappedSection) => s.id !== id));
     };
 
+    const handleEditMapping = (section: MappedSection, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const urlParams = new URLSearchParams({
+            url: fileUrl,
+            name: section.title,
+            x: section.rect.x.toString(),
+            y: section.rect.y.toString(),
+            w: section.rect.width.toString(),
+            h: section.rect.height.toString(),
+            mode: 'add'
+        });
+        window.open(`/mapping?${urlParams.toString()}`, '_blank');
+    };
+
     const handleNewSection = () => {
         setCurrentSelection(null);
         setNewSelectionTitle('');
         setActiveTool('crop');
     };
 
-    // Unified Precise Thumbnail Logic - "Perfect Aspect Ratio"
     const CropThumbnail = ({ rect }: { rect: Rect }) => {
-        const containerW = 252; // Fixed width for sidebar cards
-
-        // Calculate the height needed to maintain the exact aspect ratio of the selection
+        const containerW = 252;
         const aspectRatio = rect.height / rect.width;
         const dynamicH = containerW * aspectRatio;
-
-        // The scale is simply container width / selection width
         const scale = containerW / rect.width;
 
         return (
@@ -211,39 +218,26 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
 
     return (
         <div className="ga-viewer-overlay">
-            {/* Short Toast Alert */}
             <div className={`ga-toast ${toast.visible ? 'show' : ''}`}>
                 <CheckCircle size={16} />
                 <span>{toast.message}</span>
             </div>
 
-            {/* Top Navigation Bar */}
-            <div className="ga-viewer-top-nav">
-                <div className="left-nav-items">
-                    <button className="back-btn" onClick={onClose}>
-                        <MoveLeft size={14} />
-                        <span>BACK TO DECKS</span>
-                    </button>
-                    <div className="breadcrumb-divider">|</div>
-                    <div className="breadcrumb-text">DASHBOARD / GA PLAN</div>
-                </div>
-            </div>
+            {/* Top Nav Removed */}
 
-            {/* Header Area */}
             <div className="ga-viewer-header">
                 <div className="viewer-header-left">
-                    <div className="viewer-icon-box">
-                        <Ship size={18} color="white" />
+                    <div className="logo-icon-box-v2">
+                        <Ship size={20} className="sailing-logo" />
                     </div>
                     <div className="viewer-title-text">
-                        <h3>Ship GA Plan</h3>
+                        <h3>MV Ocean Pioneer</h3>
                         <p>TECHNICAL ENGINEERING VIEWER</p>
                     </div>
                 </div>
             </div>
 
             <div className={`ga-viewer-content-area ${isSidebarOpen ? 'sidebar-open' : ''}`}>
-                {/* Main Canvas Area */}
                 <div
                     className={`ga-viewer-main ${activeTool === 'hand' ? 'hand-active' : ''} ${activeTool === 'crop' ? 'crop-active' : ''}`}
                     onMouseDown={handleMouseDown}
@@ -278,7 +272,6 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                                 <img src={fileUrl} alt="GA Plan" className="ga-plan-image" style={{ width: '1000px', display: 'block' }} />
                             )}
 
-                            {/* Rest of the marks... */}
                             {mappedSections.map(section => (
                                 section.isVisible && (
                                     <div
@@ -291,7 +284,15 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                                             height: section.rect.height
                                         }}
                                     >
-                                        <div className="selection-tag">{section.title}</div>
+                                        <div
+                                            className="selection-tag"
+                                            style={{
+                                                transform: `scale(${100 / zoom})`,
+                                                transformOrigin: 'top left'
+                                            }}
+                                        >
+                                            {section.title}
+                                        </div>
                                     </div>
                                 )
                             ))}
@@ -307,7 +308,13 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                                     }}
                                 >
                                     {!isDrawing && (
-                                        <div className="selection-input-container">
+                                        <div
+                                            className="selection-input-container"
+                                            style={{
+                                                transform: `scale(${100 / zoom})`,
+                                                transformOrigin: 'top left'
+                                            }}
+                                        >
                                             <input
                                                 type="text"
                                                 placeholder="Enter Title..."
@@ -330,31 +337,31 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                     {/* Bottom Left Toolbar */}
                     <div className="ga-toolbar-left">
                         <div className="zoom-controls">
-                            <button onClick={() => setZoom(z => Math.max(10, z - 5))}>
-                                <Search size={16} />
-                                <Minus size={8} style={{ marginLeft: -6, marginTop: -4 }} />
+                            <button className="zoom-adjust-btn" onClick={() => setZoom(z => Math.max(10, z - 5))}>
+                                <ZoomOut size={18} />
                             </button>
                             <div className="zoom-percentage">
                                 <span className="zoom-label">ZOOM</span>
                                 <span className="zoom-value">{zoom.toFixed(1)}%</span>
                             </div>
-                            <button onClick={() => setZoom(z => Math.min(400, z + 5))}>
-                                <Search size={16} />
-                                <Plus size={8} style={{ marginLeft: -6, marginTop: -4 }} />
+                            <button className="zoom-adjust-btn" onClick={() => setZoom(z => Math.min(400, z + 5))}>
+                                <ZoomIn size={18} />
                             </button>
                         </div>
                         <div className="tool-divider"></div>
                         <button
                             className={`tool-btn-inline ${activeTool === 'hand' ? 'active' : ''}`}
                             onClick={() => setActiveTool(activeTool === 'hand' ? 'none' : 'hand')}
+                            title="Hand Tool"
                         >
                             <Hand size={18} />
                         </button>
                         <button
                             className={`tool-btn-inline ${activeTool === 'crop' ? 'active' : ''}`}
                             onClick={handleNewSection}
+                            title="Crop Tool"
                         >
-                            <Square size={18} />
+                            <Crop size={18} />
                         </button>
                     </div>
 
@@ -379,20 +386,24 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                     {/* Navigation Cluster */}
                     <div className="ga-toolbar-right">
                         <div className="quick-actions">
-                            <button className="tool-btn-inline" onClick={() => { setZoom(100); setOffset({ x: 0, y: 0 }); }}><Maximize size={18} /></button>
-                            <button className="tool-btn-inline" onClick={() => setRotation(r => r - 90)}><RotateCcw size={18} /></button>
-                            <button className="tool-btn-inline" onClick={() => setRotation(r => r + 90)}><RotateCw size={18} /></button>
-                            <button className="tool-btn-inline" onClick={() => { setZoom(100); setRotation(0); setOffset({ x: 0, y: 0 }); onUpdateSections([]); }}><History size={18} /></button>
+                            <button
+                                className="tool-btn-inline"
+                                onClick={() => window.open(fileUrl, '_blank')}
+                                title="Open Original File"
+                            >
+                                <Maximize size={18} />
+                            </button>
+                            <button className="tool-btn-inline" onClick={() => setRotation(r => r - 90)} title="Rotate Left"><RotateCcw size={18} /></button>
+                            <button className="tool-btn-inline" onClick={() => setRotation(r => r + 90)} title="Rotate Right"><RotateCw size={18} /></button>
+                            <button className="tool-btn-inline" onClick={() => { setZoom(100); setRotation(0); setOffset({ x: 0, y: 0 }); onUpdateSections([]); }} title="Reset View"><History size={18} /></button>
                         </div>
                     </div>
 
-                    {/* Sidebar Toggle */}
                     <div className="sidebar-toggle-btn" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
                         {isSidebarOpen ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
                     </div>
                 </div>
 
-                {/* Technical Engineering Sidebar */}
                 <div className={`ga-viewer-sidebar ${isSidebarOpen ? 'open' : ''}`}>
                     <div className="sidebar-header">
                         <h4>MAPPED SECTIONS</h4>
@@ -400,7 +411,6 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                     </div>
 
                     <div className="sections-list">
-                        {/* Currently Drawing Section */}
                         {currentSelection && !isDrawing && (
                             <div className="ga-section-card active current">
                                 <div className="section-card-header">
@@ -412,7 +422,6 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                             </div>
                         )}
 
-                        {/* Saved Areas List */}
                         {mappedSections.map((section, idx) => (
                             <div
                                 key={section.id}
@@ -420,8 +429,19 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                                 onClick={() => toggleSectionVisibility(section.id)}
                             >
                                 <div className="section-card-header">
-                                    <span className="section-idx">0{idx + 1}</span>
-                                    <Trash2 size={12} className="trash-icon" onClick={(e) => deleteSection(section.id, e)} />
+                                    <span className="section-idx" style={{ color: '#2563EB', fontWeight: 800 }}>{(idx + 1).toString().padStart(2, '0')}</span>
+                                    <div className="card-actions-row">
+                                        <Pencil
+                                            size={12}
+                                            className="action-icon edit-icon"
+                                            onClick={(e) => handleEditMapping(section, e)}
+                                        />
+                                        <Trash2
+                                            size={12}
+                                            className="action-icon trash-icon"
+                                            onClick={(e) => deleteSection(section.id, e)}
+                                        />
+                                    </div>
                                 </div>
                                 <CropThumbnail rect={section.rect} />
                                 <div className="section-name">{section.title}</div>

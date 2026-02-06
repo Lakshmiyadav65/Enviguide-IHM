@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
     Search, Plus, Filter, ChevronRight, ChevronLeft, ChevronDown, AlertCircle,
     Database, Package, Download, X, Settings as Cog, FileText, CheckCircle, ExternalLink, MoreVertical
@@ -23,6 +23,24 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
     const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
     const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
     const [visibleCount, setVisibleCount] = useState(12);
+    const [isRiskDropdownOpen, setIsRiskDropdownOpen] = useState(false);
+    const [isComplianceDropdownOpen, setIsComplianceDropdownOpen] = useState(false);
+
+    const riskRef = useRef<HTMLDivElement>(null);
+    const complianceRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (riskRef.current && !riskRef.current.contains(event.target as Node)) {
+                setIsRiskDropdownOpen(false);
+            }
+            if (complianceRef.current && !complianceRef.current.contains(event.target as Node)) {
+                setIsComplianceDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Filter Panel State
     // Filter Panel State
@@ -39,6 +57,19 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
     const [editName, setEditName] = useState('');
     const [editCAS, setEditCAS] = useState('1332-21-4');
     const [editRisk] = useState('High Risk');
+    const [isEmptyCategoryDropdownOpen, setIsEmptyCategoryDropdownOpen] = useState(false);
+    const [emptyStateCategory, setEmptyStateCategory] = useState('Select Material Category');
+    const emptyCategoryRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (emptyCategoryRef.current && !emptyCategoryRef.current.contains(event.target as Node)) {
+                setIsEmptyCategoryDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Logic: "PACIFIC HORIZON" gets the empty state. Others get the list.
     const isEmpty = vesselName === 'PACIFIC HORIZON';
@@ -64,9 +95,29 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                             <span className="drop-text">Choose file or drag and drop...</span>
                         </div>
 
-                        <div className="category-select-wrapper">
-                            <span>Select Material Category</span>
-                            <ChevronDown size={14} color="#64748B" />
+                        <div className="custom-select-wrapper" style={{ position: 'relative' }} ref={emptyCategoryRef}>
+                            <div
+                                className={`category-select-wrapper ${isEmptyCategoryDropdownOpen ? 'active' : ''}`}
+                                onClick={() => setIsEmptyCategoryDropdownOpen(!isEmptyCategoryDropdownOpen)}
+                            >
+                                <span>{emptyStateCategory}</span>
+                            </div>
+                            {isEmptyCategoryDropdownOpen && (
+                                <div className="custom-dropdown-menu" style={{ top: 'calc(100% + 4px)', minWidth: '220px' }}>
+                                    {['Structure/Equipment', 'Operationally Generated', 'Stores', 'Non-Hazardous'].map(option => (
+                                        <div
+                                            key={option}
+                                            className={`custom-dropdown-item ${emptyStateCategory === option ? 'active' : ''}`}
+                                            onClick={() => {
+                                                setEmptyStateCategory(option);
+                                                setIsEmptyCategoryDropdownOpen(false);
+                                            }}
+                                        >
+                                            {option}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <button className="add-material-btn-small">
@@ -219,27 +270,58 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                         />
                     </div>
 
-                    <select
-                        className="filter-dropdown"
-                        value={riskFilter}
-                        onChange={(e) => setRiskFilter(e.target.value)}
-                    >
-                        <option>Risk Level</option>
-                        <option>High</option>
-                        <option>Medium</option>
-                        <option>Low</option>
-                    </select>
+                    <div className="custom-select-wrapper" style={{ position: 'relative' }} ref={riskRef}>
+                        <div
+                            className={`filter-dropdown ${isRiskDropdownOpen ? 'active' : ''}`}
+                            onClick={() => setIsRiskDropdownOpen(!isRiskDropdownOpen)}
+                        >
+                            {riskFilter}
+                        </div>
+                        {isRiskDropdownOpen && (
+                            <div className="custom-dropdown-menu">
+                                {['Risk Level', 'High', 'Medium', 'Low'].map(option => (
+                                    <div
+                                        key={option}
+                                        className={`custom-dropdown-item ${riskFilter === option ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setRiskFilter(option);
+                                            setIsRiskDropdownOpen(false);
+                                        }}
+                                    >
+                                        {option}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
-                    <select
-                        className="filter-dropdown"
-                        value={complianceFilter}
-                        onChange={(e) => setComplianceFilter(e.target.value)}
-                    >
-                        <option>Compliance Status</option>
-                        <option>Compliant</option>
-                        <option>Non-Compliant</option>
-                    </select>
+                    <div className="custom-select-wrapper" style={{ position: 'relative' }} ref={complianceRef}>
+                        <div
+                            className={`filter-dropdown ${isComplianceDropdownOpen ? 'active' : ''}`}
+                            onClick={() => setIsComplianceDropdownOpen(!isComplianceDropdownOpen)}
+                        >
+                            {complianceFilter}
+                        </div>
+                        {isComplianceDropdownOpen && (
+                            <div className="custom-dropdown-menu">
+                                {['Compliance Status', 'Compliant', 'Non-Compliant'].map(option => (
+                                    <div
+                                        key={option}
+                                        className={`custom-dropdown-item ${complianceFilter === option ? 'active' : ''}`}
+                                        onClick={() => {
+                                            setComplianceFilter(option);
+                                            setIsComplianceDropdownOpen(false);
+                                        }}
+                                    >
+                                        {option}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
 
+                <div className="header-actions-right">
                     <button
                         className={`filter-btn-icon ${isFilterPanelOpen ? 'active' : ''}`}
                         onClick={() => {
@@ -255,62 +337,62 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                         <Download size={16} /> Export Record
                     </button>
                 </div>
+            </div>
 
-                {/* Active Filters Row (Dynamic) */}
-                {(thresholdMin > 0 || thresholdMax < 1.0 || selectedParts.length > 0 || selectedZones.length > 0) && (
-                    <div className="active-filters-row">
-                        <div className="active-chips-container">
-                            {thresholdMin > 0 || thresholdMax < 1.0 ? (
-                                <div className="filter-chip">
-                                    <span>Threshold: {thresholdMin.toFixed(2)}%-{thresholdMax.toFixed(2)}%</span>
-                                    <X size={12} onClick={() => { setThresholdMin(0); setThresholdMax(1.0); }} />
-                                </div>
-                            ) : null}
+            {/* Active Filters Row (Dynamic) */}
+            {(thresholdMin > 0 || thresholdMax < 1.0 || selectedParts.length > 0 || selectedZones.length > 0) && (
+                <div className="active-filters-row">
+                    <div className="active-chips-container">
+                        {thresholdMin > 0 || thresholdMax < 1.0 ? (
+                            <div className="filter-chip">
+                                <span>Threshold: {thresholdMin.toFixed(2)}%-{thresholdMax.toFixed(2)}%</span>
+                                <X size={12} onClick={() => { setThresholdMin(0); setThresholdMax(1.0); }} />
+                            </div>
+                        ) : null}
 
-                            {selectedParts.map(part => (
-                                <div className="filter-chip" key={part}>
-                                    <span>{part}</span>
-                                    <X size={12} onClick={() => setSelectedParts(selectedParts.filter(p => p !== part))} />
-                                </div>
-                            ))}
+                        {selectedParts.map(part => (
+                            <div className="filter-chip" key={part}>
+                                <span>{part}</span>
+                                <X size={12} onClick={() => setSelectedParts(selectedParts.filter(p => p !== part))} />
+                            </div>
+                        ))}
 
-                            {selectedZones.map(zone => (
-                                <div className="filter-chip" key={zone}>
-                                    <span>{zone}</span>
-                                    <X size={12} onClick={() => setSelectedZones(selectedZones.filter(z => z !== zone))} />
-                                </div>
-                            ))}
-                            <span className="results-count-text">Showing {filteredMaterials.length} results</span>
-                        </div>
-                        <div className="clear-all-link" onClick={() => {
-                            setThresholdMin(0); setThresholdMax(1.0);
-                            setSelectedParts([]);
-                            setSelectedZones([]);
-                        }}>
-                            Clear All
-                        </div>
+                        {selectedZones.map(zone => (
+                            <div className="filter-chip" key={zone}>
+                                <span>{zone}</span>
+                                <X size={12} onClick={() => setSelectedZones(selectedZones.filter(z => z !== zone))} />
+                            </div>
+                        ))}
+                        <span className="results-count-text">Showing {filteredMaterials.length} results</span>
                     </div>
-                )}
-
-                {/* Category Pills Row (Static Selection) */}
-                <div className="category-tabs-row">
-                    {[
-                        { label: 'All Materials', count: counts.all, key: 'All' },
-                        { label: 'Part I', count: counts.part1, key: 'Part I' },
-                        { label: 'Part II', count: counts.part2, key: 'Part II' },
-                        { label: 'Part III', count: counts.part3, key: 'Part III' },
-                        { label: 'Non-Hazardous', count: counts.nonHaz, key: 'Non-Hazardous' },
-                        { label: 'Archived', count: counts.archived, key: 'Archived' }
-                    ].map(tab => (
-                        <div
-                            key={tab.key}
-                            className={`category-tab ${activeTag === tab.key ? 'active' : ''}`}
-                            onClick={() => setActiveTag(tab.key)}
-                        >
-                            {tab.label} ({tab.count})
-                        </div>
-                    ))}
+                    <div className="clear-all-link" onClick={() => {
+                        setThresholdMin(0); setThresholdMax(1.0);
+                        setSelectedParts([]);
+                        setSelectedZones([]);
+                    }}>
+                        Clear All
+                    </div>
                 </div>
+            )}
+
+            {/* Category Pills Row (Static Selection) */}
+            <div className="category-tabs-row">
+                {[
+                    { label: 'All Materials', count: counts.all, key: 'All' },
+                    { label: 'Part I', count: counts.part1, key: 'Part I' },
+                    { label: 'Part II', count: counts.part2, key: 'Part II' },
+                    { label: 'Part III', count: counts.part3, key: 'Part III' },
+                    { label: 'Non-Hazardous', count: counts.nonHaz, key: 'Non-Hazardous' },
+                    { label: 'Archived', count: counts.archived, key: 'Archived' }
+                ].map(tab => (
+                    <div
+                        key={tab.key}
+                        className={`category-tab ${activeTag === tab.key ? 'active' : ''}`}
+                        onClick={() => setActiveTag(tab.key)}
+                    >
+                        {tab.label} ({tab.count})
+                    </div>
+                ))}
             </div>
 
             <div className={`materials-list-container ${selectedMaterialId ? '' : ''}`}>
@@ -799,6 +881,6 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                     )}
                 </div>
             </div>
-        </div >
+        </div>
     );
 }

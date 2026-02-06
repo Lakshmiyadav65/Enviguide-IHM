@@ -215,6 +215,7 @@ export default function PurchaseOrderView({
     const [expandedSuppliers, setExpandedSuppliers] = useState<string[]>([]);
     const [openActionDropdown, setOpenActionDropdown] = useState<string | null>(null);
     const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
+    const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
     const [expandedFormSections, setExpandedFormSections] = useState<string[]>(['general']);
     const [showToast, setShowToast] = useState(false);
     const [lastSavedPO, setLastSavedPO] = useState('');
@@ -661,10 +662,39 @@ export default function PurchaseOrderView({
                                     </div>
                                     <div className="form-field">
                                         <label>SUPPLIER *</label>
-                                        <select name="supplier" value={formData.supplier} onChange={handleFormChange} required>
-                                            <option value="">Select Supplier</option>
-                                            {suppliers.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                                        </select>
+                                        <div className="custom-select-wrapper" style={{ position: 'relative' }}>
+                                            <div
+                                                className={`select-input-mock ${isSupplierDropdownOpen ? 'active' : ''}`}
+                                                onClick={() => setIsSupplierDropdownOpen(!isSupplierDropdownOpen)}
+                                            >
+                                                {formData.supplier || 'Select Supplier'}
+                                            </div>
+                                            {isSupplierDropdownOpen && (
+                                                <div className="custom-dropdown-menu">
+                                                    <div
+                                                        className={`custom-dropdown-item ${formData.supplier === '' ? 'active' : ''}`}
+                                                        onClick={() => {
+                                                            setFormData(prev => ({ ...prev, supplier: '' }));
+                                                            setIsSupplierDropdownOpen(false);
+                                                        }}
+                                                    >
+                                                        Select Supplier
+                                                    </div>
+                                                    {suppliers.map(s => (
+                                                        <div
+                                                            key={s.id}
+                                                            className={`custom-dropdown-item ${formData.supplier === s.name ? 'active' : ''}`}
+                                                            onClick={() => {
+                                                                setFormData(prev => ({ ...prev, supplier: s.name }));
+                                                                setIsSupplierDropdownOpen(false);
+                                                            }}
+                                                        >
+                                                            {s.name}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="form-row">
                                         <div className="form-field">

@@ -108,23 +108,7 @@
     outline: none;
 }
 
-.filter-dropdown {
-    padding: 10px 16px;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: var(--radius-premium);
-    color: #64748b;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    outline: none;
-    min-width: 140px;
-}
-
-.filter-dropdown:hover {
-    border-color: #cbd5e1;
-    color: #334155;
-}
+/* filter-dropdown styled globally in index.css */
 
 .filter-btn-icon {
     width: 42px;
@@ -1560,4 +1544,66 @@
     background: #0F172A;
     color: white;
     border-color: #0F172A;
+}
+
+/* --- Responsive Design --- */
+@media (max-width: 1200px) {
+    .materials-content-wrapper {
+        flex-direction: column;
+        padding-right: 24px;
+    }
+
+    .materials-list-pane {
+        margin-right: 0;
+        margin-bottom: 24px;
+        width: 100%;
+    }
+
+    .materials-details-pane {
+        width: 100%;
+        margin-right: 0;
+    }
+}
+
+@media (max-width: 992px) {
+    .materials-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .search-field {
+        width: 100%;
+    }
+
+    .filter-dropdown {
+        width: 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .materials-header {
+        padding: 0 16px;
+    }
+
+    .materials-content-wrapper {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .category-tabs-row {
+        overflow-x: auto;
+        padding-bottom: 8px;
+    }
+
+    .category-tab {
+        white-space: nowrap;
+    }
+
+    .materials-table th:nth-child(3),
+    .materials-table td:nth-child(3),
+    .materials-table th:nth-child(4),
+    .materials-table td:nth-child(4) {
+        display: none;
+        /* Hide ID and Part on mobile */
+    }
 }

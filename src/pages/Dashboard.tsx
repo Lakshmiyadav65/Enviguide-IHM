@@ -1,10 +1,10 @@
+import { useState, useRef, useEffect } from 'react';
 import {
     Ship,
     FileText,
     TrendingUp,
     AlertTriangle,
     Filter,
-    ChevronDown,
     Users,
     UserCheck,
     UserX,
@@ -20,12 +20,42 @@ import Header from '../components/Header';
 import './Dashboard.css';
 
 export default function Dashboard() {
+    const [activeFilters, setActiveFilters] = useState({
+        yearly: 'Yearly',
+        shipOwner: 'Ship Owner',
+        shipManager: 'Ship Manager',
+        supplier: 'Supplier',
+        vessel: 'Vessel'
+    });
+
+    const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+    const filterRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+                setOpenDropdown(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const toggleDropdown = (name: string) => {
+        setOpenDropdown(openDropdown === name ? null : name);
+    };
+
+    const handleSelect = (filterName: string, value: string) => {
+        setActiveFilters(prev => ({ ...prev, [filterName]: value }));
+        setOpenDropdown(null);
+    };
+
     return (
         <div className="dashboard-wrapper">
             <Sidebar />
 
             <main className="main-content">
-                <Header />
+                <Header title="Dashboard" />
 
                 <div className="dashboard-content">
 
@@ -38,26 +68,133 @@ export default function Dashboard() {
                     </div>
 
                     {/* 2. Filters Row */}
-                    <div className="filters-row">
+                    <div className="filters-row" ref={filterRef}>
                         <button className="filter-btn">
                             <Filter size={16} /> Filters
                         </button>
-                        <button className="filter-btn">
-                            Yearly <ChevronDown size={16} />
-                        </button>
-                        <button className="filter-btn">
-                            Ship Owner <ChevronDown size={16} />
-                        </button>
-                        <button className="filter-btn">
-                            Ship Manager <ChevronDown size={16} />
-                        </button>
-                        <button className="filter-btn">
-                            Supplier <ChevronDown size={16} />
-                        </button>
-                        <button className="filter-btn">
-                            Vessel <ChevronDown size={16} />
-                        </button>
-                        <button className="clear-filters">Clear Filters</button>
+
+                        {/* Yearly Filter */}
+                        <div className="custom-select-wrapper" style={{ position: 'relative' }}>
+                            <div
+                                className={`filter-btn ${openDropdown === 'yearly' ? 'active' : ''}`}
+                                onClick={() => toggleDropdown('yearly')}
+                            >
+                                {activeFilters.yearly}
+                            </div>
+                            {openDropdown === 'yearly' && (
+                                <div className="custom-dropdown-menu">
+                                    {['Yearly', '2024', '2023', '2022'].map(option => (
+                                        <div
+                                            key={option}
+                                            className={`custom-dropdown-item ${activeFilters.yearly === option ? 'active' : ''}`}
+                                            onClick={() => handleSelect('yearly', option)}
+                                        >
+                                            {option}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Ship Owner Filter */}
+                        <div className="custom-select-wrapper" style={{ position: 'relative' }}>
+                            <div
+                                className={`filter-btn ${openDropdown === 'shipOwner' ? 'active' : ''}`}
+                                onClick={() => toggleDropdown('shipOwner')}
+                            >
+                                {activeFilters.shipOwner}
+                            </div>
+                            {openDropdown === 'shipOwner' && (
+                                <div className="custom-dropdown-menu">
+                                    {['Ship Owner', 'CMA CGM', 'Maersk Line', 'MSC'].map(option => (
+                                        <div
+                                            key={option}
+                                            className={`custom-dropdown-item ${activeFilters.shipOwner === option ? 'active' : ''}`}
+                                            onClick={() => handleSelect('shipOwner', option)}
+                                        >
+                                            {option}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Ship Manager Filter */}
+                        <div className="custom-select-wrapper" style={{ position: 'relative' }}>
+                            <div
+                                className={`filter-btn ${openDropdown === 'shipManager' ? 'active' : ''}`}
+                                onClick={() => toggleDropdown('shipManager')}
+                            >
+                                {activeFilters.shipManager}
+                            </div>
+                            {openDropdown === 'shipManager' && (
+                                <div className="custom-dropdown-menu">
+                                    {['Ship Manager', 'V.Ships', 'Bernhard Schulte', 'Columbia Shipmanagement'].map(option => (
+                                        <div
+                                            key={option}
+                                            className={`custom-dropdown-item ${activeFilters.shipManager === option ? 'active' : ''}`}
+                                            onClick={() => handleSelect('shipManager', option)}
+                                        >
+                                            {option}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Supplier Filter */}
+                        <div className="custom-select-wrapper" style={{ position: 'relative' }}>
+                            <div
+                                className={`filter-btn ${openDropdown === 'supplier' ? 'active' : ''}`}
+                                onClick={() => toggleDropdown('supplier')}
+                            >
+                                {activeFilters.supplier}
+                            </div>
+                            {openDropdown === 'supplier' && (
+                                <div className="custom-dropdown-menu">
+                                    {['Supplier', 'Wilhelmsen', 'Wärtsilä', 'ABB'].map(option => (
+                                        <div
+                                            key={option}
+                                            className={`custom-dropdown-item ${activeFilters.supplier === option ? 'active' : ''}`}
+                                            onClick={() => handleSelect('supplier', option)}
+                                        >
+                                            {option}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Vessel Filter */}
+                        <div className="custom-select-wrapper" style={{ position: 'relative' }}>
+                            <div
+                                className={`filter-btn ${openDropdown === 'vessel' ? 'active' : ''}`}
+                                onClick={() => toggleDropdown('vessel')}
+                            >
+                                {activeFilters.vessel}
+                            </div>
+                            {openDropdown === 'vessel' && (
+                                <div className="custom-dropdown-menu">
+                                    {['Vessel', 'MV Ocean Pioneer', 'ACOSTA', 'PACIFIC HORIZON'].map(option => (
+                                        <div
+                                            key={option}
+                                            className={`custom-dropdown-item ${activeFilters.vessel === option ? 'active' : ''}`}
+                                            onClick={() => handleSelect('vessel', option)}
+                                        >
+                                            {option}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <button className="clear-filters" onClick={() => setActiveFilters({
+                            yearly: 'Yearly',
+                            shipOwner: 'Ship Owner',
+                            shipManager: 'Ship Manager',
+                            supplier: 'Supplier',
+                            vessel: 'Vessel'
+                        })}>Clear Filters</button>
                     </div>
 
                     {/* 3. KPI Cards */}

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import {
     Search, Plus, Filter, Layers, FileText, ShoppingCart,
@@ -40,6 +40,7 @@ interface VesselData {
     signalLetters: string;
     buildersUniqueId: string;
     mdStandard: string;
+    ihmMethod: string;
     socReference: string;
     image: string;
 }
@@ -70,7 +71,8 @@ const INITIAL_VESSELS: VesselData[] = [
         ihmReference: 'IHM-P-2024',
         signalLetters: 'PION',
         buildersUniqueId: 'BUILD-P1',
-        mdStandard: 'IMO',
+        mdStandard: 'HKC',
+        ihmMethod: 'NB',
         socReference: 'SOC-998',
         image: vesselDefault
     },
@@ -99,7 +101,8 @@ const INITIAL_VESSELS: VesselData[] = [
         ihmReference: 'IHM Report: J-1109202',
         signalLetters: '3FHM7',
         buildersUniqueId: 'BUILD-99',
-        mdStandard: 'IMO',
+        mdStandard: 'HKC',
+        ihmMethod: 'NB',
         socReference: 'IHM-00670',
         image: vesselDefault
     },
@@ -128,7 +131,8 @@ const INITIAL_VESSELS: VesselData[] = [
         ihmReference: 'IHM Report: G-9922',
         signalLetters: 'ABCD4',
         buildersUniqueId: 'BUILD-45',
-        mdStandard: 'IHM Method',
+        mdStandard: 'EU',
+        ihmMethod: 'ES',
         socReference: 'IHM-9988',
         image: vesselDefault
     },
@@ -157,7 +161,8 @@ const INITIAL_VESSELS: VesselData[] = [
         ihmReference: 'IHM-PH-10',
         signalLetters: 'PHOR',
         buildersUniqueId: 'BUILD-P5',
-        mdStandard: 'Nil',
+        mdStandard: 'HKC',
+        ihmMethod: 'NB',
         socReference: 'SOC-556',
         image: vesselDefault
     },
@@ -186,7 +191,8 @@ const INITIAL_VESSELS: VesselData[] = [
         ihmReference: 'IHM-NS-01',
         signalLetters: 'NSTR',
         buildersUniqueId: 'B-STAR-1',
-        mdStandard: 'IHM v2',
+        mdStandard: 'EU',
+        ihmMethod: 'ES',
         socReference: 'SOC-NS-01',
         image: vesselDefault
     },
@@ -199,7 +205,7 @@ const EMPTY_FORM: VesselData = {
     registeredOwner: '', flagState: '', vesselIhmClass: '', classIdNo: '',
     nameOfYard: '', keelLaidDate: '', grossTonnage: '', teuUnits: '',
     ihmReference: '', signalLetters: '', buildersUniqueId: '',
-    mdStandard: '', socReference: '',
+    mdStandard: 'HKC', ihmMethod: 'NB', socReference: '',
     image: ''
 };
 
@@ -213,6 +219,25 @@ export default function Vessels() {
     const [isAdding, setIsAdding] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [isFilterExpanded, setIsFilterExpanded] = useState(false);
+
+    // Custom Dropdown States
+    const [isDocTypeDropdownOpen, setIsDocTypeDropdownOpen] = useState(false);
+    const [isDocCategoryDropdownOpen, setIsDocCategoryDropdownOpen] = useState(false);
+    const [isDocStatusDropdownOpen, setIsDocStatusDropdownOpen] = useState(false);
+
+    const docTypeRef = useRef<HTMLDivElement>(null);
+    const docCategoryRef = useRef<HTMLDivElement>(null);
+    const docStatusRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (docTypeRef.current && !docTypeRef.current.contains(event.target as Node)) setIsDocTypeDropdownOpen(false);
+            if (docCategoryRef.current && !docCategoryRef.current.contains(event.target as Node)) setIsDocCategoryDropdownOpen(false);
+            if (docStatusRef.current && !docStatusRef.current.contains(event.target as Node)) setIsDocStatusDropdownOpen(false);
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Purchase Order Filters Lifted State
     const [poFilterDateFrom, setPoFilterDateFrom] = useState('');
@@ -558,17 +583,30 @@ export default function Vessels() {
                                 style={{ display: 'none' }}
                                 onChange={handleDocFileChange}
                             />
-                            <select
-                                className="doc-type-select"
-                                value={newDocType}
-                                onChange={(e) => setNewDocType(e.target.value)}
-                            >
-                                <option>Select Document Type</option>
-                                <option>Certificate</option>
-                                <option>Manual</option>
-                                <option>Drawing</option>
-                                <option>Declaration</option>
-                            </select>
+                            <div className="custom-select-wrapper" style={{ position: 'relative' }} ref={docTypeRef}>
+                                <div
+                                    className={`doc-type-select ${isDocTypeDropdownOpen ? 'active' : ''}`}
+                                    onClick={() => setIsDocTypeDropdownOpen(!isDocTypeDropdownOpen)}
+                                >
+                                    {newDocType}
+                                </div>
+                                {isDocTypeDropdownOpen && (
+                                    <div className="custom-dropdown-menu">
+                                        {['Select Document Type', 'Certificate', 'Manual', 'Drawing', 'Declaration'].map(option => (
+                                            <div
+                                                key={option}
+                                                className={`custom-dropdown-item ${newDocType === option ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    setNewDocType(option);
+                                                    setIsDocTypeDropdownOpen(false);
+                                                }}
+                                            >
+                                                {option}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                             <button className="upload-exec-btn" onClick={handleDocUpload}>
                                 <Upload size={18} /> {selectedFile ? 'Upload Now' : 'Select File'}
                             </button>
@@ -585,22 +623,59 @@ export default function Vessels() {
                                 onChange={(e) => setDocSearch(e.target.value)}
                             />
                         </div>
-                        <select value={docCategory} onChange={(e) => setDocCategory(e.target.value)} className="doc-filter-select">
-                            <option value="All">Category</option>
-                            <option value="Certificate">Certificate</option>
-                            <option value="Manual">Manual</option>
-                            <option value="Drawing">Drawing</option>
-                            <option value="Declaration">Declaration</option>
-                        </select>
-                        <select value={docStatus} onChange={(e) => setDocStatus(e.target.value)} className="doc-filter-select">
-                            <option value="All">Status</option>
-                            <option value="Active">Active</option>
-                            <option value="Expiring">Expiring</option>
-                        </select>
+
+                        <div className="custom-select-wrapper" style={{ position: 'relative' }} ref={docCategoryRef}>
+                            <div
+                                className={`doc-filter-select ${isDocCategoryDropdownOpen ? 'active' : ''}`}
+                                onClick={() => setIsDocCategoryDropdownOpen(!isDocCategoryDropdownOpen)}
+                            >
+                                {docCategory === 'All' ? 'Category' : docCategory}
+                            </div>
+                            {isDocCategoryDropdownOpen && (
+                                <div className="custom-dropdown-menu">
+                                    {['All', 'Certificate', 'Manual', 'Drawing', 'Declaration'].map(option => (
+                                        <div
+                                            key={option}
+                                            className={`custom-dropdown-item ${docCategory === option ? 'active' : ''}`}
+                                            onClick={() => {
+                                                setDocCategory(option);
+                                                setIsDocCategoryDropdownOpen(false);
+                                            }}
+                                        >
+                                            {option === 'All' ? 'Category' : option}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="custom-select-wrapper" style={{ position: 'relative' }} ref={docStatusRef}>
+                            <div
+                                className={`doc-filter-select ${isDocStatusDropdownOpen ? 'active' : ''}`}
+                                onClick={() => setIsDocStatusDropdownOpen(!isDocStatusDropdownOpen)}
+                            >
+                                {docStatus === 'All' ? 'Status' : docStatus}
+                            </div>
+                            {isDocStatusDropdownOpen && (
+                                <div className="custom-dropdown-menu">
+                                    {['All', 'Active', 'Expiring'].map(option => (
+                                        <div
+                                            key={option}
+                                            className={`custom-dropdown-item ${docStatus === option ? 'active' : ''}`}
+                                            onClick={() => {
+                                                setDocStatus(option);
+                                                setIsDocStatusDropdownOpen(false);
+                                            }}
+                                        >
+                                            {option === 'All' ? 'Status' : option}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         <div className="doc-date-range">
                             <Calendar size={18} />
                             <span>Select Date Range (From - To)</span>
-                            <ChevronDown size={14} />
                         </div>
                         <button className="clear-filters-link" onClick={() => { setDocSearch(''); setDocCategory('All'); setDocStatus('All'); }}>Clear Filters</button>
                     </div>
@@ -842,7 +917,6 @@ export default function Vessels() {
                                 <FormGroup label="Class ID No" name="classIdNo" value={formData.classIdNo} onChange={handleInputChange} readOnly={!isEditing} />
                                 <FormGroup label="Name Of Yard" name="nameOfYard" value={formData.nameOfYard} onChange={handleInputChange} readOnly={!isEditing} />
                                 <DateGroup label="Keel Laid Date" name="keelLaidDate" value={formData.keelLaidDate} onChange={handleInputChange} readOnly={!isEditing} />
-                                <FormGroup label="Gross Tonnage" name="grossTonnage" value={formData.grossTonnage} onChange={handleInputChange} readOnly={!isEditing} />
                                 <FormGroup label="TEU No of Units" name="teuUnits" value={formData.teuUnits} onChange={handleInputChange} readOnly={!isEditing} />
                                 <FormGroup label="Initial IHM Reference" name="ihmReference" value={formData.ihmReference} onChange={handleInputChange} readOnly={!isEditing} />
                             </div>
@@ -890,15 +964,27 @@ export default function Vessels() {
 
                                 <FormGroup label="Signal Letters" name="signalLetters" value={formData.signalLetters} onChange={handleInputChange} readOnly={!isEditing} />
                                 <FormGroup label="Builders unique id of ship" name="buildersUniqueId" value={formData.buildersUniqueId} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Gross Tonnage" name="grossTonnage" value={formData.grossTonnage} onChange={handleInputChange} readOnly={!isEditing} />
 
-                                <RadioGroup
-                                    label="MD Standard"
-                                    name="mdStandard"
-                                    options={['IMO', 'IHM Method', 'Nil']}
-                                    value={formData.mdStandard}
-                                    onChange={handleInputChange}
-                                    readOnly={!isEditing}
-                                />
+                                <div className="radio-row-compact">
+                                    <RadioGroup
+                                        label="MD Standard"
+                                        name="mdStandard"
+                                        options={['HKC', 'EU']}
+                                        value={formData.mdStandard}
+                                        onChange={handleInputChange}
+                                        readOnly={!isEditing}
+                                    />
+
+                                    <RadioGroup
+                                        label="IHM Method"
+                                        name="ihmMethod"
+                                        options={['NB', 'ES']}
+                                        value={formData.ihmMethod}
+                                        onChange={handleInputChange}
+                                        readOnly={!isEditing}
+                                    />
+                                </div>
 
                                 <FormGroup label="SOC Reference" name="socReference" value={formData.socReference} onChange={handleInputChange} readOnly={!isEditing} />
                             </div>
@@ -1077,42 +1163,43 @@ export default function Vessels() {
                                     </>
                                 ) : (
                                     <>
-                                        <div className="vessel-search-container light-mode" style={{ marginTop: '20px' }}>
-                                            <div className="vessel-search-box light">
-                                                <Search size={16} color="#94A3B8" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Search vessels..."
-                                                    value={searchTerm}
-                                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="vessel-list light-mode">
-                                            {vesselList.filter(v =>
-                                                v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                v.imoNo.includes(searchTerm)
-                                            ).map((vessel) => (
-                                                <div
-                                                    key={`${vessel.name}-${vessel.imoNo}`}
-                                                    className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
-                                                    onClick={() => handleVesselSelect(vessel)}
-                                                >
-                                                    <div className="vessel-status-dot v-active"></div>
-                                                    <div className="vessel-info-block">
-                                                        <h4>{vessel.name}</h4>
-                                                        <p>IMO {vessel.imoNo}</p>
-                                                    </div>
+                                        <div className="sidebar-dark-content-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                            <div className="vessel-search-container light-mode" style={{ paddingTop: '20px' }}>
+                                                <div className="vessel-search-box light">
+                                                    <Search size={16} color="#94A3B8" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search vessels..."
+                                                        value={searchTerm}
+                                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                                    />
                                                 </div>
-                                            ))}
-                                        </div>
+                                            </div>
 
-                                        <div className="sidebar-footer dark-bg">
-                                            <button className="add-vessel-btn-large" onClick={handleAddClick}>
-                                                <Plus size={20} />
-                                                Add Vessel
-                                            </button>
+                                            <div className="vessel-list light-mode" style={{ flex: 1, overflowY: 'auto' }}>
+                                                {vesselList.filter(v =>
+                                                    v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                    v.imoNo.includes(searchTerm)
+                                                ).map((vessel) => (
+                                                    <div
+                                                        key={`${vessel.name}-${vessel.imoNo}`}
+                                                        className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
+                                                        onClick={() => handleVesselSelect(vessel)}
+                                                    >
+                                                        <div className="vessel-status-dot v-active"></div>
+                                                        <div className="vessel-info-block">
+                                                            <h4>{vessel.name}</h4>
+                                                            <p>IMO {vessel.imoNo}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                <div className="sidebar-add-action" style={{ padding: '10px 20px' }}>
+                                                    <button className="add-vessel-btn-large" onClick={handleAddClick}>
+                                                        <Plus size={20} />
+                                                        Add Vessel
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
                                     </>
                                 )}

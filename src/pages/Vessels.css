@@ -25,7 +25,7 @@
     padding: var(--header-height) 0 0 0 !important;
     height: 100vh;
     overflow: hidden;
-    /* Main container fixed, children scroll */
+    /* Main container fixed, children scroll inside tabs */
     margin-left: 280px;
     width: calc(100% - 280px);
     position: relative;
@@ -126,9 +126,8 @@ body:has(.sidebar.collapsed) .vessel-page-main {
     flex-direction: column;
     border-right: 1px solid rgba(255, 255, 255, 0.1);
     flex-shrink: 0;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #00B0FA transparent;
+    overflow: hidden;
+    /* Header fixed, list scrolls */
 }
 
 .secondary-sidebar::-webkit-scrollbar {
@@ -704,12 +703,15 @@ body:has(.sidebar.collapsed) .vessel-page-main {
     gap: 10px;
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0, 176, 250, 0.3);
+    margin: 20px 0;
 }
 
 /* Light Mode Sidebar Vessel List - Darkened as requested */
 .vessel-search-container.light-mode {
-    padding: 20px;
-    background: #0f172a;
+    padding: 24px 20px;
+    background: transparent;
+    position: relative;
+    z-index: 10;
 }
 
 .vessel-search-box.light {
@@ -814,7 +816,7 @@ body:has(.sidebar.collapsed) .vessel-page-main {
     flex: 1;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
     scroll-behavior: smooth;
     padding: 20px;
 }
@@ -2504,4 +2506,157 @@ body:has(.sidebar.collapsed) .vessel-page-main {
     background: rgba(255, 255, 255, 0.05);
     width: calc(100% - 40px);
     margin-left: 20px;
+}
+
+/* --- Responsive Design --- */
+@media (max-width: 1200px) {
+    .vessel-page-main {
+        margin-left: 80px;
+        width: calc(100% - 80px);
+    }
+
+    .form-grid,
+    .form-grid-three-col {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 992px) {
+    .vessel-header-banner {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 20px;
+    }
+
+    .banner-right {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 768px) {
+    .vessel-page-main {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    .form-grid,
+    .form-grid-three-col {
+        grid-template-columns: 1fr;
+    }
+
+    .vessel-sidebar-filter.card-style {
+        margin: 0 10px;
+    }
+
+    .secondary-sidebar {
+        display: none;
+        /* In a real app, we'd add a toggle for this */
+    }
+
+    .vessel-details-banner h1 {
+        font-size: 20px;
+    }
+
+    .vessel-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .doc-pagination-bar {
+        flex-direction: column;
+        gap: 16px;
+        align-items: flex-start;
+        padding: 20px;
+    }
+
+    .pagination-arrows {
+        width: 100%;
+        justify-content: space-between;
+    }
+}
+
+.radio-row-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin-bottom: 20px;
+}
+
+.radio-row-compact .form-group-modern {
+    margin-bottom: 12px;
+}
+
+/* Ensure main content scrolls while header is fixed */
+.vessels-main {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.vessel-tab-content {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 24px;
+}
+
+.form-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.vessel-form-card-premium {
+    margin: 0;
+}
+
+/* Sidebar scroll fix */
+.secondary-sidebar {
+    display: flex;
+    flex-direction: column;
+    height: 100% !important;
+    overflow: hidden !important;
+}
+
+.sidebar-dark-content-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.vessel-list.light-mode {
+    flex: 1 !important;
+    overflow-y: auto !important;
+}
+
+.sidebar-add-action {
+    padding: 24px 20px;
+    background: rgba(15, 23, 42, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.add-vessel-btn-large {
+    width: 100%;
+    background: var(--primary-blue);
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: var(--radius-premium);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 176, 250, 0.3);
+    transition: all 0.2s ease;
+}
+
+.add-vessel-btn-large:hover {
+    background: var(--primary-blue-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 176, 250, 0.4);
 }
