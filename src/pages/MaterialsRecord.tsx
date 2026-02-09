@@ -71,8 +71,9 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Logic: "PACIFIC HORIZON" gets the empty state. Others get the list.
-    const isEmpty = vesselName === 'PACIFIC HORIZON';
+    // Logic: The "Big 4" demo vessels get full data. Others get the empty state.
+    const demoVessels = ['MV Ocean Pioneer', 'ACOSTA', 'AFIF', 'PACIFIC HORIZON'];
+    const isEmpty = !demoVessels.includes(vesselName);
 
     if (isEmpty) {
         return (

@@ -281,6 +281,32 @@
     gap: 16px;
 }
 
+.h-deck-context-v5 {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: 24px;
+    padding-left: 24px;
+    border-left: 1px solid #E2E8F0;
+}
+
+.badge-text-v5 {
+    display: flex;
+    flex-direction: column;
+}
+
+.badge-text-v5 strong {
+    font-size: 13px;
+    line-height: 1.2;
+    color: #1e293b;
+}
+
+.badge-text-v5 span {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+}
+
 .back-btn-v5 {
     display: flex;
     align-items: center;
@@ -638,16 +664,31 @@
     color: white;
 }
 
-/* Sidebar Styling */
-/* Sidebar V5 */
+/* Sidebar V5 - Truly Fixed Logic */
 .inventory-v5-side {
     width: 480px;
+    height: 100%;
+    /* Relative to flex container */
     background: white;
     border-left: 1px solid #E2E8F0;
     display: flex;
     flex-direction: column;
     position: relative;
-    overflow-x: hidden;
+    overflow: hidden;
+    /* Constrain children */
+    box-shadow: -4px 0 15px rgba(0, 0, 0, 0.05);
+}
+
+.inventory-v5-side::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #F8FAFC;
+    /* Subtle background for the whole rail */
+    z-index: -1;
 }
 
 .v5-side-header {
@@ -685,6 +726,21 @@
     overflow-y: auto;
     overflow-x: hidden;
     padding: 16px;
+    height: 100%;
+    /* Ensure it takes full height */
+}
+
+.v5-inventory-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.v5-inventory-list::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+.v5-inventory-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
 }
 
 .v5-cat-group {

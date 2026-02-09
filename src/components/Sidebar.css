@@ -102,8 +102,8 @@
 }
 
 .sidebar-header {
-    padding: 16px 24px;
-    height: 72px;
+    padding: 12px 24px;
+    height: 64px;
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--border-color);
@@ -156,10 +156,16 @@
 /* Navigation */
 .sidebar-nav {
     flex: 1;
-    padding: 8px 16px;
+    padding: 0 16px 16px 16px;
     display: flex;
     flex-direction: column;
     gap: 4px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+    width: 0;
 }
 
 .nav-item-container {

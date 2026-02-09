@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     Hand,
     Maximize,
@@ -13,9 +13,11 @@ import {
     ZoomIn,
     ZoomOut,
     Pencil,
-    Ship
+    Ship,
+    X
 } from 'lucide-react';
 import './GAPlanViewer.css';
+import { PLAN_GENERIC } from '../assets/ship_plans';
 
 interface Rect {
     x: number;
@@ -27,7 +29,9 @@ interface Rect {
 interface MappedSection {
     id: string;
     title: string;
+    sectionId: string;
     rect: Rect;
+    itemsCount: number;
     isVisible?: boolean;
 }
 
@@ -37,17 +41,51 @@ interface GAPlanViewerProps {
     onClose: () => void;
     mappedSections: MappedSection[];
     onUpdateSections: React.Dispatch<React.SetStateAction<MappedSection[]>>;
+    focusedSectionId?: string | null;
+    vesselName: string;
+    isIsolationMode?: boolean;
 }
 
-export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSections, onUpdateSections }: GAPlanViewerProps) {
+
+export default function GAPlanViewer({
+    filename,
+    fileUrl,
+    onClose,
+    mappedSections,
+    onUpdateSections,
+    focusedSectionId,
+    vesselName,
+    isIsolationMode = false
+}: GAPlanViewerProps) {
     // View State
-    const [zoom, setZoom] = useState(100);
+    const [zoom, setZoom] = useState(30); // Initial Zoom
     const [rotation, setRotation] = useState(0);
+    const [imgAspectRatio, setImgAspectRatio] = useState(1.428); // Default 1000/700
+
+    // Sanitize URL internally
+    const displayFileUrl = (fileUrl && !fileUrl.includes('ga_plan_')) ? fileUrl : PLAN_GENERIC;
+
     const [offset, setOffset] = useState({ x: 0, y: 0 });
 
     // UI State
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [activeTool, setActiveTool] = useState<'none' | 'hand' | 'crop'>('none');
+    const [localFocusedId, setLocalFocusedId] = useState<string | null>(focusedSectionId || null);
+
+    // Sync prop to local state
+    useEffect(() => {
+        if (focusedSectionId) {
+            setLocalFocusedId(focusedSectionId);
+        }
+    }, [focusedSectionId]);
+
+    const canvasRef = useRef<HTMLDivElement>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const isPdf = filename.toLowerCase().endsWith('.pdf');
+
+    // Toast state
+    const [toast, setToast] = useState<{ title: string; subtitle: string; visible: boolean }>({ title: '', subtitle: '', visible: false });
+    const [lastAddedId, setLastAddedId] = useState<string | null>(null);
 
     // Selection state
     const [currentSelection, setCurrentSelection] = useState<Rect | null>(null);
@@ -55,12 +93,42 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
     const [isDrawing, setIsDrawing] = useState(false);
     const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
 
-    // Toast state
-    const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+    // Center view on focused section or fit entire plan
+    useEffect(() => {
+        if (localFocusedId) {
+            const section = mappedSections.find(s => s.id === localFocusedId);
+            if (section && wrapperRef.current) {
+                const viewport = wrapperRef.current.parentElement?.getBoundingClientRect();
+                if (viewport) {
+                    // Cap zoom to 100% to keep it "personal size" and clear
+                    const targetZoom = 100;
+                    setZoom(targetZoom);
+                    setOffset({
+                        x: (viewport.width / 2) - ((section.rect.x + section.rect.width / 2) * targetZoom / 100),
+                        y: (viewport.height / 2) - ((section.rect.y + section.rect.height / 2) * targetZoom / 100)
+                    });
+                }
+            }
+        } else if (wrapperRef.current) {
+            // Global Fit: Scale to show entire GA plan
+            const viewport = wrapperRef.current.parentElement?.getBoundingClientRect();
+            if (viewport) {
+                const imgWidth = 1000;
+                const imgHeight = 1000 / imgAspectRatio;
+                const padding = 1.02; // Minimal 2% padding
+                const scaleX = viewport.width / (imgWidth * padding);
+                const scaleY = viewport.height / (imgHeight * padding);
 
-    const canvasRef = useRef<HTMLDivElement>(null);
-    const wrapperRef = useRef<HTMLDivElement>(null);
-    const isPdf = filename.toLowerCase().endsWith('.pdf');
+                // Aggressive fit: Fill as much as possible
+                const fitZoom = Math.min(scaleX, scaleY) * 100;
+                setZoom(fitZoom);
+                setOffset({
+                    x: (viewport.width - (imgWidth * fitZoom / 100)) / 2,
+                    y: (viewport.height - (imgHeight * fitZoom / 100)) / 2
+                });
+            }
+        }
+    }, [localFocusedId, mappedSections.length, fileUrl, vesselName]);
 
     // Pan handling
     const [isPanning, setIsPanning] = useState(false);
@@ -132,30 +200,81 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
         }
     };
 
-    const showToast = (message: string) => {
-        setToast({ message, visible: true });
+    const showToast = (title: string, subtitle: string) => {
+        setToast({ title, subtitle, visible: true });
         setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
     };
 
-    const addSelection = () => {
-        if (currentSelection && newSelectionTitle) {
-            const newId = Date.now().toString();
-            const newSection: MappedSection = {
-                id: newId,
-                title: newSelectionTitle,
-                rect: currentSelection,
-                isVisible: false
-            };
-            onUpdateSections(prev => [...prev, newSection]);
-            showToast(`Deck "${newSelectionTitle}" Saved Successfully`);
-            setCurrentSelection(null);
-            setNewSelectionTitle('');
-            setActiveTool('none');
-        }
+    // escape key to cancel
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setActiveTool('none');
+                setCurrentSelection(null);
+                setNewSelectionTitle('');
+                setIsDrawing(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    const checkOverlap = (newRect: Rect) => {
+        return mappedSections.some(section => {
+            const r1 = newRect;
+            const r2 = section.rect;
+
+            // Check if rectangles intersect
+            return !(r2.x > r1.x + r1.width ||
+                r2.x + r2.width < r1.x ||
+                r2.y > r1.y + r1.height ||
+                r2.y + r2.height < r1.y);
+        });
     };
 
-    const toggleSectionVisibility = (id: string) => {
-        onUpdateSections((prev: MappedSection[]) => prev.map((s: MappedSection) => s.id === id ? { ...s, isVisible: !s.isVisible } : s));
+    const addSelection = () => {
+        if (!currentSelection || !newSelectionTitle) return;
+
+        // Check for overlap with existing sections
+        if (checkOverlap(currentSelection)) {
+            alert("This area is already cropped. You cannot crop the same area twice.");
+            return;
+        }
+
+        const newId = Date.now().toString();
+        const sectionId = `DECK-${newId.slice(-4)}`;
+        const newSection: MappedSection = {
+            id: newId,
+            title: newSelectionTitle,
+            sectionId: sectionId,
+            rect: currentSelection,
+            itemsCount: 0,
+            isVisible: true
+        };
+        // Initialize empty inventory for this deck
+        localStorage.setItem(`inventory_${vesselName}_${newSelectionTitle}`, JSON.stringify([]));
+        onUpdateSections(prev => [...prev, newSection]);
+        setLastAddedId(newId);
+        showToast("Deck Saved Successfully", `${newSelectionTitle} has been added to the vessel project`);
+
+        // Clear selection to avoid duplication in UI
+        setCurrentSelection(null);
+        setNewSelectionTitle('');
+        setActiveTool('none');
+    };
+
+    const handleNewSection = () => {
+        setCurrentSelection(null);
+        setNewSelectionTitle('');
+        setActiveTool('crop');
+    };
+
+    const undoLastSave = () => {
+        if (lastAddedId) {
+            onUpdateSections(prev => prev.filter(s => s.id !== lastAddedId));
+            setLastAddedId(null);
+            setToast(prev => ({ ...prev, visible: false }));
+        }
     };
 
     const deleteSection = (id: string, e: React.MouseEvent) => {
@@ -172,16 +291,12 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
             y: section.rect.y.toString(),
             w: section.rect.width.toString(),
             h: section.rect.height.toString(),
-            mode: 'add'
+            mode: 'add',
+            vessel: vesselName
         });
         window.open(`/mapping?${urlParams.toString()}`, '_blank');
     };
 
-    const handleNewSection = () => {
-        setCurrentSelection(null);
-        setNewSelectionTitle('');
-        setActiveTool('crop');
-    };
 
     const CropThumbnail = ({ rect }: { rect: Rect }) => {
         const containerW = 252;
@@ -200,7 +315,7 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                 border: '1px solid rgba(255, 255, 255, 0.1)'
             }}>
                 <img
-                    src={fileUrl}
+                    src={displayFileUrl}
                     alt="crop"
                     style={{
                         position: 'absolute',
@@ -219,8 +334,12 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
     return (
         <div className="ga-viewer-overlay">
             <div className={`ga-toast ${toast.visible ? 'show' : ''}`}>
-                <CheckCircle size={16} />
-                <span>{toast.message}</span>
+                <CheckCircle size={20} />
+                <div className="ga-toast-content">
+                    <div className="ga-toast-title">{toast.title}</div>
+                    <div className="ga-toast-subtitle">{toast.subtitle}</div>
+                </div>
+                <div className="ga-toast-action" onClick={undoLastSave}>UNDO</div>
             </div>
 
             {/* Top Nav Removed */}
@@ -231,9 +350,16 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                         <Ship size={20} className="sailing-logo" />
                     </div>
                     <div className="viewer-title-text">
-                        <h3>MV Ocean Pioneer</h3>
+                        <h3>{vesselName}</h3>
                         <p>TECHNICAL ENGINEERING VIEWER</p>
                     </div>
+                </div>
+
+                <div className="viewer-header-actions">
+                    <button className="exit-viewer-btn" onClick={onClose}>
+                        <X size={18} />
+                        <span>EXIT VIEWER</span>
+                    </button>
                 </div>
             </div>
 
@@ -243,7 +369,7 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
+                    // onMouseLeave={handleMouseUp} // Removed to prevent potential early drag release
                     onWheel={handleWheel}
                     ref={canvasRef}
                 >
@@ -254,26 +380,44 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                             transformOrigin: 'center center'
                         }}
                     >
-                        <div className="ga-plan-title-overlay">GENERAL ARRANGEMENT</div>
 
                         <div
                             className="ga-drawing-coordinate-reference"
                             ref={wrapperRef}
-                            style={{ position: 'relative', width: '1000px' }}
+                            style={{
+                                position: 'relative',
+                                width: '1000px',
+                                height: `${1000 / imgAspectRatio}px`,
+                                background: 'transparent'
+                            }}
                         >
                             {isPdf ? (
                                 <iframe
-                                    src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                                    src={`${displayFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                                     title="GA Plan PDF"
                                     className="ga-plan-frame"
-                                    style={{ width: '1000px', height: '700px', border: 'none', display: 'block' }}
+                                    style={{ width: '1000px', height: `${1000 / imgAspectRatio}px`, border: 'none', display: 'block' }}
                                 />
                             ) : (
-                                <img src={fileUrl} alt="GA Plan" className="ga-plan-image" style={{ width: '1000px', display: 'block' }} />
+                                <img
+                                    src={displayFileUrl}
+                                    alt="GA Plan"
+                                    className="ga-plan-image"
+                                    style={{ width: '1000px', height: 'auto', display: 'block' }}
+                                    draggable={false}
+                                    onLoad={(e) => {
+                                        const { naturalWidth, naturalHeight } = e.currentTarget;
+                                        if (naturalWidth && naturalHeight) {
+                                            setImgAspectRatio(naturalWidth / naturalHeight);
+                                        }
+                                    }}
+                                />
                             )}
 
                             {mappedSections.map(section => (
-                                section.isVisible && (
+                                // Use isIsolationMode to hide other sections when enabled, 
+                                // otherwise show all mapped sections
+                                ((isIsolationMode && localFocusedId) ? section.id === localFocusedId : section.isVisible) && (
                                     <div
                                         key={section.id}
                                         className="drawn-selection"
@@ -281,18 +425,22 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                                             left: section.rect.x,
                                             top: section.rect.y,
                                             width: section.rect.width,
-                                            height: section.rect.height
+                                            height: section.rect.height,
+                                            background: (localFocusedId === section.id || (activeTool === 'none' && !localFocusedId)) ? 'rgba(0, 176, 250, 0.1)' : 'transparent',
+                                            border: (localFocusedId === section.id || (activeTool === 'none' && !localFocusedId)) ? '2px solid #00B0FA' : '1px dashed rgba(0,176,250,0.3)',
+                                            zIndex: localFocusedId === section.id ? 5 : 1
                                         }}
                                     >
-                                        <div
-                                            className="selection-tag"
-                                            style={{
-                                                transform: `scale(${100 / zoom})`,
-                                                transformOrigin: 'top left'
-                                            }}
-                                        >
-                                            {section.title}
-                                        </div>
+                                        {localFocusedId === section.id && (
+                                            <div
+                                                className="section-label-viewer"
+                                                style={{
+                                                    fontSize: Math.max(12, 14 * (100 / zoom)) + 'px'
+                                                }}
+                                            >
+                                                {section.title}
+                                            </div>
+                                        )}
                                     </div>
                                 )
                             ))}
@@ -388,7 +536,9 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                         <div className="quick-actions">
                             <button
                                 className="tool-btn-inline"
-                                onClick={() => window.open(fileUrl, '_blank')}
+                                onClick={() => {
+                                    window.open(displayFileUrl, '_blank');
+                                }}
                                 title="Open Original File"
                             >
                                 <Maximize size={18} />
@@ -411,42 +561,44 @@ export default function GAPlanViewer({ filename, fileUrl, onClose, mappedSection
                     </div>
 
                     <div className="sections-list">
-                        {currentSelection && !isDrawing && (
-                            <div className="ga-section-card active current">
-                                <div className="section-card-header">
-                                    <span className="section-label-blue">CURRENT SELECTION</span>
-                                    <Trash2 size={12} style={{ color: '#9CA3AF', cursor: 'pointer' }} onClick={() => setCurrentSelection(null)} />
-                                </div>
-                                <CropThumbnail rect={currentSelection} />
-                                <div className="section-name">{newSelectionTitle || 'Unnamed Section'}</div>
-                            </div>
-                        )}
-
-                        {mappedSections.map((section, idx) => (
-                            <div
-                                key={section.id}
-                                className={`ga-section-card ${!section.isVisible ? 'hidden-section' : ''}`}
-                                onClick={() => toggleSectionVisibility(section.id)}
-                            >
-                                <div className="section-card-header">
-                                    <span className="section-idx" style={{ color: '#2563EB', fontWeight: 800 }}>{(idx + 1).toString().padStart(2, '0')}</span>
-                                    <div className="card-actions-row">
-                                        <Pencil
-                                            size={12}
-                                            className="action-icon edit-icon"
-                                            onClick={(e) => handleEditMapping(section, e)}
-                                        />
-                                        <Trash2
-                                            size={12}
-                                            className="action-icon trash-icon"
-                                            onClick={(e) => deleteSection(section.id, e)}
-                                        />
+                        {mappedSections.map((section, idx) => {
+                            const isFocused = section.id === localFocusedId;
+                            return (
+                                <div
+                                    key={section.id}
+                                    className={`ga-section-card ${isFocused ? 'active focused' : ''} ${!section.isVisible ? 'hidden-section' : ''}`}
+                                    onClick={() => {
+                                        setLocalFocusedId(section.id === localFocusedId ? null : section.id);
+                                        // Update URL to focus on this section
+                                        const query = new URLSearchParams(window.location.search);
+                                        if (section.id === localFocusedId) {
+                                            query.delete('focusedId');
+                                        } else {
+                                            query.set('focusedId', section.id);
+                                        }
+                                        window.history.replaceState(null, '', `${window.location.pathname}?${query.toString()}`);
+                                    }}
+                                >
+                                    <div className="section-card-header">
+                                        <span className="section-idx" style={{ color: isFocused ? 'white' : '#2563EB', fontWeight: 800 }}>{(idx + 1).toString().padStart(2, '0')}</span>
+                                        <div className="card-actions-row">
+                                            <Pencil
+                                                size={12}
+                                                className="action-icon edit-icon"
+                                                onClick={(e) => handleEditMapping(section, e)}
+                                            />
+                                            <Trash2
+                                                size={12}
+                                                className="action-icon trash-icon"
+                                                onClick={(e) => deleteSection(section.id, e)}
+                                            />
+                                        </div>
                                     </div>
+                                    <CropThumbnail rect={section.rect} />
+                                    <div className="section-name">{section.title}</div>
                                 </div>
-                                <CropThumbnail rect={section.rect} />
-                                <div className="section-name">{section.title}</div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </div>

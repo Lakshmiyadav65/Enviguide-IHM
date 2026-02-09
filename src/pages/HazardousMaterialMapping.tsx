@@ -44,12 +44,17 @@ interface MaterialEntry {
     ihmPartNumber?: string;
 }
 
+import { PLAN_GENERIC } from '../assets/ship_plans';
+
 export default function HazardousMaterialMapping() {
     const location = useLocation();
     const navigate = useNavigate();
     const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
 
-    const fileUrl = query.get('url') || '';
+    let fileUrl = query.get('url') || '';
+    if (fileUrl && fileUrl.includes('ga_plan_')) {
+        fileUrl = PLAN_GENERIC;
+    }
     const sectionName = query.get('name') || 'A-DECK 01';
     const rect = {
         x: parseFloat(query.get('x') || '0'),
@@ -58,13 +63,14 @@ export default function HazardousMaterialMapping() {
         h: parseFloat(query.get('h') || '700')
     };
 
+
+
     const [zoom, setZoom] = useState(100);
     const [viewMode, setViewMode] = useState<'list' | 'add' | 'detail'>('list');
     const [activeTool, setActiveTool] = useState<'none' | 'pin'>('none');
-    const [inventory, setInventory] = useState<MaterialEntry[]>(() => {
-        const stored = localStorage.getItem(`inventory_${sectionName}`);
-        return stored ? JSON.parse(stored) : [];
-    });
+    const vesselName = query.get('vessel') || 'Unknown Vessel';
+    const [inventory, setInventory] = useState<MaterialEntry[]>([]);
+    const lastLoadedKeyRef = useRef("");
     const [searchQuery, setSearchQuery] = useState('');
     const [tempPin, setTempPin] = useState<{ x: number, y: number } | null>(null);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -76,11 +82,11 @@ export default function HazardousMaterialMapping() {
     const [targetDeckForTransfer, setTargetDeckForTransfer] = useState<string | null>(null); // New state for pending transfer
 
     useEffect(() => {
-        const sections = localStorage.getItem('active_vessel_sections');
+        const sections = localStorage.getItem(`vessel_sections_${vesselName}`);
         if (sections) {
             setAvailableDecks(JSON.parse(sections));
         }
-    }, []);
+    }, [vesselName]);
 
     // Handle incoming material transfer
     useEffect(() => {
@@ -112,12 +118,17 @@ export default function HazardousMaterialMapping() {
                 unit: transfer.unit || '',
                 hmStatus: transfer.hmStatus || 'CHM'
             });
-            // Show alert
-            setTimeout(() => alert(`Re-mapping ${transfer.name}. Please click on the plan to set the new location.`), 500);
-        }
-    }, [location.state]);
+            // Clear navigation state to prevent re-triggering on refresh
+            window.history.replaceState({}, document.title);
 
-    // Constants for cropper size
+            // Professional Guidance Alert
+            setTimeout(() => {
+                alert(`RE-MAPPING INITIATED: ${transfer.name}\n\nTechnical details have been pre-filled. Please click on the plan to set the new location for this material on ${sectionName}.`);
+            }, 600);
+        }
+    }, [location.state, sectionName]);
+
+    // Constants for GA plan size - Use high-res 2000px for clarity
     const CROPPER_WIDTH = 1000;
 
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -146,6 +157,24 @@ export default function HazardousMaterialMapping() {
 
     // Initial mode check and focus on crop
     useEffect(() => {
+        // 1. Sync inventory when deck or vessel changes
+        const key = `inventory_${vesselName}_${sectionName}`;
+        const stored = localStorage.getItem(key);
+        const parsed = stored ? JSON.parse(stored) : [];
+        setInventory(parsed);
+        lastLoadedKeyRef.current = key;
+
+        // 2. Handle matId focus
+        const matId = query.get('matId');
+        if (matId) {
+            const found = parsed.find((i: MaterialEntry) => i.id === matId);
+            if (found) {
+                setViewingMaterial(found);
+                setViewMode('detail');
+            }
+        }
+
+        // 3. Handle mode add
         if (query.get('mode') === 'add') {
             setViewMode('add');
             setActiveTool('pin');
@@ -154,16 +183,14 @@ export default function HazardousMaterialMapping() {
         const updatePosition = () => {
             const viewport = wrapperRef.current?.getBoundingClientRect();
             if (viewport && viewport.width > 0) {
-                const scaleX = viewport.width / rect.w;
-                const scaleY = viewport.height / rect.h;
-                const initialZoom = Math.min(scaleX, scaleY, 8) * 100;
-
+                // Cap zoom to 150% (1.5) to keep it "personal size" and clear
+                const initialZoom = 100; // Fixed "personal size" zoom at 100%
                 setZoom(initialZoom);
 
                 // Center precisely
                 setOffset({
-                    x: (viewport.width - (rect.w * initialZoom / 100)) / 2,
-                    y: (viewport.height - (rect.h * initialZoom / 100)) / 2
+                    x: (viewport.width / 2) - ((rect.w / 2) * initialZoom / 100),
+                    y: (viewport.height / 2) - ((rect.h / 2) * initialZoom / 100)
                 });
             }
         };
@@ -180,10 +207,15 @@ export default function HazardousMaterialMapping() {
 
     // Save to localStorage whenever inventory changes
     useEffect(() => {
-        localStorage.setItem(`inventory_${sectionName}`, JSON.stringify(inventory));
-        // Dispatch storage event for other tabs
-        window.dispatchEvent(new Event('storage'));
-    }, [inventory, sectionName]);
+        const key = `inventory_${vesselName}_${sectionName}`;
+        // Only save if the current inventory belongs to the current deck/vessel key
+        // This prevents overwriting data during navigation transitions
+        if (lastLoadedKeyRef.current === key && inventory.length > 0) {
+            localStorage.setItem(key, JSON.stringify(inventory));
+            // Dispatch storage event for other tabs
+            window.dispatchEvent(new Event('storage'));
+        }
+    }, [inventory, sectionName, vesselName]);
 
     const handleCanvasClick = (e: React.MouseEvent) => {
         if (activeTool === 'pin') {
@@ -319,6 +351,7 @@ export default function HazardousMaterialMapping() {
                     </div>
                 </div>
 
+
                 <div className="h-center-v5">
                     <div className="search-pill-v5">
                         <Search size={18} />
@@ -364,13 +397,11 @@ export default function HazardousMaterialMapping() {
                             <button className="reset-label-v5" onClick={() => {
                                 const viewport = wrapperRef.current?.getBoundingClientRect();
                                 if (viewport) {
-                                    const scaleX = viewport.width / rect.w;
-                                    const scaleY = viewport.height / rect.h;
-                                    const initialZoom = Math.min(scaleX, scaleY, 8) * 100;
+                                    const initialZoom = 100;
                                     setZoom(initialZoom);
                                     setOffset({
-                                        x: (viewport.width - (rect.w * initialZoom / 100)) / 2,
-                                        y: (viewport.height - (rect.h * initialZoom / 100)) / 2
+                                        x: (viewport.width / 2) - ((rect.w / 2) * initialZoom / 100),
+                                        y: (viewport.height / 2) - ((rect.h / 2) * initialZoom / 100)
                                     });
                                 }
                             }}>
@@ -399,18 +430,23 @@ export default function HazardousMaterialMapping() {
                                         maxWidth: 'none'
                                     }} />
 
-                                {inventory.map(item => item.pin && (
-                                    <div key={item.id} className="pin-marker-v5"
-                                        style={{
-                                            left: item.pin.x - rect.x,
-                                            top: item.pin.y - rect.y,
-                                            transform: `translate(-50%, -50%) scale(${100 / zoom})`
-                                        }}>
-                                        <div className="pin-icon-box">
-                                            <Flame size={20} fill="currentColor" />
+                                {inventory.map(item => {
+                                    // If we are viewing a specific material detail, only show its pin
+                                    const shouldShowPin = viewingMaterial ? item.id === viewingMaterial.id : true;
+
+                                    return item.pin && shouldShowPin && (
+                                        <div key={item.id} className="pin-marker-v5"
+                                            style={{
+                                                left: item.pin.x - rect.x,
+                                                top: item.pin.y - rect.y,
+                                                transform: `translate(-50%, -50%) scale(${100 / zoom})`
+                                            }}>
+                                            <div className="pin-icon-box">
+                                                <Flame size={20} fill="currentColor" />
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
 
                                 {tempPin && (
                                     <div className="pin-marker-v5 ghost"
@@ -438,18 +474,20 @@ export default function HazardousMaterialMapping() {
 
                 <aside className="inventory-v5-side">
                     {viewMode === 'list' && (
-                        <div className="v5-side-header">
-                            <div className="v5-h-top">
-                                <div className="v5-title">
-                                    <LayoutGrid size={18} color="#1E3A8A" />
-                                    <h3>MATERIAL INVENTORY</h3>
-                                </div>
-                                <div className="v5-controls">
-                                    <Filter size={18} style={{ cursor: 'pointer' }} />
-                                    <Search size={18} style={{ cursor: 'pointer' }} />
+                        <>
+                            <div className="v5-side-header">
+                                <div className="v5-h-top">
+                                    <div className="v5-title">
+                                        <LayoutGrid size={18} color="#1E3A8A" />
+                                        <h3>MATERIAL INVENTORY</h3>
+                                    </div>
+                                    <div className="v5-controls">
+                                        <Filter size={18} style={{ cursor: 'pointer' }} />
+                                        <Search size={18} style={{ cursor: 'pointer' }} />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        </>
                     )}
 
                     <div className="v5-inventory-list">
@@ -618,19 +656,21 @@ export default function HazardousMaterialMapping() {
                                             if (targetDeckForTransfer) {
                                                 const deck = availableDecks.find(d => (d.title || d.sectionName) === targetDeckForTransfer);
                                                 if (deck) {
-                                                    const r = deck.rect || { x: 0, y: 0, width: 1000, height: 700 };
-                                                    const params = new URLSearchParams({
-                                                        url: 'https://placehold.co/2000x1400/f8fafc/cbd5e1.png?text=Technical+GA+Plan',
-                                                        name: deck.title || deck.sectionName,
-                                                        x: (r.x || 0).toString(),
-                                                        y: (r.y || 0).toString(),
-                                                        w: (r.width || r.w || 1000).toString(),
-                                                        h: (r.height || r.h || 700).toString()
-                                                    });
-
+                                                    const r = deck.rect || { x: 0, y: 0, width: 2000, height: 1400 };
+                                                    // Data Integrity: Remove from current deck inventory before transfer
                                                     const newInv = inventory.filter(i => i.id !== viewingMaterial.id);
                                                     setInventory(newInv);
-                                                    localStorage.setItem(`inventory_${sectionName}`, JSON.stringify(newInv));
+                                                    localStorage.setItem(`inventory_${vesselName}_${sectionName}`, JSON.stringify(newInv));
+
+                                                    const params = new URLSearchParams({
+                                                        url: fileUrl, // Preserve original plan URL
+                                                        name: deck.title || deck.sectionName,
+                                                        vessel: vesselName,
+                                                        x: (r.x || 0).toString(),
+                                                        y: (r.y || 0).toString(),
+                                                        w: (r.width || r.w || 2000).toString(),
+                                                        h: (r.height || r.h || 1400).toString()
+                                                    });
 
                                                     navigate(`${location.pathname}?${params.toString()}`, {
                                                         state: { transferMaterial: { ...viewingMaterial, deckPlan: deck.title || deck.sectionName } }
@@ -839,7 +879,7 @@ export default function HazardousMaterialMapping() {
                     The instruction's snippet for the change shows it after the `sidebar-fab-v5` and then two `</div>` tags,
                     which would place it outside the `aside` element.
                     I will follow the provided snippet's placement. */}
-            </div>
+            </div >
 
 
             <footer className="technical-footer-v3">
@@ -856,6 +896,6 @@ export default function HazardousMaterialMapping() {
                     IHM MAPPING INTERFACE V4.2.0
                 </div>
             </footer>
-        </div>
+        </div >
     );
 }

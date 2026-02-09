@@ -867,13 +867,14 @@ export default function Vessels() {
         }
 
         if (activeTab === 'decks') {
-            return <DecksView vesselName={activeVesselName} />;
+            return <DecksView key={activeVesselName} vesselName={activeVesselName} />;
         }
 
         if (activeTab === 'purchase') {
             const activeVessel = vesselList.find(v => v.name === activeVesselName);
             return (
                 <PurchaseOrderView
+                    key={activeVesselName}
                     vesselName={activeVesselName}
                     imo={activeVessel?.imoNo || ''}
                     filterDateFrom={poFilterDateFrom}
@@ -884,7 +885,7 @@ export default function Vessels() {
         }
 
         if (activeTab === 'materials') {
-            return <MaterialsRecord vesselName={activeVesselName} />;
+            return <MaterialsRecord key={activeVesselName} vesselName={activeVesselName} />;
         }
 
         return (
@@ -1018,7 +1019,7 @@ export default function Vessels() {
         <div className="vessels-page-container">
             <Sidebar />
             <main className="vessel-page-main">
-                <Header title="FLEET MANAGEMENT" />
+                <Header title="SHIPS AT PROJECT" />
 
                 <div className="vessels-layout-wrapper">
                     <div className="vessels-top-nav">
@@ -1128,8 +1129,8 @@ export default function Vessels() {
                                             </div>
                                         </div>
 
-                                        <div className="sidebar-dark-content-area" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                                            <div className="vessel-search-container dark-mode" style={{ paddingTop: '20px' }}>
+                                        <div className="sidebar-dark-content-area">
+                                            <div className="vessel-search-container dark-mode">
                                                 <div className="vessel-search-box light">
                                                     <Search size={16} color="#94A3B8" />
                                                     <input
@@ -1141,7 +1142,7 @@ export default function Vessels() {
                                                 </div>
                                             </div>
 
-                                            <div className="vessel-list dark-mode">
+                                            <div className="vessel-list dark-mode" style={{ overflowY: 'auto' }}>
                                                 {vesselList.filter(v =>
                                                     v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                                     v.imoNo.includes(searchTerm)
@@ -1158,13 +1159,19 @@ export default function Vessels() {
                                                         </div>
                                                     </div>
                                                 ))}
+                                                <div className="sidebar-list-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', marginTop: '8px' }}>
+                                                    <button className="add-vessel-btn-refined" onClick={handleAddClick}>
+                                                        <Plus size={18} />
+                                                        Add Vessel
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </>
                                 ) : (
                                     <>
-                                        <div className="sidebar-dark-content-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                                            <div className="vessel-search-container light-mode" style={{ paddingTop: '20px' }}>
+                                        <div className="sidebar-dark-content-area">
+                                            <div className="vessel-search-container light-mode">
                                                 <div className="vessel-search-box light">
                                                     <Search size={16} color="#94A3B8" />
                                                     <input
@@ -1176,7 +1183,7 @@ export default function Vessels() {
                                                 </div>
                                             </div>
 
-                                            <div className="vessel-list light-mode" style={{ flex: 1, overflowY: 'auto' }}>
+                                            <div className="vessel-list light-mode" style={{ overflowY: 'auto' }}>
                                                 {vesselList.filter(v =>
                                                     v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                                     v.imoNo.includes(searchTerm)
@@ -1193,9 +1200,9 @@ export default function Vessels() {
                                                         </div>
                                                     </div>
                                                 ))}
-                                                <div className="sidebar-add-action" style={{ padding: '10px 20px' }}>
-                                                    <button className="add-vessel-btn-large" onClick={handleAddClick}>
-                                                        <Plus size={20} />
+                                                <div className="sidebar-list-footer" style={{ borderTop: '1px solid rgba(0,0,0,0.05)', marginTop: '8px' }}>
+                                                    <button className="add-vessel-btn-refined" onClick={handleAddClick}>
+                                                        <Plus size={18} />
                                                         Add Vessel
                                                     </button>
                                                 </div>
@@ -1214,14 +1221,16 @@ export default function Vessels() {
                         </div>
                     </div>
                 </div>
-                {showModal && (
-                    <SuccessModal
-                        message={modalMessage}
-                        onClose={() => setShowModal(false)}
-                    />
-                )}
-            </main>
-        </div>
+                {
+                    showModal && (
+                        <SuccessModal
+                            message={modalMessage}
+                            onClose={() => setShowModal(false)}
+                        />
+                    )
+                }
+            </main >
+        </div >
     );
 }
 

@@ -1,14 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import GAPlanViewer from './GAPlanViewer';
 
 export default function FullPlanViewer() {
     const location = useLocation();
     const query = new URLSearchParams(location.search);
-    const fileUrl = query.get('url') || '';
+    let fileUrl = query.get('url') || '';
+    // Sanitize URL to avoid EPERM error on locked file
+    if (fileUrl.includes('ga_plan_illustration.png')) {
+        fileUrl = '/ga_plan_minimal.png';
+    }
     const filename = query.get('name') || 'Plan Viewer';
 
-    const [mappedSections, setMappedSections] = useState([]);
+    const vesselName = query.get('vessel') || 'Unknown Vessel';
+
+    const [mappedSections, setMappedSections] = useState<any[]>(() => {
+        const saved = localStorage.getItem(`vessel_sections_${vesselName}`);
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    // Save back to localStorage when sections change
+    useEffect(() => {
+        if (vesselName !== 'Unknown Vessel') {
+            localStorage.setItem(`vessel_sections_${vesselName}`, JSON.stringify(mappedSections));
+        }
+    }, [mappedSections, vesselName]);
 
     if (!fileUrl) {
         return (
@@ -41,6 +57,8 @@ export default function FullPlanViewer() {
         );
     }
 
+    const focusedId = query.get('focusedId');
+
     return (
         <div style={{ height: '100vh', width: '100vw', overflow: 'hidden' }}>
             <GAPlanViewer
@@ -49,6 +67,9 @@ export default function FullPlanViewer() {
                 onClose={() => window.close()}
                 mappedSections={mappedSections}
                 onUpdateSections={setMappedSections as any}
+                focusedSectionId={focusedId}
+                vesselName={vesselName}
+                isIsolationMode={query.get('isolated') === 'true'}
             />
         </div>
     );
