@@ -924,433 +924,432 @@ export default function Vessels() {
 
             return (
                 <div className="reports-container">
-                    {reportGroups.map((group) => (
-                        <div
-                            key={group.id}
-                            className={`report-accordion-card ${group.isDullRed ? 'dull-red' : ''} ${openReportId === group.id ? 'active' : ''}`}
-                            onClick={() => !group.disabled && setOpenReportId(openReportId === group.id ? null : group.id)}
-                        >
-                            <div className="report-accordion-header">
-                                <div className="report-header-left">
-                                    <group.icon size={20} className="report-group-icon" />
-                                    <h3>{group.label} {group.ticks && <span className="tick-count">[{group.ticks} Ticks]</span>}</h3>
-                                </div>
-                                <ChevronDown
-                                    size={18}
-                                    className="report-chevron"
-                                    style={{
-                                        transform: openReportId === group.id ? 'rotate(180deg)' : 'none',
-                                        transition: 'transform 0.2s'
-                                    }}
-                                />
-                            </div>
-
-                            {openReportId === group.id && (
-                                <div className="report-accordion-content">
-                                    <div className="report-item-row">
-                                        <div className="report-info">
-                                            <div className="report-icon-bg">
-                                                <FileText size={22} />
-                                            </div>
-                                            <div className="report-text">
-                                                <h4>Compliance Summary</h4>
-                                                <p>LAST UPDATE: 24 OCT 2023</p>
-                                            </div>
-                                        </div>
-                                        <div className="report-actions">
-                                            <button className="generate-btn-primary">
-                                                <RefreshCw size={14} /> GENERATE
-                                            </button>
-                                            <button className="download-icon-btn">
-                                                <Download size={22} />
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="report-item-row">
-                                        <div className="report-info">
-                                            <div className="report-icon-bg">
-                                                <BarChart2 size={22} />
-                                            </div>
-                                            <div className="report-text">
-                                                <h4>{group.id === 'adhoc' ? 'Ad Hoc Report - Standard Audit' : 'Detailed Materials Inventory Report'}</h4>
-                                                <p>LAST UPDATE: 12 OCT 2023</p>
-                                            </div>
-                                        </div>
-                                        <div className="report-actions">
-                                            <button className="generate-btn-primary">
-                                                <RefreshCw size={14} /> GENERATE
-                                            </button>
-                                            <button className="download-icon-btn">
-                                                <Download size={22} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-                </div >
-            );
-}
-
-
-
-if (activeTab === 'certificate') {
-    return (
-        <IHMCertificateView
-            key={activeVesselName}
-            vesselName={activeVesselName}
-            onCertificateSubmit={() => setNotifCount(prev => prev + 1)}
-        />
-    );
-}
-
-return (
-    <div className="form-scroll-area">
-        <div className="vessel-form-card-premium">
-            <form onSubmit={handleSave} className="vessel-edit-form-modern">
-                <div className="form-grid-three-col">
-                    {/* Column 1 */}
-                    <div className="form-column">
-                        <FormGroup label="Name" name="name" value={formData.name} onChange={handleInputChange} required readOnly={!isEditing} />
-                        <FormGroup label="Ship Owner" name="shipOwner" value={formData.shipOwner} onChange={handleInputChange} required readOnly={!isEditing} />
-                        <FormGroup label="Fleet" name="fleet" value={formData.fleet} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Sub Fleet" name="subFleet" value={formData.subFleet} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Vessel Class" name="vesselClass" value={formData.vesselClass} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="IMO No" name="imoNo" value={formData.imoNo} onChange={handleInputChange} required readOnly={!isEditing} />
-                        <FormGroup label="Registration Number" name="registrationNumber" value={formData.registrationNumber} onChange={handleInputChange} readOnly={!isEditing} />
-                        <DateGroup label="Delivery Date" name="deliveryDate" value={formData.deliveryDate} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Deadweight Tonnage" name="deadweightTonnage" value={formData.deadweightTonnage} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Port of Registry" name="portOfRegistry" value={formData.portOfRegistry} onChange={handleInputChange} readOnly={!isEditing} />
-                        <DateGroup label="SOC Expiry Date" name="socExpiryDate" value={formData.socExpiryDate} onChange={handleInputChange} readOnly={!isEditing} />
-                    </div>
-
-                    {/* Column 2 */}
-                    <div className="form-column">
-                        <FormGroup label="Type" name="type" value={formData.type} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Ship Manager" name="shipManager" value={formData.shipManager} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Registered Owner" name="registeredOwner" value={formData.registeredOwner} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Flag State" name="flagState" value={formData.flagState} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Vessel IHM Class" name="vesselIhmClass" value={formData.vesselIhmClass} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Class ID No" name="classIdNo" value={formData.classIdNo} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Name Of Yard" name="nameOfYard" value={formData.nameOfYard} onChange={handleInputChange} readOnly={!isEditing} />
-                        <DateGroup label="Keel Laid Date" name="keelLaidDate" value={formData.keelLaidDate} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="TEU No of Units" name="teuUnits" value={formData.teuUnits} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Initial IHM Reference" name="ihmReference" value={formData.ihmReference} onChange={handleInputChange} readOnly={!isEditing} />
-                    </div>
-
-                    {/* Column 3 */}
-                    <div className="form-column">
-                        <div className="image-upload-modern">
-                            <label>Vessel Image</label>
+                    <div className="reports-stack">
+                        {reportGroups.map((group) => (
                             <div
-                                className={`image-preview-container-modern ${!formData.image ? 'no-image' : ''} ${isDraggingFile ? 'dragging' : ''}`}
-                                onClick={isEditing ? triggerFileSelect : undefined}
-                                onDragOver={handleDragOver}
-                                onDragLeave={handleDragLeave}
-                                onDrop={handleDrop}
+                                key={group.id}
+                                className={`report-accordion-card ${group.isDullRed ? 'dull-red' : ''} ${openReportId === group.id ? 'active' : ''}`}
+                                onClick={() => !group.disabled && setOpenReportId(openReportId === group.id ? null : group.id)}
                             >
-                                {formData.image ? (
-                                    <>
-                                        <img
-                                            key={formData.image || 'empty'}
-                                            src={formData.image}
-                                            alt="Vessel preview"
-                                        />
-                                        {isEditing && (
-                                            <div className="upload-overlay-modern">
-                                                <Plus size={24} />
-                                                <span>Change image</span>
+                                <div className="report-accordion-header">
+                                    <div className="report-header-left">
+                                        <group.icon size={20} className="report-group-icon" />
+                                        <h3>{group.label} {group.ticks && <span className="tick-count">[{group.ticks} Ticks]</span>}</h3>
+                                    </div>
+                                    <ChevronDown
+                                        size={18}
+                                        className="report-chevron"
+                                        style={{
+                                            transform: openReportId === group.id ? 'rotate(180deg)' : 'none',
+                                            transition: 'transform 0.2s'
+                                        }}
+                                    />
+                                </div>
+
+                                {openReportId === group.id && (
+                                    <div className="report-accordion-content">
+                                        <div className="report-item-row">
+                                            <div className="report-info">
+                                                <div className="report-icon-bg">
+                                                    <FileText size={22} />
+                                                </div>
+                                                <div className="report-text">
+                                                    <h4>Compliance Summary</h4>
+                                                    <p>LAST UPDATE: 24 OCT 2023</p>
+                                                </div>
                                             </div>
-                                        )}
-                                    </>
-                                ) : (
-                                    <div className="drag-drop-placeholder">
-                                        <div className="upload-icon-circle">
-                                            <Upload size={32} />
+                                            <div className="report-actions">
+                                                <button className="generate-btn-primary">
+                                                    <RefreshCw size={14} /> GENERATE
+                                                </button>
+                                                <button className="download-icon-btn">
+                                                    <Download size={22} />
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="upload-text">
-                                            <p className="main-text">Drag and drop file</p>
-                                            <p className="sub-text">or <span className="highlight">browse</span> from computer</p>
+
+                                        <div className="report-item-row">
+                                            <div className="report-info">
+                                                <div className="report-icon-bg">
+                                                    <BarChart2 size={22} />
+                                                </div>
+                                                <div className="report-text">
+                                                    <h4>{group.id === 'adhoc' ? 'Ad Hoc Report - Standard Audit' : 'Detailed Materials Inventory Report'}</h4>
+                                                    <p>LAST UPDATE: 12 OCT 2023</p>
+                                                </div>
+                                            </div>
+                                            <div className="report-actions">
+                                                <button className="generate-btn-primary">
+                                                    <RefreshCw size={14} /> GENERATE
+                                                </button>
+                                                <button className="download-icon-btn">
+                                                    <Download size={22} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
-                            {isEditing && <span className="upload-hint">Note: Image should not exceed 10MB</span>}
-                            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" style={{ display: 'none' }} />
-                        </div>
-
-                        <FormGroup label="Signal Letters" name="signalLetters" value={formData.signalLetters} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Builders unique id of ship" name="buildersUniqueId" value={formData.buildersUniqueId} onChange={handleInputChange} readOnly={!isEditing} />
-                        <FormGroup label="Gross Tonnage" name="grossTonnage" value={formData.grossTonnage} onChange={handleInputChange} readOnly={!isEditing} />
-
-                        <div className="radio-row-compact">
-                            <RadioGroup
-                                label="MD Standard"
-                                name="mdStandard"
-                                options={['HKC', 'EU']}
-                                value={formData.mdStandard}
-                                onChange={handleInputChange}
-                                readOnly={!isEditing}
-                            />
-
-                            <RadioGroup
-                                label="IHM Method"
-                                name="ihmMethod"
-                                options={['NB', 'ES']}
-                                value={formData.ihmMethod}
-                                onChange={handleInputChange}
-                                readOnly={!isEditing}
-                            />
-                        </div>
-
-                        <FormGroup label="SOC Reference" name="socReference" value={formData.socReference} onChange={handleInputChange} readOnly={!isEditing} />
+                        ))}
                     </div>
                 </div>
+            );
+        }
 
-                <div className="vessel-form-actions-premium">
-                    {!isEditing ? (
-                        <button type="button" className="edit-btn-premium" onClick={() => setIsEditing(true)}>
-                            <Edit2 size={18} />
-                            <span>EDIT DETAILS</span>
-                        </button>
-                    ) : (
-                        <div className="actions-group-premium">
-                            <button type="button" className="cancel-btn-premium" onClick={() => { setIsEditing(false); setIsAdding(false); setFormData(activeVesselData || INITIAL_VESSELS[0]); }}>
-                                CANCEL
-                            </button>
-                            <button type="submit" className="save-btn-premium">
-                                <Check size={18} />
-                                SAVE CHANGES
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </form>
-        </div>
-    </div>
-);
-    };
+        if (activeTab === 'certificate') {
+            return (
+                <IHMCertificateView
+                    key={activeVesselName}
+                    vesselName={activeVesselName}
+                    onCertificateSubmit={() => setNotifCount(prev => prev + 1)}
+                />
+            );
+        }
 
-return (
-    <div className="vessels-page-container">
-        <Sidebar />
-        <main className="vessel-page-main">
-            <Header title="SHIPS AT PROJECT" notificationCount={notifCount} />
+        return (
+            <div className="form-scroll-area">
+                <div className="vessel-form-card-premium">
+                    <form onSubmit={handleSave} className="vessel-edit-form-modern">
+                        <div className="form-grid-three-col">
+                            {/* Column 1 */}
+                            <div className="form-column">
+                                <FormGroup label="Name" name="name" value={formData.name} onChange={handleInputChange} required readOnly={!isEditing} />
+                                <FormGroup label="Ship Owner" name="shipOwner" value={formData.shipOwner} onChange={handleInputChange} required readOnly={!isEditing} />
+                                <FormGroup label="Fleet" name="fleet" value={formData.fleet} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Sub Fleet" name="subFleet" value={formData.subFleet} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Vessel Class" name="vesselClass" value={formData.vesselClass} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="IMO No" name="imoNo" value={formData.imoNo} onChange={handleInputChange} required readOnly={!isEditing} />
+                                <FormGroup label="Registration Number" name="registrationNumber" value={formData.registrationNumber} onChange={handleInputChange} readOnly={!isEditing} />
+                                <DateGroup label="Delivery Date" name="deliveryDate" value={formData.deliveryDate} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Deadweight Tonnage" name="deadweightTonnage" value={formData.deadweightTonnage} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Port of Registry" name="portOfRegistry" value={formData.portOfRegistry} onChange={handleInputChange} readOnly={!isEditing} />
+                                <DateGroup label="SOC Expiry Date" name="socExpiryDate" value={formData.socExpiryDate} onChange={handleInputChange} readOnly={!isEditing} />
+                            </div>
 
-            <div className="vessels-layout-wrapper">
-                <div className="vessels-top-nav">
-                    <nav className="fleet-tabs-inline">
-                        <div className="tabs-scroll-area">
-                            {tabs.map((tab) => (
-                                <div
-                                    key={tab.id}
-                                    className={`tab-item-inline ${activeTab === tab.id ? 'active' : ''}`}
-                                    onClick={() => setActiveTab(tab.id)}
-                                >
-                                    <tab.icon size={18} />
-                                    <span>{tab.label}</span>
+                            {/* Column 2 */}
+                            <div className="form-column">
+                                <FormGroup label="Type" name="type" value={formData.type} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Ship Manager" name="shipManager" value={formData.shipManager} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Registered Owner" name="registeredOwner" value={formData.registeredOwner} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Flag State" name="flagState" value={formData.flagState} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Vessel IHM Class" name="vesselIhmClass" value={formData.vesselIhmClass} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Class ID No" name="classIdNo" value={formData.classIdNo} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Name Of Yard" name="nameOfYard" value={formData.nameOfYard} onChange={handleInputChange} readOnly={!isEditing} />
+                                <DateGroup label="Keel Laid Date" name="keelLaidDate" value={formData.keelLaidDate} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="TEU No of Units" name="teuUnits" value={formData.teuUnits} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Initial IHM Reference" name="ihmReference" value={formData.ihmReference} onChange={handleInputChange} readOnly={!isEditing} />
+                            </div>
+
+                            {/* Column 3 */}
+                            <div className="form-column">
+                                <div className="image-upload-modern">
+                                    <label>Vessel Image</label>
+                                    <div
+                                        className={`image-preview-container-modern ${!formData.image ? 'no-image' : ''} ${isDraggingFile ? 'dragging' : ''}`}
+                                        onClick={isEditing ? triggerFileSelect : undefined}
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
+                                    >
+                                        {formData.image ? (
+                                            <>
+                                                <img
+                                                    key={formData.image || 'empty'}
+                                                    src={formData.image}
+                                                    alt="Vessel preview"
+                                                />
+                                                {isEditing && (
+                                                    <div className="upload-overlay-modern">
+                                                        <Plus size={24} />
+                                                        <span>Change image</span>
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <div className="drag-drop-placeholder">
+                                                <div className="upload-icon-circle">
+                                                    <Upload size={32} />
+                                                </div>
+                                                <div className="upload-text">
+                                                    <p className="main-text">Drag and drop file</p>
+                                                    <p className="sub-text">or <span className="highlight">browse</span> from computer</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {isEditing && <span className="upload-hint">Note: Image should not exceed 10MB</span>}
+                                    <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" style={{ display: 'none' }} />
                                 </div>
-                            ))}
+
+                                <FormGroup label="Signal Letters" name="signalLetters" value={formData.signalLetters} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Builders unique id of ship" name="buildersUniqueId" value={formData.buildersUniqueId} onChange={handleInputChange} readOnly={!isEditing} />
+                                <FormGroup label="Gross Tonnage" name="grossTonnage" value={formData.grossTonnage} onChange={handleInputChange} readOnly={!isEditing} />
+
+                                <div className="radio-row-compact">
+                                    <RadioGroup
+                                        label="MD Standard"
+                                        name="mdStandard"
+                                        options={['HKC', 'EU']}
+                                        value={formData.mdStandard}
+                                        onChange={handleInputChange}
+                                        readOnly={!isEditing}
+                                    />
+
+                                    <RadioGroup
+                                        label="IHM Method"
+                                        name="ihmMethod"
+                                        options={['NB', 'ES']}
+                                        value={formData.ihmMethod}
+                                        onChange={handleInputChange}
+                                        readOnly={!isEditing}
+                                    />
+                                </div>
+
+                                <FormGroup label="SOC Reference" name="socReference" value={formData.socReference} onChange={handleInputChange} readOnly={!isEditing} />
+                            </div>
                         </div>
-                    </nav>
-                </div>
 
-                <div className="vessels-content-layout">
-                    {/* Secondary Sidebar - Hidden on Decks, Documents, Materials & Certificate tabs */}
-                    {activeTab !== 'decks' && activeTab !== 'documents' && activeTab !== 'materials' && activeTab !== 'certificate' && activeTab !== 'reports' && (
-                        <aside className="secondary-sidebar">
-                            {activeTab === 'purchase' ? (
-                                <>
-                                    <div className="sidebar-filters-wrapper">
-                                        <div className="sticky-filter-section">
-                                            <div className="vessel-sidebar-filter card-style" onClick={() => setIsFilterExpanded(!isFilterExpanded)}>
-                                                <Filter size={14} />
-                                                <span>FILTER</span>
-                                                {isFilterExpanded ? <ChevronUp size={14} style={{ marginLeft: 'auto', color: '#64748b' }} /> : <ChevronDown size={14} style={{ marginLeft: 'auto', color: '#64748b' }} />}
-                                            </div>
-
-                                            {isFilterExpanded && (
-                                                <div className="sidebar-filter-content-direct">
-                                                    <div className="filter-section">
-                                                        <div className="filter-section-title">DATE RANGE</div>
-                                                        <div className="filter-date-inputs">
-                                                            <div className="filter-date-field">
-                                                                <label>FROM</label>
-                                                                <div className="date-input-with-icon">
-                                                                    <input
-                                                                        type="date"
-                                                                        value={poFilterDateFrom}
-                                                                        onChange={(e) => setPoFilterDateFrom(e.target.value)}
-                                                                    />
-                                                                    <Calendar size={14} className="calendar-icon-overlay" />
-                                                                </div>
-                                                            </div>
-                                                            <div className="filter-date-field">
-                                                                <label>TO</label>
-                                                                <div className="date-input-with-icon">
-                                                                    <input
-                                                                        type="date"
-                                                                        value={poFilterDateTo}
-                                                                        onChange={(e) => setPoFilterDateTo(e.target.value)}
-                                                                    />
-                                                                    <Calendar size={14} className="calendar-icon-overlay" />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="filter-section">
-                                                        <div className="filter-section-title">COMPLIANCE STATUS</div>
-                                                        <div className="filter-radio-group">
-                                                            <label className="filter-radio-item">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="compliance"
-                                                                    checked={poFilterCompliance === 'All'}
-                                                                    onChange={() => setPoFilterCompliance('All')}
-                                                                />
-                                                                <span>All Statuses</span>
-                                                            </label>
-                                                            <label className="filter-radio-item">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="compliance"
-                                                                    checked={poFilterCompliance === 'Verified'}
-                                                                    onChange={() => setPoFilterCompliance('Verified')}
-                                                                />
-                                                                <span>Verified</span>
-                                                            </label>
-                                                            <label className="filter-radio-item">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="compliance"
-                                                                    checked={poFilterCompliance === 'Not Verified'}
-                                                                    onChange={() => setPoFilterCompliance('Not Verified')}
-                                                                />
-                                                                <span>Not Verified</span>
-                                                            </label>
-                                                            <label className="filter-radio-item">
-                                                                <input
-                                                                    type="radio"
-                                                                    name="compliance"
-                                                                    checked={poFilterCompliance === 'MD Pending'}
-                                                                    onChange={() => setPoFilterCompliance('MD Pending')}
-                                                                />
-                                                                <span>MD Pending</span>
-                                                            </label>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="sidebar-dark-content-area">
-                                        <div className="vessel-search-container dark-mode">
-                                            <div className="vessel-search-box light">
-                                                <Search size={16} color="#94A3B8" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Search vessels..."
-                                                    value={searchTerm}
-                                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="vessel-list dark-mode" style={{ flex: 1, overflowY: 'auto' }}>
-                                            {vesselList.filter(v =>
-                                                v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                v.imoNo.includes(searchTerm)
-                                            ).map((vessel) => (
-                                                <div
-                                                    key={`${vessel.name}-${vessel.imoNo}`}
-                                                    className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
-                                                    onClick={() => handleVesselSelect(vessel)}
-                                                >
-                                                    <div className="vessel-status-dot v-active"></div>
-                                                    <div className="vessel-info-block">
-                                                        <h4>{vessel.name}</h4>
-                                                        <p>IMO {vessel.imoNo}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="sidebar-list-footer">
-                                            <button className="add-vessel-btn-refined" onClick={handleAddClick}>
-                                                <Plus size={18} />
-                                                ADD VISUAL
-                                            </button>
-                                        </div>
-                                    </div>
-                                </>
+                        <div className="vessel-form-actions-premium">
+                            {!isEditing ? (
+                                <button type="button" className="edit-btn-premium" onClick={() => setIsEditing(true)}>
+                                    <Edit2 size={18} />
+                                    <span>EDIT DETAILS</span>
+                                </button>
                             ) : (
-                                <>
-                                    <div className="sidebar-dark-content-area">
-                                        <div className="vessel-search-container light-mode">
-                                            <div className="vessel-search-box light">
-                                                <Search size={16} color="#94A3B8" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Search vessels..."
-                                                    value={searchTerm}
-                                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="vessel-list light-mode" style={{ flex: 1, overflowY: 'auto' }}>
-                                            {vesselList.filter(v =>
-                                                v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                v.imoNo.includes(searchTerm)
-                                            ).map((vessel) => (
-                                                <div
-                                                    key={`${vessel.name}-${vessel.imoNo}`}
-                                                    className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
-                                                    onClick={() => handleVesselSelect(vessel)}
-                                                >
-                                                    <div className="vessel-status-dot v-active"></div>
-                                                    <div className="vessel-info-block">
-                                                        <h4>{vessel.name}</h4>
-                                                        <p>IMO {vessel.imoNo}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="sidebar-list-footer">
-                                            <button className="add-vessel-btn-refined" onClick={handleAddClick}>
-                                                <Plus size={18} />
-                                                Add Vessel
-                                            </button>
-                                        </div>
-                                    </div>
-                                </>
+                                <div className="actions-group-premium">
+                                    <button type="button" className="cancel-btn-premium" onClick={() => { setIsEditing(false); setIsAdding(false); setFormData(activeVesselData || INITIAL_VESSELS[0]); }}>
+                                        CANCEL
+                                    </button>
+                                    <button type="submit" className="save-btn-premium">
+                                        <Check size={18} />
+                                        SAVE CHANGES
+                                    </button>
+                                </div>
                             )}
-                        </aside>
-                    )}
-
-                    {/* Main Section */}
-                    <div className="vessels-main">
-                        <div className={`vessel-tab-content ${activeTab === 'purchase' ? 'no-scroll' : ''}`}>
-                            {renderContent()}
                         </div>
-                    </div>
+                    </form>
                 </div>
             </div>
-            {
-                showModal && (
-                    <SuccessModal
-                        message={modalMessage}
-                        onClose={() => setShowModal(false)}
-                    />
-                )
-            }
-        </main >
-    </div >
-);
+        );
+    };
+
+    return (
+        <div className="vessels-page-container">
+            <Sidebar />
+            <main className="vessel-page-main">
+                <Header title="SHIPS AT PROJECT" notificationCount={notifCount} />
+
+                <div className="vessels-layout-wrapper">
+                    <div className="vessels-top-nav">
+                        <nav className="fleet-tabs-inline">
+                            <div className="tabs-scroll-area">
+                                {tabs.map((tab) => (
+                                    <div
+                                        key={tab.id}
+                                        className={`tab-item-inline ${activeTab === tab.id ? 'active' : ''}`}
+                                        onClick={() => setActiveTab(tab.id)}
+                                    >
+                                        <tab.icon size={18} />
+                                        <span>{tab.label}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </nav>
+                    </div>
+
+                    <div className="vessels-content-layout">
+                        {/* Secondary Sidebar - Hidden on Decks, Documents, Materials & Certificate tabs */}
+                        {activeTab !== 'decks' && activeTab !== 'documents' && activeTab !== 'materials' && activeTab !== 'certificate' && activeTab !== 'reports' && (
+                            <aside className="secondary-sidebar">
+                                {activeTab === 'purchase' ? (
+                                    <>
+                                        <div className="sidebar-filters-wrapper">
+                                            <div className="sticky-filter-section">
+                                                <div className="vessel-sidebar-filter card-style" onClick={() => setIsFilterExpanded(!isFilterExpanded)}>
+                                                    <Filter size={14} />
+                                                    <span>FILTER</span>
+                                                    {isFilterExpanded ? <ChevronUp size={14} style={{ marginLeft: 'auto', color: '#64748b' }} /> : <ChevronDown size={14} style={{ marginLeft: 'auto', color: '#64748b' }} />}
+                                                </div>
+
+                                                {isFilterExpanded && (
+                                                    <div className="sidebar-filter-content-direct">
+                                                        <div className="filter-section">
+                                                            <div className="filter-section-title">DATE RANGE</div>
+                                                            <div className="filter-date-inputs">
+                                                                <div className="filter-date-field">
+                                                                    <label>FROM</label>
+                                                                    <div className="date-input-with-icon">
+                                                                        <input
+                                                                            type="date"
+                                                                            value={poFilterDateFrom}
+                                                                            onChange={(e) => setPoFilterDateFrom(e.target.value)}
+                                                                        />
+                                                                        <Calendar size={14} className="calendar-icon-overlay" />
+                                                                    </div>
+                                                                </div>
+                                                                <div className="filter-date-field">
+                                                                    <label>TO</label>
+                                                                    <div className="date-input-with-icon">
+                                                                        <input
+                                                                            type="date"
+                                                                            value={poFilterDateTo}
+                                                                            onChange={(e) => setPoFilterDateTo(e.target.value)}
+                                                                        />
+                                                                        <Calendar size={14} className="calendar-icon-overlay" />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="filter-section">
+                                                            <div className="filter-section-title">COMPLIANCE STATUS</div>
+                                                            <div className="filter-radio-group">
+                                                                <label className="filter-radio-item">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="compliance"
+                                                                        checked={poFilterCompliance === 'All'}
+                                                                        onChange={() => setPoFilterCompliance('All')}
+                                                                    />
+                                                                    <span>All Statuses</span>
+                                                                </label>
+                                                                <label className="filter-radio-item">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="compliance"
+                                                                        checked={poFilterCompliance === 'Verified'}
+                                                                        onChange={() => setPoFilterCompliance('Verified')}
+                                                                    />
+                                                                    <span>Verified</span>
+                                                                </label>
+                                                                <label className="filter-radio-item">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="compliance"
+                                                                        checked={poFilterCompliance === 'Not Verified'}
+                                                                        onChange={() => setPoFilterCompliance('Not Verified')}
+                                                                    />
+                                                                    <span>Not Verified</span>
+                                                                </label>
+                                                                <label className="filter-radio-item">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name="compliance"
+                                                                        checked={poFilterCompliance === 'MD Pending'}
+                                                                        onChange={() => setPoFilterCompliance('MD Pending')}
+                                                                    />
+                                                                    <span>MD Pending</span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="sidebar-dark-content-area">
+                                            <div className="vessel-search-container dark-mode">
+                                                <div className="vessel-search-box light">
+                                                    <Search size={16} color="#94A3B8" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search vessels..."
+                                                        value={searchTerm}
+                                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="vessel-list dark-mode" style={{ flex: 1, overflowY: 'auto' }}>
+                                                {vesselList.filter(v =>
+                                                    v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                    v.imoNo.includes(searchTerm)
+                                                ).map((vessel) => (
+                                                    <div
+                                                        key={`${vessel.name}-${vessel.imoNo}`}
+                                                        className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
+                                                        onClick={() => handleVesselSelect(vessel)}
+                                                    >
+                                                        <div className="vessel-status-dot v-active"></div>
+                                                        <div className="vessel-info-block">
+                                                            <h4>{vessel.name}</h4>
+                                                            <p>IMO {vessel.imoNo}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="sidebar-list-footer">
+                                                <button className="add-vessel-btn-refined" onClick={handleAddClick}>
+                                                    <Plus size={18} />
+                                                    Add Vessel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="sidebar-dark-content-area">
+                                            <div className="vessel-search-container light-mode">
+                                                <div className="vessel-search-box light">
+                                                    <Search size={16} color="#94A3B8" />
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search vessels..."
+                                                        value={searchTerm}
+                                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="vessel-list light-mode" style={{ flex: 1, overflowY: 'auto' }}>
+                                                {vesselList.filter(v =>
+                                                    v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                    v.imoNo.includes(searchTerm)
+                                                ).map((vessel) => (
+                                                    <div
+                                                        key={`${vessel.name}-${vessel.imoNo}`}
+                                                        className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
+                                                        onClick={() => handleVesselSelect(vessel)}
+                                                    >
+                                                        <div className="vessel-status-dot v-active"></div>
+                                                        <div className="vessel-info-block">
+                                                            <h4>{vessel.name}</h4>
+                                                            <p>IMO {vessel.imoNo}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="sidebar-list-footer">
+                                                <button className="add-vessel-btn-refined" onClick={handleAddClick}>
+                                                    <Plus size={18} />
+                                                    Add Vessel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </aside>
+                        )}
+
+                        {/* Main Section */}
+                        <div className="vessels-main">
+                            <div className={`vessel-tab-content ${activeTab === 'purchase' ? 'no-scroll' : ''}`}>
+                                {renderContent()}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {
+                    showModal && (
+                        <SuccessModal
+                            message={modalMessage}
+                            onClose={() => setShowModal(false)}
+                        />
+                    )
+                }
+            </main >
+        </div >
+    );
 }
 
 // Helper Components

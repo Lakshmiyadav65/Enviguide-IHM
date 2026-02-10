@@ -3037,18 +3037,41 @@ body:has(.sidebar.collapsed) .vessel-page-main {
     padding: 0 4px 24px 4px;
 }
 
+/* Reports Layout Refinement */
+.reports-container {
+    height: 100%;
+    overflow-y: auto;
+    padding: 24px;
+    position: relative;
+    /* Smooth fade at the bottom of the scroll area to dull the last two cards */
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, black 75%, rgba(0, 0, 0, 0.4) 85%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 0%, black 75%, rgba(0, 0, 0, 0.4) 85%, transparent 100%);
+}
+
+.reports-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-bottom: 200px;
+    /* Ample space for the fade effect to be visible */
+}
+
 .report-accordion-card {
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 12px;
-    margin-bottom: 12px;
     overflow: hidden;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.report-accordion-card:hover:not(.locked) {
+/* When a card is hovered, it should always be 100% visible regardless of scroll position */
+.report-accordion-card:hover {
     border-color: #00B0FA;
-    box-shadow: 0 4px 12px rgba(0, 176, 250, 0.08);
+    box-shadow: 0 10px 15px -3px rgba(0, 176, 250, 0.1);
+    transform: translateY(-2px);
+    z-index: 10;
+    opacity: 1 !important;
+    filter: none !important;
 }
 
 .report-accordion-card.active {
@@ -3065,11 +3088,11 @@ body:has(.sidebar.collapsed) .vessel-page-main {
 }
 
 .report-group-icon {
-    color: #1e293b;
+    color: #64748b;
     transition: color 0.2s;
 }
 
-.report-accordion-card:hover:not(.locked) .report-group-icon,
+.report-accordion-card:hover .report-group-icon,
 .report-accordion-card.active .report-group-icon {
     color: #00B0FA;
 }
@@ -3083,12 +3106,12 @@ body:has(.sidebar.collapsed) .vessel-page-main {
 .report-header-left h3 {
     margin: 0;
     font-size: 14px;
-    font-weight: 400;
+    font-weight: 500;
     color: #1e293b;
     transition: color 0.2s;
 }
 
-.report-accordion-card:hover:not(.locked) h3,
+.report-accordion-card:hover h3,
 .report-accordion-card.active h3 {
     color: #00B0FA;
 }
@@ -3098,7 +3121,7 @@ body:has(.sidebar.collapsed) .vessel-page-main {
     transition: all 0.2s;
 }
 
-.report-accordion-card:hover:not(.locked) .report-chevron,
+.report-accordion-card:hover .report-chevron,
 .report-accordion-card.active .report-chevron {
     color: #00B0FA;
 }
@@ -3107,32 +3130,6 @@ body:has(.sidebar.collapsed) .vessel-page-main {
     opacity: 0.6;
     cursor: not-allowed;
     background: #f8fafc;
-}
-
-.report-accordion-card.dull-red {
-    background: #fff5f5;
-    border-color: #fee2e2;
-    opacity: 0.7;
-}
-
-.report-accordion-card.dull-red .report-group-icon,
-.report-accordion-card.dull-red h3 {
-    color: #991b1b;
-}
-
-.report-accordion-card.dull-red .report-chevron {
-    color: #f87171;
-}
-
-/* Every last element in the stack appears duller */
-.reports-stack>.report-accordion-card:last-child {
-    opacity: 0.5;
-    filter: grayscale(0.5);
-    transition: opacity 0.3s;
-}
-
-.reports-stack>.report-accordion-card:last-child:hover {
-    opacity: 0.8;
 }
 
 .tick-count {
@@ -3221,65 +3218,18 @@ body:has(.sidebar.collapsed) .vessel-page-main {
     transform: translateY(-1px);
 }
 
+.download-icon-btn {
+    background: transparent;
+    border: none;
+    color: #00B0FA;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
 .download-icon-btn:hover {
-    color: #0090cc;
-}
-
-/* Sidebar Key for Reports */
-.reports-sidebar-key {
-    padding: 24px;
-    background: #f8fafc;
-    height: 100%;
-    border-right: 1px solid #e2e8f0;
-}
-
-.key-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 24px;
-    color: #1e293b;
-    font-weight: 600;
-    font-size: 13px;
-    letter-spacing: 0.02em;
-}
-
-.key-content {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.key-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 13px;
-    color: #64748b;
-}
-
-.key-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-}
-
-.key-dot.active {
-    background: #10b981;
-    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
-}
-
-.key-dot.pending {
-    background: #f59e0b;
-    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.1);
-}
-
-.key-dot.archived {
-    background: #f87171;
-    box-shadow: 0 0 0 4px rgba(248, 113, 113, 0.1);
-}
-
-.download-icon-btn:hover:not(:disabled) {
     color: #0090cc;
     transform: scale(1.1);
 }
