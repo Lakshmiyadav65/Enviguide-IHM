@@ -1,10 +1,10 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import {
     Search, Plus, Filter, Layers, FileText, ShoppingCart,
     BarChart2, FileCheck, ShieldCheck, Check, Edit2, X,
     FolderOpen, Ship as ShipIcon, Pin, Upload, Eye, Trash2, Calendar, ChevronDown, ChevronUp,
-    Download, AlertTriangle, ExternalLink, ChevronLeft, ChevronRight, RefreshCw
+    Download, AlertTriangle, ExternalLink, ChevronLeft, ChevronRight, Book, RotateCw, Monitor, Paperclip, GripVertical, EyeOff, ZoomIn, ZoomOut, Maximize2
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -221,9 +221,38 @@ export default function Vessels() {
     const [isAdding, setIsAdding] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [isFilterExpanded, setIsFilterExpanded] = useState(false);
-    const [openReportId, setOpenReportId] = useState<string | null>('adhoc');
 
-    // Custom Dropdown States
+    // Document & Form States
+    const [docSearch, setDocSearch] = useState('');
+    const [docCategory, setDocCategory] = useState('All');
+    const [docStatus, setDocStatus] = useState('All');
+    const [docPage, setDocPage] = useState(1);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [newDocType, setNewDocType] = useState('Select Document Type');
+    const docsPerPage = 10;
+
+    const [isDraggingFile, setIsDraggingFile] = useState(false);
+    const [formData, setFormData] = useState<VesselData>(INITIAL_VESSELS[0]);
+    const [showModal, setShowModal] = useState(false);
+    const [modalMessage, setModalMessage] = useState('');
+
+    const [selectedDoc, setSelectedDoc] = useState<any>(null);
+    const [docToDelete, setDocToDelete] = useState<any>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // Reports Flow States
+    const [reportStep, setReportStep] = useState(0); // 0: Selection, 1: Configuration, 2: Editor
+    const [selectedReportType, setSelectedReportType] = useState<string | null>(null);
+    const [selectedReportCategory, setSelectedReportCategory] = useState<string | null>(null);
+    const [selectedSections, setSelectedSections] = useState<string[]>([]);
+    const [hiddenSections, setHiddenSections] = useState<string[]>([]);
+    const [reorderedSections, setReorderedSections] = useState<any[]>([]);
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const docInputRef = useRef<HTMLInputElement>(null);
+
+    // Custom Dropdown States & Refs
     const [isDocTypeDropdownOpen, setIsDocTypeDropdownOpen] = useState(false);
     const [isDocCategoryDropdownOpen, setIsDocCategoryDropdownOpen] = useState(false);
     const [isDocStatusDropdownOpen, setIsDocStatusDropdownOpen] = useState(false);
@@ -253,6 +282,73 @@ export default function Vessels() {
     const [poFilterDateFrom, setPoFilterDateFrom] = useState('');
     const [poFilterDateTo, setPoFilterDateTo] = useState('');
     const [poFilterCompliance, setPoFilterCompliance] = useState('All');
+
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    // Scroll effect for report blurred cards (Accordion cards in Step 0)
+    useEffect(() => {
+        const handleScroll = () => {
+            const container = scrollContainerRef.current;
+            if (!container) return;
+
+            const cards = container.querySelectorAll('.report-accordion-group');
+            const containerRect = container.getBoundingClientRect();
+            const containerBottom = containerRect.bottom;
+            const scrollHeight = container.scrollHeight;
+            const scrollTop = container.scrollTop;
+            const clientHeight = container.clientHeight;
+
+            const isAtBottom = scrollHeight - (scrollTop + clientHeight) < 10;
+
+            cards.forEach((card) => {
+                const rect = (card as HTMLElement).getBoundingClientRect();
+                const cardBottom = rect.bottom;
+                const distanceToBottom = containerBottom - cardBottom;
+
+                // If we are at the very bottom, remove all blur
+                if (isAtBottom) {
+                    (card as HTMLElement).style.filter = 'none';
+                    (card as HTMLElement).style.opacity = '1';
+                    (card as HTMLElement).style.transform = 'scale(1)';
+                    return;
+                }
+
+                // Identify the "last few" cards based on proximity to container bottom
+                // We want the last 2 visible cards to be blurry
+                if (distanceToBottom < 100 && distanceToBottom > -50) {
+                    const blurAmount = Math.max(0, (100 - distanceToBottom) / 20);
+                    const opacityAmount = Math.max(0.6, distanceToBottom / 100);
+                    (card as HTMLElement).style.filter = `blur(${blurAmount}px)`;
+                    (card as HTMLElement).style.opacity = `${opacityAmount}`;
+                    (card as HTMLElement).style.transform = `scale(${0.98 + (distanceToBottom / 5000)})`;
+                } else if (distanceToBottom <= -50) {
+                    // Elements below the viewport bottom
+                    (card as HTMLElement).style.filter = 'blur(8px)';
+                    (card as HTMLElement).style.opacity = '0';
+                } else {
+                    (card as HTMLElement).style.filter = 'none';
+                    (card as HTMLElement).style.opacity = '1';
+                    (card as HTMLElement).style.transform = 'scale(1)';
+                }
+            });
+        };
+
+        const container = scrollContainerRef.current;
+        if (activeTab === 'reports' && reportStep === 0 && container) {
+            container.addEventListener('scroll', handleScroll);
+            // Trigger once to set initial state
+            handleScroll();
+        } else if (container) {
+            // Reset all cards if we leave reports or move to config step
+            const cards = container.querySelectorAll('.report-accordion-group');
+            cards.forEach((card) => {
+                (card as HTMLElement).style.filter = 'none';
+                (card as HTMLElement).style.opacity = '1';
+                (card as HTMLElement).style.transform = 'scale(1)';
+            });
+        }
+        return () => container?.removeEventListener('scroll', handleScroll);
+    }, [activeTab, reportStep]);
 
     const [vesselDocuments, setVesselDocuments] = useState<{ [key: string]: any[] }>({
         'MV Ocean Pioneer': Array.from({ length: 45 }, (_, i) => ({
@@ -359,25 +455,7 @@ export default function Vessels() {
         }))
     });
 
-    const [docSearch, setDocSearch] = useState('');
-    const [docCategory, setDocCategory] = useState('All');
-    const [docStatus, setDocStatus] = useState('All');
-
-    const [formData, setFormData] = useState<VesselData>(INITIAL_VESSELS[0]);
-    const [showModal, setShowModal] = useState(false);
-    const [modalMessage, setModalMessage] = useState('');
-    const [isDraggingFile, setIsDraggingFile] = useState(false);
-
-    const [selectedDoc, setSelectedDoc] = useState<any>(null);
-    const [docToDelete, setDocToDelete] = useState<any>(null);
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [newDocType, setNewDocType] = useState('Select Document Type');
-    const [docPage, setDocPage] = useState(1);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const docsPerPage = 7;
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const docInputRef = useRef<HTMLInputElement>(null);
+    // State management handles consolidated above
 
 
     const activeVesselData = useMemo(() => {
@@ -899,98 +977,426 @@ export default function Vessels() {
         }
 
         if (activeTab === 'reports') {
-            interface ReportGroup {
-                id: string;
-                label: string;
-                icon: any;
-                disabled: boolean;
-                isDullRed?: boolean;
-                ticks?: number;
-            }
+            const vesselDisplayName = activeVesselName.includes(' ') ? activeVesselName.split(' ')[1].toUpperCase() : activeVesselName.toUpperCase();
 
-            const reportGroups: ReportGroup[] = [
-                { id: 'adhoc', label: 'Ad Hoc Report', icon: FileText, disabled: false },
-                { id: 'kf2-web', label: 'KF2 Webtechmembers', icon: ShieldCheck, disabled: false },
-                { id: 'q4-25', label: 'Q4 (01/10/2025 - 31/12/2025)', icon: Calendar, disabled: false },
-                { id: 'q3-25', label: 'Q3 (01/07/2025 - 30/09/2025)', icon: Calendar, disabled: false },
-                { id: 'q2-25', label: 'Q2 (01/04/2025 - 30/06/2025)', icon: Calendar, disabled: false },
-                { id: 'q1-25', label: 'Q1 (01/01/2025 - 31/03/2025)', icon: Calendar, disabled: false },
-                { id: 'q4-24', label: 'Q4 (01/10/2024 - 31/12/2024)', icon: Calendar, disabled: false },
-                { id: 'q3-24', label: 'Q3 (01/07/2024 - 30/09/2024)', icon: Calendar, disabled: false },
-                { id: 'q2-24', label: 'Q2 (01/04/2024 - 30/06/2024)', icon: Calendar, disabled: false },
-                { id: 'q1-24', label: 'Q1 (01/01/2024 - 31/03/2024)', icon: Calendar, disabled: false },
-                { id: 'q4-23', label: 'Q4 (01/10/2023 - 31/12/2023)', icon: Calendar, disabled: false },
+            const reportCategories = [
+                {
+                    id: 'adhoc',
+                    title: 'AD HOC REPORT',
+                    items: [
+                        { id: 'summary', name: 'Compliance Summary Report', date: 'Last updated: Oct 24, 2023' },
+                        { id: 'inventory', name: 'Detailed Materials Inventory Report', date: 'Last updated: Oct 12, 2023' },
+                        { id: 'hazmat', name: 'Global Hazmat Overview Report', date: 'Last updated: Nov 05, 2023' },
+                    ]
+                },
+                { id: 'q1_2026', title: 'Q1 (01/01/2026 - 31/03/2026)', items: [{ id: 'q1_26_1', name: 'Quarterly Compliance Report', date: 'Last updated: Feb 01, 2026' }] },
+                { id: 'q4_2025', title: 'Q4 (01/10/2025 - 31/12/2025)', items: [{ id: 'q4_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 05, 2026' }] },
+                { id: 'q3_2025', title: 'Q3 (01/07/2025 - 30/09/2025)', items: [{ id: 'q3_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 10, 2025' }] },
+                { id: 'q2_2025', title: 'Q2 (01/04/2025 - 30/06/2025)', items: [{ id: 'q2_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 15, 2025' }] },
+                { id: 'q1_2025', title: 'Q1 (01/01/2025 - 31/03/2025)', items: [{ id: 'q1_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 10, 2025' }] },
+                { id: 'q4_2024', title: 'Q4 (01/10/2024 - 31/12/2024)', items: [{ id: 'q4_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 12, 2025' }] },
+                { id: 'q3_2024', title: 'Q3 (01/07/2024 - 30/09/2024)', items: [{ id: 'q3_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 15, 2024' }] },
+                { id: 'q2_2024', title: 'Q2 (01/04/2024 - 30/06/2024)', items: [{ id: 'q2_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 20, 2024' }] },
+                { id: 'q1_2024', title: 'Q1 (01/01/2024 - 31/03/2024)', items: [{ id: 'q1_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 18, 2024' }] },
+                { id: 'q4_2023', title: 'Q4 (01/10/2023 - 31/12/2023)', items: [{ id: 'q4_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 22, 2024' }] },
+                { id: 'q3_2023', title: 'Q3 (01/07/2023 - 30/09/2023)', items: [{ id: 'q3_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 25, 2023' }] },
+                { id: 'q2_2023', title: 'Q2 (01/04/2023 - 30/06/2023)', items: [{ id: 'q2_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 28, 2023' }] },
+                { id: 'q1_2023', title: 'Q1 (01/01/2023 - 31/03/2023)', items: [{ id: 'q1_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 30, 2023' }] },
+                { id: 'q4_2022', title: 'Q4 (01/10/2022 - 31/12/2022)', items: [{ id: 'q4_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 15, 2023' }] },
+                { id: 'q3_2022', title: 'Q3 (01/07/2022 - 30/09/2022)', items: [{ id: 'q3_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 20, 2022' }] },
+                { id: 'q2_2022', title: 'Q2 (01/04/2022 - 30/06/2022)', items: [{ id: 'q2_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 25, 2022' }] },
+                { id: 'q1_2022', title: 'Q1 (01/01/2022 - 31/03/2022)', items: [{ id: 'q1_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 28, 2022' }] },
+                { id: 'q4_2021', title: 'Q4 (01/10/2021 - 31/12/2021)', items: [{ id: 'q4_21_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 18, 2022' }] },
+                { id: 'q3_2021', title: 'Q3 (01/07/2021 - 30/09/2021)', items: [{ id: 'q3_21_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 22, 2021' }] },
+                { id: 'q2_2021', title: 'Q2 (01/04/2021 - 30/06/2021)', items: [{ id: 'q2_21_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 25, 2021' }] },
             ];
 
-            return (
-                <div className="reports-container">
-                    <div className="reports-stack">
-                        {reportGroups.map((group) => (
-                            <div
-                                key={group.id}
-                                className={`report-accordion-card ${group.isDullRed ? 'dull-red' : ''} ${openReportId === group.id ? 'active' : ''}`}
-                                onClick={() => !group.disabled && setOpenReportId(openReportId === group.id ? null : group.id)}
-                            >
-                                <div className="report-accordion-header">
-                                    <div className="report-header-left">
-                                        <group.icon size={20} className="report-group-icon" />
-                                        <h3>{group.label} {group.ticks && <span className="tick-count">[{group.ticks} Ticks]</span>}</h3>
-                                    </div>
-                                    <ChevronDown
-                                        size={18}
-                                        className="report-chevron"
-                                        style={{
-                                            transform: openReportId === group.id ? 'rotate(180deg)' : 'none',
-                                            transition: 'transform 0.2s'
+            const SECTIONS_LIST = [
+                { id: 'intro', title: 'Introduction', hasView: true },
+                { id: 'specs', title: 'Vessel Specifications', hasView: true },
+                { id: 'index', title: 'Index', hasView: true },
+                { id: 'mov', title: 'IHM Movement', hasView: true },
+                { id: 'haz', title: 'Ship Hazmat Overview', hasView: true },
+                { id: 'details', title: 'IHM Details', hasView: true },
+                { id: 'decks', title: 'HM Marked Decks', hasView: true },
+                { id: 'doc', title: 'IHM Document', hasView: true },
+                { id: 'f1', title: '9371543_CLODOMIRA_IHM Attestation Letter', hasView: true },
+                { id: 'f2', title: 'CLODOMIRA-IHM-002699', hasView: true },
+                { id: 'f3', title: '2020-12-01-ihm-report-compressed', hasView: true },
+                { id: 'f4', title: 'ACOSTA-IHM-004122_FULL TERM', hasView: true },
+                { id: 'f5', title: 'Anti-fouling Certificate', hasView: true },
+                { id: 'f6', title: '_ACOSTA-IHM-FULL TERM NEW ISSUED', hasView: true },
+                { id: 'other', title: 'Other', hasView: true }
+            ];
+
+            const toggleSection = (id: string) => {
+                if (selectedSections.includes(id)) {
+                    setSelectedSections(selectedSections.filter(s => s !== id));
+                } else {
+                    setSelectedSections([...selectedSections, id]);
+                }
+            };
+
+            if (reportStep === 0 || reportStep === 1) {
+                return (
+                    <div className="reports-accordion-wrapper" ref={scrollContainerRef}>
+                        {reportCategories.map((cat) => {
+                            const isCategoryConfiguring = reportStep === 1 && selectedReportCategory === cat.id;
+                            // Only expand if it's the selected category. ADHOC is no longer forced open.
+                            const isExpanded = selectedReportCategory === cat.id;
+
+                            return (
+                                <div key={cat.id} className={`report-accordion-group ${isExpanded ? 'expanded' : ''}`}>
+                                    <div
+                                        className="report-accordion-header"
+                                        onClick={() => {
+                                            if (reportStep === 1 && selectedReportCategory === cat.id) {
+                                                setReportStep(0);
+                                                setSelectedReportCategory(null);
+                                            } else {
+                                                setSelectedReportCategory(isExpanded ? null : cat.id);
+                                            }
                                         }}
-                                    />
-                                </div>
-
-                                {openReportId === group.id && (
-                                    <div className="report-accordion-content">
-                                        <div className="report-item-row">
-                                            <div className="report-info">
-                                                <div className="report-icon-bg">
-                                                    <FileText size={22} />
-                                                </div>
-                                                <div className="report-text">
-                                                    <h4>Compliance Summary</h4>
-                                                    <p>LAST UPDATE: 24 OCT 2023</p>
-                                                </div>
-                                            </div>
-                                            <div className="report-actions">
-                                                <button className="generate-btn-primary">
-                                                    <RefreshCw size={14} /> GENERATE
-                                                </button>
-                                                <button className="download-icon-btn">
-                                                    <Download size={22} />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="report-item-row">
-                                            <div className="report-info">
-                                                <div className="report-icon-bg">
-                                                    <BarChart2 size={22} />
-                                                </div>
-                                                <div className="report-text">
-                                                    <h4>{group.id === 'adhoc' ? 'Ad Hoc Report - Standard Audit' : 'Detailed Materials Inventory Report'}</h4>
-                                                    <p>LAST UPDATE: 12 OCT 2023</p>
-                                                </div>
-                                            </div>
-                                            <div className="report-actions">
-                                                <button className="generate-btn-primary">
-                                                    <RefreshCw size={14} /> GENERATE
-                                                </button>
-                                                <button className="download-icon-btn">
-                                                    <Download size={22} />
-                                                </button>
-                                            </div>
-                                        </div>
+                                    >
+                                        <Monitor size={18} color="#00B0FA" />
+                                        <h3>{cat.title}</h3>
+                                        <ChevronDown size={14} className="accordion-arrow" />
                                     </div>
+                                    {isExpanded && (
+                                        <div className="report-accordion-content">
+                                            {isCategoryConfiguring ? (
+                                                <div className="designer-report-config-form">
+                                                    <div className="config-form-top-row">
+                                                        <div className="designer-field-group">
+                                                            <label>From Date *</label>
+                                                            <div className="designer-input-box">
+                                                                <input type="date" defaultValue="2021-05-15" />
+                                                            </div>
+                                                            <span className="field-helper">MM/DD/YYYY</span>
+                                                        </div>
+                                                        <div className="designer-field-group">
+                                                            <label>To Date *</label>
+                                                            <div className="designer-input-box">
+                                                                <input type="date" defaultValue="2026-02-04" />
+                                                            </div>
+                                                            <span className="field-helper">MM/DD/YYYY</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="designer-file-row">
+                                                        <label>Choose file</label>
+                                                        <div className="file-selection-bar" onClick={() => docInputRef.current?.click()}>
+                                                            <div className="file-display-area">
+                                                                <Paperclip size={18} color="#94A3B8" />
+                                                                <span style={{ fontSize: '13px', color: '#64748B', marginLeft: '8px' }}>
+                                                                    {selectedFile ? selectedFile.name : 'No file selected'}
+                                                                </span>
+                                                            </div>
+                                                            <button className="designer-upload-btn" type="button">
+                                                                <Upload size={18} />
+                                                            </button>
+                                                        </div>
+                                                        <input
+                                                            type="file"
+                                                            ref={docInputRef}
+                                                            style={{ display: 'none' }}
+                                                            onChange={handleDocFileChange}
+                                                        />
+                                                    </div>
+
+                                                    <div className="designer-sections-table">
+                                                        <div className="sections-table-header">
+                                                            <span className="col-sections">Sections</span>
+                                                            <span className="col-include">INCLUDE</span>
+                                                        </div>
+                                                        <div className="sections-table-body">
+                                                            {SECTIONS_LIST.map(sec => (
+                                                                <div key={sec.id} className="section-table-row">
+                                                                    <div className="section-name-cell">
+                                                                        <span>{sec.title}</span>
+                                                                        {sec.hasView && (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="action-icn-btn minimal"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    if (hiddenSections.includes(sec.id)) {
+                                                                                        setHiddenSections(hiddenSections.filter(h => h !== sec.id));
+                                                                                    } else {
+                                                                                        setHiddenSections([...hiddenSections, sec.id]);
+                                                                                    }
+                                                                                }}
+                                                                                title="Toggle visibility"
+                                                                            >
+                                                                                {hiddenSections.includes(sec.id) ? <EyeOff size={14} color="#EF4444" /> : <Eye size={14} className="view-icon-dim" />}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="section-checkbox-cell">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={selectedSections.includes(sec.id)}
+                                                                            onChange={() => toggleSection(sec.id)}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="designer-form-footer">
+                                                        <button
+                                                            className="preview-btn-designer"
+                                                            onClick={() => {
+                                                                const currentSections = SECTIONS_LIST.filter(sec =>
+                                                                    selectedSections.includes(sec.id) && !hiddenSections.includes(sec.id)
+                                                                );
+                                                                setReorderedSections(currentSections);
+                                                                setReportStep(2);
+                                                            }}
+                                                        >
+                                                            <Eye size={18} />
+                                                            PREVIEW REPORT
+                                                        </button>
+                                                        <button
+                                                            className="generate-btn-designer"
+                                                            onClick={() => {
+                                                                const currentSections = SECTIONS_LIST.filter(sec =>
+                                                                    selectedSections.includes(sec.id) && !hiddenSections.includes(sec.id)
+                                                                );
+                                                                setReorderedSections(currentSections);
+                                                                setReportStep(2);
+                                                            }}
+                                                        >
+                                                            <RotateCw size={18} />
+                                                            GENERATE REPORT
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="report-items-list">
+                                                    {cat.items.length > 0 ? (
+                                                        cat.items.map((item) => (
+                                                            <div key={item.id} className="report-item-card-premium">
+                                                                <div className="report-item-icon-box">
+                                                                    <FileText size={24} color="#94A3B8" />
+                                                                </div>
+                                                                <div className="report-item-info">
+                                                                    <div className="report-item-name">{item.name}</div>
+                                                                    <div className="report-item-meta">{item.date}</div>
+                                                                </div>
+                                                                <div className="report-action-btns">
+                                                                    <button
+                                                                        className="generate-btn-final"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedReportType(item.name);
+                                                                            setSelectedReportCategory(cat.id);
+                                                                            setReportStep(1);
+                                                                        }}
+                                                                    >
+                                                                        <RotateCw size={16} />
+                                                                        GENERATE
+                                                                    </button>
+                                                                    <button className="download-btn-final" onClick={(e) => e.stopPropagation()}>
+                                                                        <Download size={16} />
+                                                                        DOWNLOAD
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <div className="empty-category-msg">No reports found for this criteria.</div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            }
+
+            // STEP 2: REPORT PREVIEW (As per user request, reorder structure is hidden for now)
+            return (
+                <div className="reports-final-output-wrapper">
+                    {/* Sub-header with Title - Meta and Edit Config removed as per user request */}
+                    <div className="report-sub-header-premium">
+                        <div className="sub-title-main">
+                            <Book size={24} className="editor-icon" />
+                            <h2>Report Structure Editor</h2>
+                        </div>
+                    </div>
+
+                    <div className="report-editor-layout">
+                        {/* Left Sidebar: Draggable Structure */}
+                        <div className="report-structure-sidebar">
+                            <div className="sidebar-header-row">
+                                <h3>DRAG TO REORDER SECTIONS</h3>
+                                <button className="add-sec-btn-text">ADD SECTION</button>
+                            </div>
+
+                            <div className="draggable-sections-list">
+                                {reorderedSections.length > 0 ? (
+                                    reorderedSections.map((sec, idx) => (
+                                        <div
+                                            key={sec.id}
+                                            className={`draggable-section-card ${draggedIndex === idx ? 'dragging' : ''}`}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                setDraggedIndex(idx);
+                                                e.dataTransfer.effectAllowed = 'move';
+                                            }}
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                if (draggedIndex === null || draggedIndex === idx) return;
+                                                const newSections = [...reorderedSections];
+                                                const itemToMove = newSections[draggedIndex];
+                                                newSections.splice(draggedIndex, 1);
+                                                newSections.splice(idx, 0, itemToMove);
+                                                setDraggedIndex(idx);
+                                                setReorderedSections(newSections);
+                                            }}
+                                            onDragEnd={() => setDraggedIndex(null)}
+                                        >
+                                            <div className="card-grab-handle">
+                                                <GripVertical size={16} color="#94A3B8" />
+                                            </div>
+                                            <div className="card-title-txt">{sec.title}</div>
+                                            <div
+                                                className="card-visibility-icn"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const newReordered = reorderedSections.filter(s => s.id !== sec.id);
+                                                    setReorderedSections(newReordered);
+                                                    setHiddenSections([...hiddenSections, sec.id]);
+                                                }}
+                                                style={{ cursor: 'pointer' }}
+                                                title="Hide section"
+                                            >
+                                                <Eye size={16} color="#94A3B8" />
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="empty-selection-msg">No sections selected for preview.</div>
                                 )}
                             </div>
-                        ))}
+
+                            <div className="sidebar-footer-actions">
+                                <button className="reset-order-btn" onClick={() => {
+                                    const original = SECTIONS_LIST.filter(sec =>
+                                        selectedSections.includes(sec.id) && !hiddenSections.includes(sec.id)
+                                    );
+                                    setReorderedSections(original);
+                                }}>RESET ORDER</button>
+                            </div>
+                        </div>
+
+                        {/* Right: Preview Pane */}
+                        <div className="report-main-preview-area">
+                            {/* Centered Mock Paper Document */}
+                            <div className="preview-pane-standalone">
+                                <div className="pane-header-actions">
+                                    <div className="preview-tag">
+                                        <FileText size={18} className="preview-icon-small" />
+                                        <h3>Live Preview: {selectedReportType || 'Report Overview'}</h3>
+                                    </div>
+                                    <div className="preview-controls-overlay">
+                                        <span className="page-indicator">Page 1 of 12</span>
+                                        <div className="zoom-btns">
+                                            <button className="zoom-btn"><ZoomOut size={16} /></button>
+                                            <button className="zoom-btn"><ZoomIn size={16} /></button>
+                                            <button className="zoom-btn"><Maximize2 size={16} /></button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="paper-viewer-container">
+                                    <div className="mock-paper-document">
+                                        <div className="paper-header">
+                                            <div className="paper-logo-icon">
+                                                <ShipIcon size={32} />
+                                            </div>
+                                            <div className="confidential-mark">
+                                                <span>STRICTLY CONFIDENTIAL</span>
+                                                <small>Ref: VS-{vesselDisplayName}-2024-001</small>
+                                            </div>
+                                        </div>
+
+                                        <h1 className="paper-title">{selectedReportType || 'Ship Hazmat Overview'}</h1>
+
+                                        <p className="paper-intro-text">
+                                            The following overview outlines the distribution and concentration of
+                                            hazardous materials identified during the most recent IHM survey for the
+                                            vessel <strong>{activeVesselName} (IMO: {activeVesselData?.imoNo || '9371543'})</strong>.
+                                        </p>
+
+                                        <div className="summary-boxes-row">
+                                            <div className="summary-box">
+                                                <span className="box-label">TOTAL ITEMS LOGGED</span>
+                                                <span className="box-value">124 Samples</span>
+                                            </div>
+                                            <div className="summary-box accent">
+                                                <span className="box-label">ACTIVE HAZARDS</span>
+                                                <span className="box-value">12 Locations</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="hazmat-table-mock">
+                                            <div className="table-header">
+                                                <span>HAZMAT CODE</span>
+                                                <span>LOCATION</span>
+                                                <span>STATUS</span>
+                                            </div>
+                                            <div className="table-row">
+                                                <span>Asbestos (Table A)</span>
+                                                <span>Engine Room - Gasket</span>
+                                                <span className="status-pos">Positive</span>
+                                            </div>
+                                            <div className="table-row">
+                                                <span>PCBs (Table A)</span>
+                                                <span>Main Deck - Paint</span>
+                                                <span className="status-neg">Negative</span>
+                                            </div>
+                                            <div className="table-row">
+                                                <span>Ozone Depleting</span>
+                                                <span>A/C Plant 2</span>
+                                                <span className="status-trace">Trace</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="paper-footer-note">
+                                            Note: All findings are subject to regular quarterly inspections and should be cross-referenced with the Movement Log on page 7.
+                                        </div>
+
+                                        <div className="paper-bottom-meta">
+                                            <span>Varuna Sentinels | IHM Compliance Report</span>
+                                            <span>Page 1 of 12</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pane-footer-actions">
+                                    <button className="save-draft-btn-plain">SAVE DRAFT</button>
+                                    <button className="finalize-export-btn">
+                                        <Layers size={18} /> FINALIZE & EXPORT
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="vessel-status-bar">
+                        <div className="status-left">
+                            <div className="status-dot dot-online"></div>
+                            <span>System Online</span>
+                        </div>
+                        <div className="status-right">
+                            <span>© 2024 Varuna Sentinels. All rights reserved.</span>
+                        </div>
                     </div>
                 </div>
             );
@@ -1158,7 +1564,7 @@ export default function Vessels() {
                     </div>
 
                     <div className="vessels-content-layout">
-                        {/* Secondary Sidebar - Hidden on Decks, Documents, Materials & Certificate tabs */}
+                        {/* Secondary Sidebar - Hidden on Decks, Documents, Materials, Certificate & Reports tabs */}
                         {activeTab !== 'decks' && activeTab !== 'documents' && activeTab !== 'materials' && activeTab !== 'certificate' && activeTab !== 'reports' && (
                             <aside className="secondary-sidebar">
                                 {activeTab === 'purchase' ? (
@@ -1288,43 +1694,45 @@ export default function Vessels() {
                                     </>
                                 ) : (
                                     <>
-                                        <div className="sidebar-dark-content-area">
-                                            <div className="vessel-search-container light-mode">
-                                                <div className="vessel-search-box light">
-                                                    <Search size={16} color="#94A3B8" />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search vessels..."
-                                                        value={searchTerm}
-                                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                                    />
-                                                </div>
+                                        <div className="sidebar-section-header">
+                                            <span>VESSEL SELECTION</span>
+                                            <Search size={14} style={{ cursor: 'pointer', color: '#64748B' }} />
+                                        </div>
+                                        <div className="vessel-search-container light-mode">
+                                            <div className="vessel-search-box light">
+                                                <Search size={16} color="#94A3B8" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search vessels..."
+                                                    value={searchTerm}
+                                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                                />
                                             </div>
+                                        </div>
 
-                                            <div className="vessel-list light-mode" style={{ flex: 1, overflowY: 'auto' }}>
-                                                {vesselList.filter(v =>
-                                                    v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                    v.imoNo.includes(searchTerm)
-                                                ).map((vessel) => (
-                                                    <div
-                                                        key={`${vessel.name}-${vessel.imoNo}`}
-                                                        className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
-                                                        onClick={() => handleVesselSelect(vessel)}
-                                                    >
-                                                        <div className="vessel-status-dot v-active"></div>
-                                                        <div className="vessel-info-block">
-                                                            <h4>{vessel.name}</h4>
-                                                            <p>IMO {vessel.imoNo}</p>
-                                                        </div>
+                                        <div className="vessel-list light-mode" style={{ flex: 1, overflowY: 'auto' }}>
+                                            {vesselList.filter(v =>
+                                                v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                v.imoNo.includes(searchTerm)
+                                            ).map((vessel) => (
+                                                <div
+                                                    key={`${vessel.name}-${vessel.imoNo}`}
+                                                    className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
+                                                    onClick={() => handleVesselSelect(vessel)}
+                                                >
+                                                    <div className="vessel-status-dot v-active"></div>
+                                                    <div className="vessel-info-block">
+                                                        <h4>{vessel.name}</h4>
+                                                        <p>IMO {vessel.imoNo}</p>
                                                     </div>
-                                                ))}
-                                            </div>
-                                            <div className="sidebar-list-footer">
-                                                <button className="add-vessel-btn-refined" onClick={handleAddClick}>
-                                                    <Plus size={18} />
-                                                    Add Vessel
-                                                </button>
-                                            </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="sidebar-list-footer">
+                                            <button className="add-vessel-btn-refined" onClick={handleAddClick}>
+                                                <Plus size={18} />
+                                                Add Vessel
+                                            </button>
                                         </div>
                                     </>
                                 )}
@@ -1333,7 +1741,7 @@ export default function Vessels() {
 
                         {/* Main Section */}
                         <div className="vessels-main">
-                            <div className={`vessel-tab-content ${activeTab === 'purchase' ? 'no-scroll' : ''}`}>
+                            <div className={`vessel-tab-content ${activeTab === 'purchase' || (activeTab === 'reports' && reportStep === 2) ? 'no-scroll no-padding' : ''}`}>
                                 {renderContent()}
                             </div>
                         </div>
@@ -1353,74 +1761,82 @@ export default function Vessels() {
 }
 
 // Helper Components
-const FormGroup = ({ label, name, value, onChange, required, readOnly }: { label: string, name: string, value: string, onChange: (e: any) => void, required?: boolean, readOnly?: boolean }) => (
-    <div className="form-group-modern">
-        <label>{label} {required && <span className="required">*</span>}</label>
-        <input
-            type="text"
-            name={name}
-            className={`form-control-modern ${readOnly ? 'read-only' : ''}`}
-            value={value}
-            onChange={onChange}
-            readOnly={readOnly}
-            placeholder={`Enter ${label.toLowerCase()}`}
-        />
-    </div>
-);
-
-const DateGroup = ({ label, name, value, onChange, readOnly }: { label: string, name: string, value: string, onChange: (e: any) => void, readOnly?: boolean }) => (
-    <div className="form-group-modern">
-        <label>{label}</label>
-        <div className="date-input-wrapper-modern">
+function FormGroup({ label, name, value, onChange, required, readOnly }: { label: string, name: string, value: string, onChange: (e: any) => void, required?: boolean, readOnly?: boolean }) {
+    return (
+        <div className="form-group-modern">
+            <label>{label} {required && <span className="required">*</span>}</label>
             <input
-                type="date"
+                type="text"
                 name={name}
                 className={`form-control-modern ${readOnly ? 'read-only' : ''}`}
                 value={value}
                 onChange={onChange}
-                onKeyDown={(e) => e.preventDefault()}
-                onClick={(e) => !readOnly && (e.target as HTMLInputElement).showPicker?.()}
-                style={{ cursor: readOnly ? 'default' : 'pointer' }}
                 readOnly={readOnly}
+                placeholder={`Enter ${label.toLowerCase()}`}
             />
-            <Calendar className="date-icon-modern" size={16} />
         </div>
-    </div>
-);
+    );
+}
 
-const RadioGroup = ({ label, name, options, value, onChange, readOnly }: { label: string, name: string, options: string[], value: string, onChange: (e: any) => void, readOnly?: boolean }) => (
-    <div className="form-group-modern">
-        <label>{label}</label>
-        <div className="radio-group-container">
-            {options.map(opt => (
-                <label key={opt} className={`radio-option ${readOnly ? 'disabled' : ''}`}>
-                    <input
-                        type="radio"
-                        name={name}
-                        value={opt}
-                        checked={value === opt}
-                        onChange={onChange}
-                        disabled={readOnly}
-                    />
-                    <span className="radio-custom"></span>
-                    <span className="radio-text">{opt}</span>
-                </label>
-            ))}
-        </div>
-    </div>
-);
-
-const SuccessModal = ({ message, onClose }: { message: string, onClose: () => void }) => (
-    <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content success-card-modal">
-            <div className="modal-success-icon">
-                <Check size={40} />
+function DateGroup({ label, name, value, onChange, readOnly }: { label: string, name: string, value: string, onChange: (e: any) => void, readOnly?: boolean }) {
+    return (
+        <div className="form-group-modern">
+            <label>{label}</label>
+            <div className="date-input-wrapper-modern">
+                <input
+                    type="date"
+                    name={name}
+                    className={`form-control-modern ${readOnly ? 'read-only' : ''}`}
+                    value={value}
+                    onChange={onChange}
+                    onKeyDown={(e) => e.preventDefault()}
+                    onClick={(e) => !readOnly && (e.target as HTMLInputElement).showPicker?.()}
+                    style={{ cursor: readOnly ? 'default' : 'pointer' }}
+                    readOnly={readOnly}
+                />
+                <Calendar className="date-icon-modern" size={16} />
             </div>
-            <h2 className="modal-title">Success!</h2>
-            <p className="modal-message">{message}</p>
-            <button className="modal-action-btn" onClick={onClose}>
-                DONE
-            </button>
         </div>
-    </div>
-);
+    );
+}
+
+function RadioGroup({ label, name, options, value, onChange, readOnly }: { label: string, name: string, options: string[], value: string, onChange: (e: any) => void, readOnly?: boolean }) {
+    return (
+        <div className="form-group-modern">
+            <label>{label}</label>
+            <div className="radio-group-container">
+                {options.map(opt => (
+                    <label key={opt} className={`radio-option ${readOnly ? 'disabled' : ''}`}>
+                        <input
+                            type="radio"
+                            name={name}
+                            value={opt}
+                            checked={value === opt}
+                            onChange={onChange}
+                            disabled={readOnly}
+                        />
+                        <span className="radio-custom"></span>
+                        <span className="radio-text">{opt}</span>
+                    </label>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function SuccessModal({ message, onClose }: { message: string, onClose: () => void }) {
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content success-card-modal">
+                <div className="modal-success-icon">
+                    <Check size={40} />
+                </div>
+                <h2 className="modal-title">Success!</h2>
+                <p className="modal-message">{message}</p>
+                <button className="modal-action-btn" onClick={onClose}>
+                    DONE
+                </button>
+            </div>
+        </div>
+    );
+}

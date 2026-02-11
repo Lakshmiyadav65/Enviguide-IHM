@@ -3,7 +3,7 @@ import {
     FileText, Calendar, ShieldCheck, Landmark, Upload, Info,
     Search, Plus, ChevronDown, ChevronUp, Eye, Download, RefreshCw,
     CheckCircle2, Clock, Ship, ChevronRight, ChevronLeft,
-    Trash2, Lock, X
+    Trash2, Lock, X, Layers
 } from 'lucide-react';
 import './IHMCertificateView.css';
 
@@ -692,7 +692,43 @@ const IHMCertificateView: React.FC<IHMCertificateViewProps> = ({ vesselName, onC
                     )}
                 </div>
 
-                {/* 2. Statement of Compliance (SoC) */}
+                {/* 2. IHM Part II & III */}
+                <div className={`cert-accordion-item ${expandedSection === 'part23' ? 'expanded' : ''}`}>
+                    <div className="accordion-header" onClick={() => setExpandedSection(expandedSection === 'part23' ? null : 'part23')}>
+                        <div className="header-left">
+                            <div className="header-icon-box"><Layers size={20} color="#00B0FA" /></div>
+                            <div className="header-text">
+                                <h3>IHM Part II & III (Operationally Generated Waste)</h3>
+                                <p>Manage operationally generated waste and relevant documentation.</p>
+                            </div>
+                        </div>
+                        {expandedSection === 'part23' ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
+                    {expandedSection === 'part23' && (
+                        <div className="accordion-content">
+                            <div className="data-placeholder-row">
+                                <Info size={16} />
+                                <span>Specific waste data and disposal records will be listed here.</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* 3. Annual Compliance Review */}
+                <div className={`cert-accordion-item ${expandedSection === 'annual' ? 'expanded' : ''}`}>
+                    <div className="accordion-header" onClick={() => setExpandedSection(expandedSection === 'annual' ? null : 'annual')}>
+                        <div className="header-left">
+                            <div className="header-icon-box"><CheckCircle2 size={20} color="#10b981" /></div>
+                            <div className="header-text">
+                                <h3>Annual Compliance Review</h3>
+                                <p>Track yearly audits and self-assessment results.</p>
+                            </div>
+                        </div>
+                        {expandedSection === 'annual' ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
+                </div>
+
+                {/* 4. Statement of Compliance (SoC) */}
                 <div className={`cert-accordion-item ${expandedSection === 'soc' ? 'expanded' : ''}`}>
                     <div className="accordion-header" onClick={() => setExpandedSection(expandedSection === 'soc' ? null : 'soc')}>
                         <div className="header-left">
@@ -705,20 +741,7 @@ const IHMCertificateView: React.FC<IHMCertificateViewProps> = ({ vesselName, onC
                     </div>
                 </div>
 
-                {/* 3. Interim Certificates */}
-                <div className={`cert-accordion-item ${expandedSection === 'interim' ? 'expanded' : ''}`}>
-                    <div className="accordion-header" onClick={() => setExpandedSection(expandedSection === 'interim' ? null : 'interim')}>
-                        <div className="header-left">
-                            <div className="header-icon-box"><Clock size={20} color="#3b82f6" /></div>
-                            <div className="header-text">
-                                <h3>Interim Certificates</h3>
-                            </div>
-                        </div>
-                        {expandedSection === 'interim' ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                    </div>
-                </div>
-
-                {/* 4. Archived Certifications */}
+                {/* 5. Archived Certifications */}
                 <div className={`cert-accordion-item ${expandedSection === 'archived' ? 'expanded' : ''}`}>
                     <div className="accordion-header" onClick={() => setExpandedSection(expandedSection === 'archived' ? null : 'archived')}>
                         <div className="header-left">
