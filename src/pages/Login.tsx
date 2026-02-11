@@ -196,17 +196,6 @@ export default function Login() {
                                 )}
                             </button>
 
-                            <div className="demo-credentials">
-                                <div className="demo-header">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <circle cx="12" cy="12" r="10" />
-                                        <path d="M12 16v-4M12 8h.01" />
-                                    </svg>
-                                    <span>Demo Access</span>
-                                </div>
-                                <p className="demo-info">Email: <strong>admin@maritime.com</strong></p>
-                                <p className="demo-info">Password: <strong>demo123</strong></p>
-                            </div>
                         </form>
 
                         <div className="form-footer">
@@ -227,6 +216,21 @@ export default function Login() {
                             <a href="#">Support</a>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* Separate Demo Hint - Moved outside cards for future-proofing */}
+            <div className="floating-demo-hint">
+                <div className="demo-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4M12 8h.01" />
+                    </svg>
+                    <span>DEMO ACCESS</span>
+                </div>
+                <div className="demo-hint-content">
+                    <p>Email: <strong>admin@maritime.com</strong></p>
+                    <p>Password: <strong>demo123</strong></p>
                 </div>
             </div>
         </div>

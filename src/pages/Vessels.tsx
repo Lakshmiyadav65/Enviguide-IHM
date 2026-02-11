@@ -1473,8 +1473,13 @@ export default function Vessels() {
                                             </>
                                         ) : (
                                             <div className="drag-drop-placeholder">
-                                                <div className="upload-icon-circle">
-                                                    <Upload size={32} />
+                                                <div className="custom-upload-animation">
+                                                    <div className="animated-circle">
+                                                        <div className="inverted-v-divider">
+                                                            <div className="v-line left"></div>
+                                                            <div className="v-line right"></div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div className="upload-text">
                                                     <p className="main-text">Drag and drop file</p>
@@ -1543,7 +1548,7 @@ export default function Vessels() {
         <div className="vessels-page-container">
             <Sidebar />
             <main className="vessel-page-main">
-                <Header title="SHIPS AT PROJECT" notificationCount={notifCount} />
+                <Header notificationCount={notifCount} />
 
                 <div className="vessels-layout-wrapper">
                     <div className="vessels-top-nav">
@@ -1779,22 +1784,262 @@ function FormGroup({ label, name, value, onChange, required, readOnly }: { label
 }
 
 function DateGroup({ label, name, value, onChange, readOnly }: { label: string, name: string, value: string, onChange: (e: any) => void, readOnly?: boolean }) {
+    const [showCalendar, setShowCalendar] = useState(false);
+    const [showYearPicker, setShowYearPicker] = useState(false);
+    const [showMonthPicker, setShowMonthPicker] = useState(false);
+
+    // Check if browser supports :has(), otherwise we might need global class handling, but inline style works for z-index
+
+    const parseDate = (val: string | null) => {
+        if (!val) return null;
+        const d = new Date(val);
+        return !isNaN(d.getTime()) ? d : null;
+    };
+
+    const initialDate = parseDate(value);
+    const [viewDate, setViewDate] = useState(initialDate || new Date());
+    const [selectedDate, setSelectedDate] = useState<Date | null>(initialDate);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const yearsContainerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const parsed = parseDate(value);
+        setSelectedDate(parsed);
+        if (parsed) {
+            setViewDate(parsed);
+        }
+    }, [value]);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setShowCalendar(false);
+                setShowYearPicker(false);
+                setShowMonthPicker(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // Auto-scroll year picker
+    useEffect(() => {
+        if (showYearPicker && yearsContainerRef.current) {
+            const currentYearEl = yearsContainerRef.current.querySelector('.year-cell.current');
+            if (currentYearEl) {
+                currentYearEl.scrollIntoView({ block: 'center', behavior: 'auto' });
+            }
+        }
+    }, [showYearPicker]);
+
+    const handleToggle = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!readOnly) {
+            setShowCalendar(prev => !prev);
+            setShowYearPicker(false);
+            setShowMonthPicker(false);
+        }
+    };
+
+    const daysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
+    const startDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
+
+    const handlePrevMonth = () => {
+        setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
+    };
+
+    const handleNextMonth = () => {
+        setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
+    };
+
+    const handleYearChange = (year: number) => {
+        setViewDate(new Date(year, viewDate.getMonth(), 1));
+        setShowYearPicker(false);
+        // Optional: switch to month picker after year? keeping to day view for efficiency unless requested
+        // User asked "Ask user about the month then ask them about the day" - maybe go to Month picker?
+        // Let's go to Month picker for better flow
+        setShowMonthPicker(true);
+    };
+
+    const handleMonthChange = (monthIndex: number) => {
+        setViewDate(new Date(viewDate.getFullYear(), monthIndex, 1));
+        setShowMonthPicker(false);
+    };
+
+    const handleSelectDate = (day: number) => {
+        const newDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+        setSelectedDate(newDate);
+        setShowCalendar(false);
+
+        const yyyy = newDate.getFullYear();
+        const mm = String(newDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(newDate.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+
+        // Simulate full event to prevent crashes in parent handlers
+        const syntheticEvent = {
+            target: { name, value: dateStr },
+            preventDefault: () => { },
+            stopPropagation: () => { },
+            persist: () => { }
+        };
+
+        onChange(syntheticEvent);
+    };
+
+    const formatDateDisplay = (date: Date | null) => {
+        if (!date) return "";
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yyyy = date.getFullYear();
+        return `${dd} - ${mm} - ${yyyy}`;
+    };
+
+    const renderYearPicker = () => {
+        const currentYear = viewDate.getFullYear();
+        // Generate years 1900 to 2100
+        const years = Array.from({ length: 201 }, (_, i) => 1900 + i);
+
+        return (
+            <div className="year-picker-grid">
+                <div className="year-picker-header">Select Year</div>
+                <div className="years-container" ref={yearsContainerRef}>
+                    {years.map(y => (
+                        <div
+                            key={y}
+                            className={`year-cell ${y === currentYear ? 'current' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); handleYearChange(y); }}
+                        >
+                            {y}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const renderMonthPicker = () => {
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const currentMonth = viewDate.getMonth();
+
+        return (
+            <div className="month-picker-grid">
+                <div className="year-picker-header">Select Month</div>
+                <div className="months-container">
+                    {monthNames.map((m, idx) => (
+                        <div
+                            key={m}
+                            className={`month-cell ${idx === currentMonth ? 'current' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); handleMonthChange(idx); }}
+                        >
+                            {m}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const renderCalendar = () => {
+        const month = viewDate.getMonth();
+        const year = viewDate.getFullYear();
+        const days = [];
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+        const offset = startDayOfMonth(month, year);
+        for (let i = 0; i < offset; i++) {
+            days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
+        }
+
+        const totalDays = daysInMonth(month, year);
+        for (let d = 1; d <= totalDays; d++) {
+            const isToday = new Date().toDateString() === new Date(year, month, d).toDateString();
+            const isSelected = selectedDate?.toDateString() === new Date(year, month, d).toDateString();
+            days.push(
+                <div
+                    key={d}
+                    className={`calendar-day ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); handleSelectDate(d); }}
+                >
+                    {d}
+                </div>
+            );
+        }
+
+        return (
+            <div className="innovative-calendar-popup" onClick={(e) => e.stopPropagation()}>
+                {showYearPicker ? renderYearPicker() : showMonthPicker ? renderMonthPicker() : (
+                    <>
+                        <div className="calendar-header-premium">
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handlePrevMonth(); }} className="nav-btn-cal"><ChevronLeft size={16} /></button>
+                            <div className="month-year-display">
+                                <span
+                                    className="cal-month clickable"
+                                    onClick={(e) => { e.stopPropagation(); setShowMonthPicker(true); }}
+                                    title="Click to change month"
+                                >
+                                    {monthNames[month]}
+                                </span>
+                                <div
+                                    className="cal-year-badge clickable"
+                                    onClick={(e) => { e.stopPropagation(); setShowYearPicker(true); }}
+                                    title="Click to change year"
+                                >
+                                    {year}
+                                </div>
+                            </div>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handleNextMonth(); }} className="nav-btn-cal"><ChevronRight size={16} /></button>
+                        </div>
+                        <div className="calendar-weekdays">
+                            {['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'].map(wd => <span key={wd}>{wd}</span>)}
+                        </div>
+                        <div className="calendar-grid-premium">
+                            {days}
+                        </div>
+                        <div className="calendar-footer-cal">
+                            <button
+                                type="button"
+                                className="today-btn-cal"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const now = new Date();
+                                    setViewDate(now);
+                                    handleSelectDate(now.getDate());
+                                }}
+                            >
+                                Go to Today
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    };
+
     return (
-        <div className="form-group-modern">
+        <div
+            className="form-group-modern"
+            ref={containerRef}
+            style={{ zIndex: showCalendar ? 100 : 'auto', position: 'relative' }} /* Fix overlap */
+        >
             <label>{label}</label>
             <div className="date-input-wrapper-modern">
-                <input
-                    type="date"
-                    name={name}
-                    className={`form-control-modern ${readOnly ? 'read-only' : ''}`}
-                    value={value}
-                    onChange={onChange}
-                    onKeyDown={(e) => e.preventDefault()}
-                    onClick={(e) => !readOnly && (e.target as HTMLInputElement).showPicker?.()}
-                    style={{ cursor: readOnly ? 'default' : 'pointer' }}
-                    readOnly={readOnly}
-                />
-                <Calendar className="date-icon-modern" size={16} />
+                <div
+                    className={`custom-date-field ${readOnly ? 'read-only' : ''} ${showCalendar ? 'active' : ''}`}
+                    onClick={handleToggle}
+                >
+                    <span className={`date-value-text ${!selectedDate ? 'placeholder' : ''}`}>
+                        {selectedDate ? formatDateDisplay(selectedDate) : `Select ${label.toLowerCase()}`}
+                    </span>
+                    <div
+                        className="orbital-cal-indicator"
+                        onClick={handleToggle}
+                    >
+                        <Calendar size={16} />
+                    </div>
+                </div>
+                {!readOnly && showCalendar && renderCalendar()}
             </div>
         </div>
     );

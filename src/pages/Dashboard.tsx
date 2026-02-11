@@ -55,7 +55,7 @@ export default function Dashboard() {
             <Sidebar />
 
             <main className="main-content">
-                <Header title="Dashboard" />
+                <Header />
 
                 <div className="dashboard-content">
 

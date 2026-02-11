@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import {
     Search, Plus, Filter, ChevronRight, ChevronLeft, ChevronDown, AlertCircle,
-    Database, Package, Download, X, Settings as Cog, FileText, CheckCircle, ExternalLink, MoreVertical
+    Database, Package, Download, X, FileText, CheckCircle, ExternalLink, MoreVertical
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import './MaterialsRecord.css';
 
 import { mockMaterials } from '../services/mockData';
@@ -16,6 +17,7 @@ interface MaterialsRecordProps {
 }
 
 export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
+    const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTag, setActiveTag] = useState('All');
     const [riskFilter, setRiskFilter] = useState('Risk Level');
@@ -28,6 +30,16 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
 
     const riskRef = useRef<HTMLDivElement>(null);
     const complianceRef = useRef<HTMLDivElement>(null);
+    const topScrollRef = useRef<HTMLDivElement>(null);
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    useEffect(() => {
+        const handleStorageChange = () => setRefreshTrigger(prev => prev + 1);
+        window.addEventListener('storage', handleStorageChange);
+        return () => window.removeEventListener('storage', handleStorageChange);
+    }, []);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -51,11 +63,10 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
     const [selectedChemicalGroup, setSelectedChemicalGroup] = useState('All Chemical Groups');
     const [isEditing, setIsEditing] = useState(false);
     const [showToast, setShowToast] = useState(false);
-    const [updatedMaterialId, setUpdatedMaterialId] = useState<string | null>(null);
 
     // Edit State
     const [editName, setEditName] = useState('');
-    const [editCAS, setEditCAS] = useState('1332-21-4');
+    const [editPO, setEditPO] = useState('PO-12345');
     const [editRisk] = useState('High Risk');
     const [isEmptyCategoryDropdownOpen, setIsEmptyCategoryDropdownOpen] = useState(false);
     const [emptyStateCategory, setEmptyStateCategory] = useState('Select Material Category');
@@ -69,6 +80,28 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Sync Horizontal Scroll
+    useEffect(() => {
+        const top = topScrollRef.current;
+        const bottom = tableContainerRef.current;
+        if (!top || !bottom) return;
+
+        const onTopScroll = () => {
+            bottom.scrollLeft = top.scrollLeft;
+        };
+        const onBottomScroll = () => {
+            top.scrollLeft = bottom.scrollLeft;
+        };
+
+        top.addEventListener('scroll', onTopScroll);
+        bottom.addEventListener('scroll', onBottomScroll);
+
+        return () => {
+            top.removeEventListener('scroll', onTopScroll);
+            bottom.removeEventListener('scroll', onBottomScroll);
+        };
     }, []);
 
     // Logic: The "Big 4" demo vessels get full data. Others get the empty state.
@@ -165,19 +198,79 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
         );
     }
 
-    // Calculate Dynamic Counts
+    // Unified data source: mockData + localStorage (for real-time sync with mapping page)
+    const allAvailableMaterials = useMemo(() => {
+        // Read from mock data
+        const baseMaterials = mockMaterials.map(m => ({
+            ...m,
+            vesselId: m.vesselId || (m.zone?.includes('Deck') ? '1' : '2') // Assign mock vessel IDs
+        }));
+
+        // Read from localStorage (saved from HazardousMaterialMapping)
+        const savedInventoryRaw = localStorage.getItem(`vessel_inventory_${vesselName}`);
+        const savedInventory: Material[] = savedInventoryRaw ? JSON.parse(savedInventoryRaw) : [];
+
+        // NEW: Read from deck-specific localStorages to sync with mapping page
+        const deckInventories: Material[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith(`inventory_${vesselName}_`)) {
+                try {
+                    const data = JSON.parse(localStorage.getItem(key) || '[]');
+                    const sectionName = key.replace(`inventory_${vesselName}_`, '');
+                    deckInventories.push(...data.map((m: any) => ({
+                        id: m.id,
+                        name: m.name,
+                        vesselId: vesselIdMap[vesselName] || '1',
+                        ihmPart: m.ihmPart || 'PART I',
+                        category: (m.hmStatus && m.hmStatus.toLowerCase() === 'chm') ? 'hazard' : 'warning',
+                        completion: 100,
+                        status: 'Mapped',
+                        poNo: m.shipPO || '',
+                        zone: sectionName,
+                        materialName: m.material,
+                        equipment: m.equipment,
+                        compartment: m.compartment
+                    })));
+                } catch (e) {
+                    console.error("Failed to parse deck inventory:", e);
+                }
+            }
+        }
+
+        // Combine both sources
+        return [...baseMaterials, ...savedInventory, ...deckInventories];
+    }, [vesselName, refreshTrigger]);
+
+    // Map vessel name to a mock ID if necessary
+    const vesselIdMap: Record<string, string> = {
+        'MV Ocean Pioneer': '1',
+        'ACOSTA': '2',
+        'AFIF': '3',
+        'PACIFIC HORIZON': '4'
+    };
+
+    // Calculate Dynamic Counts based on current vessel
+    const vesselSpecificMaterials = useMemo(() => {
+        return allAvailableMaterials.filter(m => {
+            // If it's from localStorage, it might already be filtered by vesselName in the key.
+            // If it's mock data, we check vesselIdMap or just use vesselName if available.
+            return vesselIdMap[vesselName] === m.vesselId || m.id.startsWith('MAPPED-');
+        });
+    }, [allAvailableMaterials, vesselName]);
+
     const counts = useMemo(() => {
         return {
-            all: mockMaterials.length,
-            part1: mockMaterials.filter(m => m.ihmPart === 'PART I').length,
-            part2: mockMaterials.filter(m => m.ihmPart === 'PART II').length,
-            part3: mockMaterials.filter(m => m.ihmPart === 'PART III').length,
-            nonHaz: mockMaterials.filter(m => m.category === 'safe' || m.thresholdMessage === 'Non-Hazardous').length,
-            archived: 0 // Mock 0
+            all: vesselSpecificMaterials.length,
+            part1: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART I').length,
+            part2: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART II').length,
+            part3: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART III').length,
+            nonHaz: vesselSpecificMaterials.filter(m => m.category === 'safe' || m.thresholdMessage === 'Non-Hazardous').length,
+            archived: 0
         };
-    }, []);
+    }, [vesselSpecificMaterials]);
 
-    const filteredMaterials = mockMaterials.filter(m => {
+    const filteredMaterials = vesselSpecificMaterials.filter(m => {
         const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             m.id.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -207,22 +300,19 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
         // Side Panel Filters
         let matchesPartFilter = true;
         if (selectedParts.length > 0) {
-            // Match "PART I" from mock to "Part I" from state
             matchesPartFilter = selectedParts.some(p => {
-                const normalizedPart = p.split(':')[0].trim().toUpperCase(); // "Part I: ..." -> "PART I"
+                const normalizedPart = p.split(':')[0].trim().toUpperCase();
                 return m.ihmPart.toUpperCase() === normalizedPart;
             });
         }
 
         let matchesZone = true;
         if (selectedZones.length > 0) {
-            // m.zone "Engine Room" vs selected "Engine Room"
             matchesZone = m.zone ? selectedZones.includes(m.zone) : false;
         }
 
         let matchesThreshold = true;
         if (m.thresholdValue !== undefined) {
-            // Assume thresholdValue is percentage number (e.g. 0.12). Min/Max are also percentages.
             matchesThreshold = m.thresholdValue >= thresholdMin && m.thresholdValue <= thresholdMax;
         }
 
@@ -232,12 +322,13 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
     const displayedMaterials = filteredMaterials.slice(0, visibleCount);
 
     const handleEditClick = (material: Material) => {
-        setEditName(material.name);
-        setIsEditing(true);
+        // Redirect to mapping page with the selected material ID and vessel
+        // Defaulting to material.zone as section name if available
+        const deckName = material.zone || 'A-DECK 01';
+        navigate(`/mapping?matId=${material.id}&vessel=${vesselName}&name=${deckName}`);
     };
 
     const handleSaveUpdate = () => {
-        setUpdatedMaterialId(selectedMaterialId);
         setIsEditing(false);
         setShowToast(true);
         setTimeout(() => setShowToast(false), 4000);
@@ -332,7 +423,7 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                         <Filter size={18} />
                     </button>
 
-                    <button className="export-record-btn-top">
+                    <button className="export-record-btn-top" style={{ marginLeft: '4px' }}>
                         <Download size={16} /> Export Record
                     </button>
                 </div>
@@ -399,15 +490,36 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
             <div className={`materials-list-container ${selectedMaterialId ? '' : ''}`}>
                 <div className="materials-content-wrapper">
                     <div className={`materials-list-pane ${selectedMaterialId ? 'shrunk' : ''}`}>
-                        <div className="materials-table-wrapper" style={{ flex: 1, overflow: 'visible' }}>
+                        {/* Top Scrollbar Dummy */}
+                        <div
+                            ref={topScrollRef}
+                            style={{
+                                overflowX: 'auto',
+                                overflowY: 'hidden',
+                                height: '10px',
+                                width: '100%',
+                                borderBottom: '1px solid var(--border-color)',
+                                background: 'white'
+                            }}
+                        >
+                            <div style={{ width: '1600px', height: '1px' }}></div>
+                        </div>
+
+                        <div className="materials-table-wrapper" ref={tableContainerRef}>
                             <table className="materials-table">
                                 <thead>
                                     <tr>
-                                        <th>SUBSTANCE DETAILS</th>
-                                        <th>IHM PART</th>
-                                        <th>COMPLIANCE STATUS</th>
-                                        <th>THRESHOLD INFO</th>
-                                        <th style={{ width: '60px' }}>ACTION</th>
+                                        <th style={{ minWidth: '280px' }}>SUBSTANCE DETAILS</th>
+                                        <th style={{ minWidth: '100px' }}>DECK</th>
+                                        <th style={{ minWidth: '120px' }}>PO NO</th>
+                                        <th style={{ minWidth: '180px' }}>COMPONENT</th>
+                                        <th style={{ minWidth: '100px', textAlign: 'center' }}>HAZMAT</th>
+                                        <th style={{ minWidth: '220px' }}>MATERIAL</th>
+                                        <th style={{ minWidth: '220px' }}>EQUIPMENT</th>
+                                        <th style={{ minWidth: '100px' }}>IHM PART</th>
+                                        <th style={{ minWidth: '160px' }}>COMPLIANCE STATUS</th>
+                                        <th style={{ minWidth: '180px' }}>THRESHOLD INFO</th>
+                                        <th className="sticky-col" style={{ width: '80px' }}>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -434,48 +546,24 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                                                     </div>
                                                 </div>
                                             </td>
+                                            <td className="deck-cell">{item.zone || '-'}</td>
+                                            <td className="po-cell">{item.poNo || '-'}</td>
+                                            <td className="component-cell">{item.component || '-'}</td>
+                                            <td className="hazmat-cell" style={{ textAlign: 'center' }}>
+                                                {item.hazardType && (
+                                                    <span className="hazmat-text-only">
+                                                        {item.hazardType}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="material-cell">{item.materialName || item.name}</td>
+                                            <td className="equipment-cell">{item.equipment || '-'}</td>
                                             <td>
                                                 <span className="part-badge">{item.ihmPart}</span>
                                             </td>
                                             <td className="compliance-cell">
-                                                <div className="compliance-status-wrapper">
-                                                    <div className="status-info-main">
-                                                        <div className="percent-complete">
-                                                            <span className="percent-val">{item.completion}%</span>
-                                                            <span className="complete-label">Complete</span>
-                                                        </div>
-                                                        <div className={`status-type-label ${item.status === 'Certified' || item.status === 'Verified' ? 'certified' : item.status === 'Pending Survey' ? 'pending' : 'in-progress'}`}>
-                                                            <div className="status-words">
-                                                                {updatedMaterialId === item.id ? (
-                                                                    <>
-                                                                        <span>DATA</span>
-                                                                        <span>UPDATED</span>
-                                                                    </>
-                                                                ) : item.status === 'In Progress' ? (
-                                                                    <>
-                                                                        <span>In</span>
-                                                                        <span>Progress</span>
-                                                                    </>
-                                                                ) : item.status === 'Pending Survey' ? (
-                                                                    <>
-                                                                        <span>Pending</span>
-                                                                        <span>Survey</span>
-                                                                    </>
-                                                                ) : (
-                                                                    <span>{item.status}</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="progress-bar-track">
-                                                        <div
-                                                            className="progress-bar-fill"
-                                                            style={{
-                                                                width: `${item.completion}%`,
-                                                                backgroundColor: item.status === 'Certified' || item.status === 'Verified' ? '#22c55e' : item.status === 'Pending Survey' ? '#ef4444' : '#f59e0b'
-                                                            }}
-                                                        />
-                                                    </div>
+                                                <div className={`status-badge-text ${item.status === 'Certified' || item.status === 'Verified' ? 'certified' : item.status === 'Pending Survey' ? 'pending' : 'in-progress'}`}>
+                                                    {item.status}
                                                 </div>
                                             </td>
                                             <td>
@@ -483,7 +571,7 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                                                     {item.thresholdMessage}
                                                 </span>
                                             </td>
-                                            <td>
+                                            <td className="sticky-col">
                                                 <div className="action-arrow">
                                                     <ChevronRight size={20} />
                                                 </div>
@@ -536,9 +624,9 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                                     {isEditing ? 'Edit Material Details' : mockMaterials.find(m => m.id === selectedMaterialId)?.name}
                                 </h2>
                                 {!isEditing && (
-                                    <div className="cas-badge">
-                                        <Cog size={14} />
-                                        <span>CAS: 12001-29-5 (Chrysotile)</span>
+                                    <div className="po-badge">
+                                        <Package size={14} />
+                                        <span>PO: {vesselSpecificMaterials.find(m => m.id === selectedMaterialId)?.poNo || 'N/A'}</span>
                                     </div>
                                 )}
                                 <button className="close-panel-btn" onClick={() => { setSelectedMaterialId(null); setIsEditing(false); }}>
@@ -561,12 +649,12 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
 
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                             <div className="edit-form-group">
-                                                <label>CAS NUMBER</label>
+                                                <label>PO NUMBER</label>
                                                 <input
                                                     type="text"
                                                     className="edit-form-input"
-                                                    value={editCAS}
-                                                    onChange={(e) => setEditCAS(e.target.value)}
+                                                    value={editPO}
+                                                    onChange={(e) => setEditPO(e.target.value)}
                                                 />
                                             </div>
                                             <div className="edit-form-group">
@@ -639,8 +727,8 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                                                 <span>{mockMaterials.find(m => m.id === selectedMaterialId)?.name}</span>
                                             </div>
                                             <div className="substance-info-card">
-                                                <label>CAS NUMBER</label>
-                                                <span>1332-21-4</span>
+                                                <label>PO NUMBER</label>
+                                                <span>{vesselSpecificMaterials.find(m => m.id === selectedMaterialId)?.poNo || 'N/A'}</span>
                                             </div>
                                             <div className="substance-info-card risk-card">
                                                 <label>RISK LEVEL</label>
@@ -882,6 +970,6 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
