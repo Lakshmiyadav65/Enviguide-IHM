@@ -4,7 +4,6 @@ import {
     LayoutGrid,
     Plus,
     Search,
-    Bell,
     Filter,
     Flame,
     MapPin,
@@ -81,7 +80,7 @@ export default function HazardousMaterialMapping() {
     const vesselName = query.get('vessel') || 'Unknown Vessel';
     const [inventory, setInventory] = useState<MaterialEntry[]>([]);
     const lastLoadedKeyRef = useRef("");
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery] = useState('');
     const [tempPin, setTempPin] = useState<{ x: number, y: number } | null>(null);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
@@ -291,11 +290,7 @@ export default function HazardousMaterialMapping() {
         }
     };
 
-    const handleFileUpload = () => {
-        // Simulate file upload
-        const newFile = `doc_ref_${formData.files.length + 1}.pdf`;
-        setFormData(prev => ({ ...prev, files: [...prev.files, newFile] }));
-    };
+
 
     const handleAddMaterial = () => {
         if (!tempPin) {
@@ -384,6 +379,27 @@ export default function HazardousMaterialMapping() {
         return groups;
     }, [filteredInventory]);
 
+    const [hoveredMaterialId, setHoveredMaterialId] = useState<string | null>(null);
+
+    const [highlightedMaterialId, setHighlightedMaterialId] = useState<string | null>(null);
+
+    const handlePinClick = (id: string) => {
+        setHighlightedMaterialId(id);
+
+        // Find element and scroll
+        setTimeout(() => {
+            const el = document.getElementById(`material-card-${id}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+
+        // Remove highlight after animation
+        setTimeout(() => {
+            setHighlightedMaterialId(null);
+        }, 1500);
+    };
+
     return (
         <div className="hazmat-mapping-page">
             <header className="mapping-header-v5">
@@ -398,32 +414,6 @@ export default function HazardousMaterialMapping() {
                     </div>
                 </div>
 
-
-                <div className="h-center-v5">
-                    <div className="search-pill-v5">
-                        <Search size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search inventory..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                <div className="h-right-v5">
-                    <div className="notif-badge-v5">
-                        <Bell size={20} />
-                        <span className="notif-red">3</span>
-                    </div>
-                    <div className="profile-capsule-v5">
-                        <div className="p-info">
-                            <strong>John Administrator</strong>
-                            <span className="p-role">ADMIN</span>
-                        </div>
-                        <div className="p-avatar-v5">JA</div>
-                    </div>
-                </div>
             </header>
 
             <div className="mapping-main-v5">
@@ -480,16 +470,24 @@ export default function HazardousMaterialMapping() {
                                 {inventory.map(item => {
                                     // If we are viewing a specific material detail, only show its pin
                                     const shouldShowPin = viewingMaterial ? item.id === viewingMaterial.id : true;
+                                    const isHovered = hoveredMaterialId === item.id;
 
                                     return item.pin && shouldShowPin && (
                                         <div key={item.id} className="pin-marker-v5"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handlePinClick(item.id);
+                                            }}
                                             style={{
                                                 left: item.pin.x - rect.x,
                                                 top: item.pin.y - rect.y,
-                                                transform: `translate(-50%, -50%) scale(${100 / zoom})`
+                                                transform: `translate(-50%, -50%) scale(${100 / zoom})`,
+                                                color: isHovered ? '#EF4444' : '#00B0FA', // Change directly via inline style or class
+                                                zIndex: isHovered ? 100 : 10,
+                                                cursor: 'pointer'
                                             }}>
-                                            <div className="pin-icon-box">
-                                                <Flame size={20} fill="currentColor" />
+                                            <div className="pin-icon-box" style={{ filter: isHovered ? 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' : undefined }}>
+                                                <Flame size={isHovered ? 26 : 20} fill="currentColor" />
                                             </div>
                                         </div>
                                     );
@@ -551,7 +549,14 @@ export default function HazardousMaterialMapping() {
                                         </div>
                                         <div className="v5-cat-items">
                                             {items.map(item => (
-                                                <div key={item.id} className="v5-item-card" onClick={() => { setViewingMaterial(item); setViewMode('detail'); }}>
+                                                <div
+                                                    key={item.id}
+                                                    id={`material-card-${item.id}`}
+                                                    className={`v5-item-card ${highlightedMaterialId === item.id ? 'pin-highlight' : ''}`}
+                                                    onClick={() => { setViewingMaterial(item); setViewMode('detail'); }}
+                                                    onMouseEnter={() => setHoveredMaterialId(item.id)}
+                                                    onMouseLeave={() => setHoveredMaterialId(null)}
+                                                >
                                                     <div className="v5-card-inner">
                                                         <div className="v5-selection-rail">
                                                             <div className={`v5-check-circle ${viewingMaterial?.id === item.id ? 'checked' : ''}`}>
@@ -587,6 +592,15 @@ export default function HazardousMaterialMapping() {
                             )
                         ) : viewMode === 'detail' && viewingMaterial ? (
                             <div className="material-detail-panel-v5" style={{ padding: '0', background: '#F8FAFC' }}>
+                                <div style={{ padding: '16px 16px 0 16px' }}>
+                                    <button
+                                        onClick={() => { setViewingMaterial(null); setViewMode('list'); }}
+                                        className="back-btn-v5"
+                                        style={{ width: 'auto', padding: '6px 12px', fontSize: '12px', height: '32px' }}
+                                    >
+                                        <ChevronLeft size={16} /> BACK
+                                    </button>
+                                </div>
                                 <div className="detail-card-premium">
                                     <div className="detail-header-row">
                                         <div className="dh-left">
@@ -595,10 +609,10 @@ export default function HazardousMaterialMapping() {
                                             </div>
                                             <div className="dh-titles">
                                                 <h3>{viewingMaterial.name}</h3>
-                                                <span className="dh-ref">PO NO: {viewingMaterial.shipPO || 'N/A'}</span>
+                                                <span className="dh-ref">EG NO: {viewingMaterial.shipPO ? (viewingMaterial.shipPO.startsWith('EG') ? viewingMaterial.shipPO : `EG${viewingMaterial.shipPO}`) : 'EG3456'}</span>
                                             </div>
                                         </div>
-                                        <span className="status-badge-premium mapped">MAPPED</span>
+                                        <span className="status-badge-premium mapped" style={{ marginLeft: 'auto' }}>MAPPED</span>
                                     </div>
 
                                     <div className="detail-form-grid">
@@ -841,7 +855,7 @@ export default function HazardousMaterialMapping() {
                                         </div>
                                         <div className="form-group-technical flex-1">
                                             <label>SHIP PO</label>
-                                            <input type="text" placeholder="PO-123456" value={formData.shipPO} onChange={e => setFormData({ ...formData, shipPO: e.target.value })} />
+                                            <input type="text" placeholder="e.g. PO-123456" value={formData.shipPO} onChange={e => setFormData({ ...formData, shipPO: e.target.value })} />
                                         </div>
                                     </div>
 
@@ -1044,9 +1058,7 @@ export default function HazardousMaterialMapping() {
                     <div className="f-divider" />
                     <div className="f-h-item">LAST SYNC: JUST NOW</div>
                 </div>
-                <div className="f-version">
-                    IHM MAPPING INTERFACE V4.2.0
-                </div>
+
             </footer>
         </div >
     );

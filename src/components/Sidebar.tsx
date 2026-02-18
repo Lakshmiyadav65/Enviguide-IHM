@@ -31,7 +31,17 @@ const menuItems = [
     { path: '/decks', icon: Layers, label: 'Decks & Materials' },
     { path: '/materials', icon: FileText, label: 'Materials Record' },
     { path: '/purchase-orders', icon: ShoppingCart, label: 'Purchase Orders' },
-    { path: '/administration', icon: Settings, label: 'Administration' },
+    {
+        path: '/administration',
+        icon: Settings,
+        label: 'Administration',
+        children: [
+            { path: '/administration/upload-po', icon: Upload, label: 'Upload Purchase Order' },
+            { path: '/administration/pending-audits', icon: FileText, label: 'Pending Audits' },
+            { path: '/administration/pending-reviews', icon: FileText, label: 'Pending Reviews' },
+            { path: '/administration/md-sdoc-audit', icon: FileText, label: 'MD SDOC Audit Pending' },
+        ]
+    },
     { path: '/users', icon: Users, label: 'Users & Security' },
     { path: '/master-data', icon: Database, label: 'Master Data' },
     { path: '/inventory', icon: Upload, label: 'Inventory Onboarding' },
@@ -83,7 +93,7 @@ export default function Sidebar() {
                     </div>
                     <div className="logo-text">
                         <h2>IHM Platform</h2>
-                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--primary-blue)' }}>Maritime Safety</p>
+                        <p className="logo-subtitle">Maritime Safety</p>
                     </div>
                 </div>
                 <button

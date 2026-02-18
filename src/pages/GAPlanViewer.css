@@ -11,6 +11,16 @@
     font-family: 'Inter', sans-serif;
 }
 
+.ga-viewer-content-area {
+    flex: 1;
+    display: flex;
+    position: relative;
+    background: #E2E8F0;
+    overflow: hidden;
+    min-height: 0;
+    /* Allow inner flex to shrink/grow */
+}
+
 .ga-viewer-main {
     flex: 1;
     position: relative;
@@ -59,21 +69,28 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    color: #CBD5E1;
+    color: #64748B;
     background: transparent;
     border: none;
     cursor: pointer;
     text-transform: uppercase;
+    transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+    color: #00B0FA;
+    transform: translateX(-2px);
 }
 
 .ga-viewer-header {
-    height: 64px;
-    background: #475569;
+    height: 72px;
+    background: #4B5563;
+    /* Matched to map section background (Dark Grey) */
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .viewer-header-left {
@@ -114,15 +131,34 @@
 }
 
 .logo-icon-box-v2 {
-    width: 36px;
-    height: 36px;
-    background: #00B0FA;
-    border-radius: 8px;
+    width: 42px;
+    height: 42px;
+    background: var(--primary-blue);
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
-    box-shadow: 0 4px 12px rgba(0, 176, 250, 0.3);
+    /* Changed to white icon on blue background to match Sidebar */
+    flex-shrink: 0;
+    box-shadow: var(--shadow-sm);
+}
+
+.logo-text h2 {
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.2;
+    margin: 0;
+    color: #000000;
+    /* deep black as requested */
+}
+
+.logo-subtitle {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: #00B0FA;
+    letter-spacing: 0.1px;
 }
 
 .sailing-logo {
@@ -147,17 +183,19 @@
 
 .viewer-title-text h3 {
     margin: 0;
-    color: white;
-    font-size: 14px;
-    font-weight: 600;
+    color: #000000;
+    /* Deep black as requested */
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
 }
 
 .viewer-title-text p {
-    margin: -1px 0 0 0;
-    color: #94A3B8;
-    font-size: 9px;
+    margin: 1px 0 0 0;
+    color: #00B0FA;
+    font-size: 11px;
     font-weight: 700;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
 }
 
 .ga-viewer-content-area {
@@ -184,6 +222,21 @@
     margin-bottom: 40px;
     border-bottom: 1px solid #E2E8F0;
     padding-bottom: 20px;
+}
+
+.ga-toolbar-top-left {
+    position: absolute;
+    top: 30px;
+    left: 30px;
+    background: #334155;
+    border-radius: var(--radius-premium);
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: white;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    z-index: 100;
 }
 
 .ga-toolbar-left {
@@ -286,11 +339,11 @@
 }
 
 .sidebar-open .ga-toolbar-right {
-    right: 330px;
+    right: 350px;
 }
 
 .sidebar-open .drawing-info-card {
-    right: 330px;
+    right: 350px;
 }
 
 .quick-actions {
@@ -386,34 +439,44 @@
 }
 
 .sidebar-open .sidebar-toggle-btn {
-    right: 300px;
+    right: 320px;
 }
 
 .ga-viewer-sidebar {
-    width: 300px;
+    width: 320px;
     background: #4B5563;
-    /* Matches the sidebar in the design */
+    /* Reverted to professional Dark theme */
     z-index: 300;
     box-shadow: -10px 0 30px rgba(0, 0, 0, 0.2);
     display: flex;
     flex-direction: column;
-    padding: 24px;
     position: absolute;
     right: 0;
     top: 0;
+    bottom: 0;
     height: 100%;
+    /* Ensure full height */
     transform: translateX(100%);
     transition: transform 0.3s ease;
-    overflow-x: hidden;
-    /* Remove horizontal scroll */
+    overflow: hidden;
 }
 
 .ga-viewer-sidebar.open {
     transform: translateX(0);
 }
 
-.sidebar-header {
-    margin-bottom: 32px;
+/* Specific selector for GA Viewer Sidebar Header to avoid conflict */
+.ga-viewer-sidebar .sidebar-header {
+    padding: 24px 20px;
+    background: #4B5563 !important;
+    /* Force Dark Grey in Viewer */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
 }
 
 .sidebar-header h4 {
@@ -421,7 +484,8 @@
     font-size: 13px;
     letter-spacing: 1.5px;
     font-weight: 700;
-    color: #E5E7EB;
+    color: white;
+    /* White text for dark background */
     text-transform: uppercase;
 }
 
@@ -430,33 +494,56 @@
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800;
     color: #9CA3AF;
+    /* Light grey for sub-label on dark bg */
     letter-spacing: 1px;
-    margin-top: 4px;
 }
 
 .sections-list {
     flex: 1;
+    width: 100%;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-    /* Remove horizontal scroll */
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 32px;
+    /* Increased gap for cleaner separation */
+    padding: 20px 18px 80px 18px;
+    /* Added top padding and increased bottom padding */
+    background: transparent;
+    box-sizing: border-box;
+    /* Ensure padding includes in width */
+}
+
+/* Premium Scrollbar */
+.sections-list::-webkit-scrollbar {
+    width: 5px;
+}
+
+.sections-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sections-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.sections-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 /* GA Section Card Refinement */
 .ga-section-card {
     background: #5A6679;
     border-radius: var(--radius-premium);
-    padding: 16px;
+    padding: 14px;
     color: white;
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     border: 1px solid rgba(255, 255, 255, 0.05);
     width: 100%;
-    /* Fill container */
     box-sizing: border-box;
-    /* Prevent padding overflow */
 }
 
 .ga-section-card:hover {
@@ -466,8 +553,8 @@
 }
 
 .ga-section-card.active.focused {
-    background: #1E3A8A;
-    border-color: #00B0FA;
+    background: #5A6679;
+    border: 2px solid #00B0FA;
     box-shadow: 0 8px 30px rgba(0, 176, 250, 0.25);
 }
 
@@ -480,12 +567,17 @@
 }
 
 .section-idx {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 800;
-    color: #4F46E5;
-    opacity: 0.6;
-    /* Subdued visibility as requested */
+    color: #94A3B8;
+    opacity: 0.9;
     letter-spacing: 0.5px;
+}
+
+.section-idx.current {
+    color: #00B0FA;
+    /* Active blue for current selection */
+    opacity: 1;
 }
 
 .card-actions-row {
@@ -522,8 +614,7 @@
 
 .section-thumbnail-box {
     width: 100%;
-    height: 142px;
-    /* Fixed height for consistency */
+    min-height: 120px;
     background: #374151;
     border-radius: 8px;
     margin-bottom: 12px;
@@ -586,9 +677,11 @@
 .ga-toast-content {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 0px;
+    /* Tighter gap as seen in design */
     flex: 1;
 }
+
 
 .ga-toast-title {
     font-size: 14px;
@@ -604,6 +697,8 @@
     letter-spacing: 0.2px;
 }
 
+
+
 .ga-toast-action {
     font-size: 11px;
     font-weight: 600;
@@ -613,6 +708,8 @@
     cursor: pointer;
     flex-shrink: 0;
 }
+
+
 
 /* Selection marks on canvas */
 .drawn-selection {

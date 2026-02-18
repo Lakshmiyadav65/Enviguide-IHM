@@ -1,7 +1,7 @@
 .dashboard-header {
     height: 72px;
-    background: white;
-    border-bottom: 1px solid #edf2f7;
+    background: #ffffff;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -115,10 +115,15 @@ body:has(.sidebar.collapsed) .dashboard-header {
     font-weight: 800;
     color: white;
     background: #00B0FA;
-    padding: 1px 6px;
+    padding: 2px 8px;
+    /* Slightly better padding for premium feel */
     border-radius: 4px;
     text-transform: uppercase;
-    margin-top: 1px;
+    margin-top: 2px;
+    width: fit-content;
+    /* THIS FIXES THE LENGTH ISSUE */
+    display: block;
+    /* Keep as block to respects parent flex or margin-top */
 }
 
 .user-profile-avatar {

@@ -102,28 +102,44 @@
 }
 
 .sidebar-header {
-    padding: 12px 24px;
-    height: 64px;
+    padding: 0 24px;
+    height: 72px;
     display: flex;
     align-items: center;
     border-bottom: 1px solid var(--border-color);
+    background: #EEF8FF;
+    /* Light blue brand background from design */
+    position: relative;
+    z-index: 10;
 }
+
+
 
 .sidebar-logo {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
+    /* Increased margin between logo and text as requested */
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
 
 .logo-icon {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    /* Slightly larger like image */
+    height: 42px;
     background: var(--primary-blue);
-    border-radius: var(--radius-premium);
+    border-radius: 12px;
+    /* Correct squircle-like radius */
     display: flex;
     align-items: center;
     justify-content: center;
     color: white;
+    flex-shrink: 0;
 }
 
 .logo-icon svg {
@@ -148,9 +164,20 @@
 
 .logo-text h2 {
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 800;
+    line-height: 1.2;
     margin: 0;
-    color: #1a1a1a;
+    color: #101828;
+    /* Dark as seen in the latest design image */
+}
+
+.logo-subtitle {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #00B0FA;
+    /* Primary blue as seen in the latest design image */
+    letter-spacing: 0.1px;
 }
 
 /* Navigation */
@@ -249,8 +276,17 @@
 .nav-item.sub-item {
     background: transparent;
     color: var(--text-secondary);
-    padding-left: 48px;
-    /* Indent child items */
+    padding-left: 32px;
+    /* Reduced from 48px */
+    height: auto;
+    /* Allow multi-line */
+    min-height: 44px;
+}
+
+.nav-item.sub-item .nav-label {
+    white-space: normal;
+    /* Allow wrapping for long items like MD SDOC */
+    line-height: 1.3;
 }
 
 /* Submenu Active State */

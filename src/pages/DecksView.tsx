@@ -705,6 +705,10 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                                                 <div className="divider-circle-v3">
                                                 </div>
                                             </div>
+                                            <div className="divider-legs-v3">
+                                                <div className="leg-v3 left"></div>
+                                                <div className="leg-v3 right"></div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="plus-floating-mini">

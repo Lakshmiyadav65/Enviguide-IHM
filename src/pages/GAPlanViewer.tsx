@@ -4,7 +4,7 @@ import {
     Maximize,
     RotateCw,
     RotateCcw,
-    History,
+
     CheckCircle,
     Trash2,
     ChevronLeft,
@@ -14,8 +14,11 @@ import {
     ZoomOut,
     Pencil,
     Ship,
-    X
+    Save,
+    Undo,
+    Redo
 } from 'lucide-react';
+
 import './GAPlanViewer.css';
 import { PLAN_GENERIC } from '../assets/ship_plans';
 
@@ -62,6 +65,11 @@ export default function GAPlanViewer({
     const [rotation, setRotation] = useState(0);
     const [imgAspectRatio, setImgAspectRatio] = useState(1.428); // Default 1000/700
 
+    // Undo/Redo History Stacks
+    const [history, setHistory] = useState<MappedSection[][]>([]);
+    const [future, setFuture] = useState<MappedSection[][]>([]);
+    const hasOpenedRef = useRef(false);
+
     // Sanitize URL internally
     const displayFileUrl = (fileUrl && !fileUrl.includes('ga_plan_')) ? fileUrl : PLAN_GENERIC;
 
@@ -79,13 +87,47 @@ export default function GAPlanViewer({
         }
     }, [focusedSectionId]);
 
+    // Auto-open sidebar if sections exist on load
+    useEffect(() => {
+        if (mappedSections.length > 0 && !hasOpenedRef.current) {
+            setIsSidebarOpen(true);
+            hasOpenedRef.current = true;
+        }
+    }, [mappedSections.length]);
+
+    const executeUpdate = (newSections: MappedSection[]) => {
+        setHistory(prev => [...prev, mappedSections]);
+        setFuture([]); // Clear redo stack on new action
+        onUpdateSections(newSections);
+    };
+
+    const handleUndo = () => {
+        if (history.length === 0) return;
+        const previous = history[history.length - 1];
+        const newHistory = history.slice(0, -1);
+        setFuture(prev => [mappedSections, ...prev]);
+        setHistory(newHistory);
+        onUpdateSections(previous);
+        // Also update lastAddedId if we undo a creation? 
+        // Logic might get complex for toast but basic undo works.
+        setToast(prev => ({ ...prev, visible: false }));
+    };
+
+    const handleRedo = () => {
+        if (future.length === 0) return;
+        const next = future[0];
+        const newFuture = future.slice(1);
+        setHistory(prev => [...prev, mappedSections]);
+        setFuture(newFuture);
+        onUpdateSections(next);
+    };
+
     const canvasRef = useRef<HTMLDivElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const isPdf = filename.toLowerCase().endsWith('.pdf');
 
     // Toast state
     const [toast, setToast] = useState<{ title: string; subtitle: string; visible: boolean }>({ title: '', subtitle: '', visible: false });
-    const [lastAddedId, setLastAddedId] = useState<string | null>(null);
 
     // Selection state
     const [currentSelection, setCurrentSelection] = useState<Rect | null>(null);
@@ -190,15 +232,7 @@ export default function GAPlanViewer({
         }
     };
 
-    const handleWheel = (e: React.WheelEvent) => {
-        if (activeTool === 'hand') {
-            const delta = e.deltaY;
-            setZoom(prev => {
-                const newZoom = delta > 0 ? prev - 5 : prev + 5;
-                return Math.min(Math.max(10, newZoom), 400);
-            });
-        }
-    };
+    // --- Manual Zoom via Wheel Disabled ---
 
     const showToast = (title: string, subtitle: string) => {
         setToast({ title, subtitle, visible: true });
@@ -215,8 +249,21 @@ export default function GAPlanViewer({
                 setIsDrawing(false);
             }
         };
+
+        // Prevent native browser zoom (Ctrl+Wheel) and accidental scroll zoom
+        const handleNativeZoom = (e: WheelEvent) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+            }
+        };
+
         window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
+        window.addEventListener('wheel', handleNativeZoom, { passive: false });
+
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('wheel', handleNativeZoom);
+        };
     }, []);
 
     const checkOverlap = (newRect: Rect) => {
@@ -241,6 +288,15 @@ export default function GAPlanViewer({
             return;
         }
 
+        // Check for duplicate name (case-insensitive)
+        const normalizedTitle = newSelectionTitle.trim().toLowerCase();
+        const isDuplicateName = mappedSections.some(section => section.title.trim().toLowerCase() === normalizedTitle);
+
+        if (isDuplicateName) {
+            alert(`The name "${newSelectionTitle}" is already in use. Please enter a unique name.`);
+            return;
+        }
+
         const newId = Date.now().toString();
         const sectionId = `DECK-${newId.slice(-4)}`;
         const newSection: MappedSection = {
@@ -253,8 +309,11 @@ export default function GAPlanViewer({
         };
         // Initialize empty inventory for this deck
         localStorage.setItem(`inventory_${vesselName}_${newSelectionTitle}`, JSON.stringify([]));
-        onUpdateSections(prev => [...prev, newSection]);
-        setLastAddedId(newId);
+
+        const newSections = [...mappedSections, newSection];
+        executeUpdate(newSections);
+
+
         showToast("Deck Saved Successfully", `${newSelectionTitle} has been added to the vessel project`);
 
         // Clear selection to avoid duplication in UI
@@ -270,16 +329,14 @@ export default function GAPlanViewer({
     };
 
     const undoLastSave = () => {
-        if (lastAddedId) {
-            onUpdateSections(prev => prev.filter(s => s.id !== lastAddedId));
-            setLastAddedId(null);
-            setToast(prev => ({ ...prev, visible: false }));
-        }
+        handleUndo();
+
     };
 
     const deleteSection = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        onUpdateSections((prev: MappedSection[]) => prev.filter((s: MappedSection) => s.id !== id));
+        const newSections = mappedSections.filter(s => s.id !== id);
+        executeUpdate(newSections);
     };
 
     const handleEditMapping = (section: MappedSection, e: React.MouseEvent) => {
@@ -299,9 +356,9 @@ export default function GAPlanViewer({
 
 
     const CropThumbnail = ({ rect }: { rect: Rect }) => {
-        const containerW = 252;
+        const containerW = 256; // Perfectly sized for 320px sidebar (18px margins + 14px card padding)
         const aspectRatio = rect.height / rect.width;
-        const dynamicH = containerW * aspectRatio;
+        const dynamicH = Math.max(120, containerW * aspectRatio);
         const scale = containerW / rect.width;
 
         return (
@@ -346,20 +403,20 @@ export default function GAPlanViewer({
 
             <div className="ga-viewer-header">
                 <div className="viewer-header-left">
+                    <button className="back-btn" onClick={onClose} style={{ marginRight: '8px' }}>
+                        <ChevronLeft size={20} />
+                        <span style={{ fontSize: '12px', fontWeight: '700' }}>BACK</span>
+                    </button>
                     <div className="logo-icon-box-v2">
                         <Ship size={20} className="sailing-logo" />
                     </div>
-                    <div className="viewer-title-text">
-                        <h3>{vesselName}</h3>
-                        <p>TECHNICAL ENGINEERING VIEWER</p>
+                    <div className="logo-text">
+                        <h2>IHM Platform</h2>
+                        <p className="logo-subtitle">Maritime Safety</p>
                     </div>
                 </div>
 
                 <div className="viewer-header-actions">
-                    <button className="exit-viewer-btn" onClick={onClose}>
-                        <X size={18} />
-                        <span>EXIT VIEWER</span>
-                    </button>
                 </div>
             </div>
 
@@ -370,7 +427,6 @@ export default function GAPlanViewer({
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     // onMouseLeave={handleMouseUp} // Removed to prevent potential early drag release
-                    onWheel={handleWheel}
                     ref={canvasRef}
                 >
                     <div
@@ -473,13 +529,38 @@ export default function GAPlanViewer({
                                                 onKeyDown={(e) => e.key === 'Enter' && addSelection()}
                                             />
                                             <button className="input-save-btn" onClick={addSelection}>
-                                                <CheckCircle size={14} />
+                                                <Save size={14} />
                                             </button>
                                         </div>
                                     )}
                                 </div>
                             )}
                         </div>
+                    </div>
+
+
+
+                    {/* Top Left Toolbar (Undo/Redo) */}
+                    <div className="ga-toolbar-top-left">
+                        <button
+                            className={`tool-btn-inline ${history.length === 0 ? 'disabled' : ''}`}
+                            onClick={handleUndo}
+                            disabled={history.length === 0}
+                            title="Undo (Ctrl+Z)"
+                            style={{ opacity: history.length === 0 ? 0.5 : 1 }}
+                        >
+                            <Undo size={18} />
+                        </button>
+                        <div className="tool-divider"></div>
+                        <button
+                            className={`tool-btn-inline ${future.length === 0 ? 'disabled' : ''}`}
+                            onClick={handleRedo}
+                            disabled={future.length === 0}
+                            title="Redo (Ctrl+Y)"
+                            style={{ opacity: future.length === 0 ? 0.5 : 1 }}
+                        >
+                            <Redo size={18} />
+                        </button>
                     </div>
 
                     {/* Bottom Left Toolbar */}
@@ -545,7 +626,30 @@ export default function GAPlanViewer({
                             </button>
                             <button className="tool-btn-inline" onClick={() => setRotation(r => r - 90)} title="Rotate Left"><RotateCcw size={18} /></button>
                             <button className="tool-btn-inline" onClick={() => setRotation(r => r + 90)} title="Rotate Right"><RotateCw size={18} /></button>
-                            <button className="tool-btn-inline" onClick={() => { setZoom(100); setRotation(0); setOffset({ x: 0, y: 0 }); onUpdateSections([]); }} title="Reset View"><History size={18} /></button>
+                            <button
+                                className="tool-btn-inline"
+                                onClick={() => {
+                                    if (window.confirm("Are you sure you want to remove all mapped sections? This will reset the complete cropper section.")) {
+                                        setZoom(100);
+                                        setRotation(0);
+                                        setOffset({ x: 0, y: 0 });
+                                        executeUpdate([]);
+                                    }
+                                }}
+                                title="Reset All Sections"
+                                style={{
+                                    fontSize: '10px',
+                                    fontWeight: '800',
+                                    color: '#EF4444',
+                                    border: '1px solid rgba(239, 68, 68, 0.4)',
+                                    borderRadius: '4px',
+                                    padding: '4px 10px',
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    letterSpacing: '0.5px'
+                                }}
+                            >
+                                RESET
+                            </button>
                         </div>
                     </div>
 
@@ -559,6 +663,7 @@ export default function GAPlanViewer({
                         <h4>MAPPED SECTIONS</h4>
                         <div className="sidebar-sub-label">{mappedSections.length} AREAS DEFINED</div>
                     </div>
+
 
                     <div className="sections-list">
                         {mappedSections.map((section, idx) => {
@@ -580,7 +685,9 @@ export default function GAPlanViewer({
                                     }}
                                 >
                                     <div className="section-card-header">
-                                        <span className="section-idx" style={{ color: isFocused ? 'white' : '#2563EB', fontWeight: 800 }}>{(idx + 1).toString().padStart(2, '0')}</span>
+                                        <span className={`section-idx ${isFocused ? 'current' : ''}`}>
+                                            {(idx + 1).toString().padStart(2, '0')}
+                                        </span>
                                         <div className="card-actions-row">
                                             <Pencil
                                                 size={12}
@@ -595,13 +702,13 @@ export default function GAPlanViewer({
                                         </div>
                                     </div>
                                     <CropThumbnail rect={section.rect} />
-                                    <div className="section-name">{section.title}</div>
+                                    <div className="section-name" style={{ textAlign: 'center', marginTop: '8px' }}>{section.title}</div>
                                 </div>
                             );
                         })}
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }
