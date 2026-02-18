@@ -32,13 +32,13 @@
 .logo-text h1 {
     font-size: 20px;
     font-weight: 700;
-    color: var(--text-primary);
+    color: #000000 !important;
     margin-bottom: 2px;
 }
 
 .logo-text p {
     font-size: 12px;
-    color: var(--text-secondary);
+    color: #000000 !important;
     font-weight: 500;
 }
 

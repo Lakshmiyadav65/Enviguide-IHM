@@ -356,32 +356,40 @@ export default function GAPlanViewer({
 
 
     const CropThumbnail = ({ rect }: { rect: Rect }) => {
-        const containerW = 256; // Perfectly sized for 320px sidebar (18px margins + 14px card padding)
-        const aspectRatio = rect.height / rect.width;
-        const dynamicH = Math.max(120, containerW * aspectRatio);
-        const scale = containerW / rect.width;
+        const wrapperRef = useRef<HTMLDivElement>(null);
+        const [boxSize, setBoxSize] = useState({ w: 256, h: 160 });
+
+        useEffect(() => {
+            if (wrapperRef.current) {
+                setBoxSize({
+                    w: wrapperRef.current.offsetWidth,
+                    h: wrapperRef.current.offsetHeight
+                });
+            }
+        }, []);
+
+        // Logic: Contain the crop within the standard 16:10 box
+        const scale = Math.min(boxSize.w / rect.width, boxSize.h / rect.height);
+
+        // Logical image width is 1000px
+        const imgScale = scale;
+        const left = (boxSize.w - rect.width * scale) / 2 - rect.x * scale;
+        const top = (boxSize.h - rect.height * scale) / 2 - rect.y * scale;
 
         return (
-            <div className="section-thumbnail-box" style={{
-                width: `${containerW}px`,
-                height: `${dynamicH}px`,
-                background: 'white',
-                overflow: 'hidden',
-                position: 'relative',
-                borderRadius: '6px',
-                border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
+            <div className="section-thumbnail-box" ref={wrapperRef}>
                 <img
                     src={displayFileUrl}
                     alt="crop"
                     style={{
                         position: 'absolute',
-                        left: `${-rect.x * scale}px`,
-                        top: `${-rect.y * scale}px`,
-                        width: `${1000 * scale}px`,
+                        left: `${left}px`,
+                        top: `${top}px`,
+                        width: `${1000 * imgScale}px`,
                         height: 'auto',
                         maxWidth: 'none',
-                        pointerEvents: 'none'
+                        pointerEvents: 'none',
+                        display: 'block'
                     }}
                 />
             </div>
@@ -403,20 +411,21 @@ export default function GAPlanViewer({
 
             <div className="ga-viewer-header">
                 <div className="viewer-header-left">
-                    <button className="back-btn" onClick={onClose} style={{ marginRight: '8px' }}>
-                        <ChevronLeft size={20} />
-                        <span style={{ fontSize: '12px', fontWeight: '700' }}>BACK</span>
+                    <button className="back-btn" onClick={onClose} style={{ marginRight: '24px' }}>
+                        <ChevronLeft size={18} />
+                        <span style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.5px' }}>BACK TO DECKS</span>
                     </button>
                     <div className="logo-icon-box-v2">
                         <Ship size={20} className="sailing-logo" />
                     </div>
                     <div className="logo-text">
-                        <h2>IHM Platform</h2>
-                        <p className="logo-subtitle">Maritime Safety</p>
+                        <h2 style={{ color: 'white', textTransform: 'none' }}>Ship GA Plan</h2>
+                        <p className="logo-subtitle" style={{ color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '1px', fontSize: '10px' }}>TECHNICAL ENGINEERING VIEWER</p>
                     </div>
                 </div>
 
                 <div className="viewer-header-actions">
+                    {/* Live Sync and Close buttons removed as requested */}
                 </div>
             </div>
 
@@ -626,8 +635,9 @@ export default function GAPlanViewer({
                             </button>
                             <button className="tool-btn-inline" onClick={() => setRotation(r => r - 90)} title="Rotate Left"><RotateCcw size={18} /></button>
                             <button className="tool-btn-inline" onClick={() => setRotation(r => r + 90)} title="Rotate Right"><RotateCw size={18} /></button>
+                            <div className="tool-divider"></div>
                             <button
-                                className="tool-btn-inline"
+                                className="tool-btn-inline reset-all-btn"
                                 onClick={() => {
                                     if (window.confirm("Are you sure you want to remove all mapped sections? This will reset the complete cropper section.")) {
                                         setZoom(100);
@@ -637,16 +647,6 @@ export default function GAPlanViewer({
                                     }
                                 }}
                                 title="Reset All Sections"
-                                style={{
-                                    fontSize: '10px',
-                                    fontWeight: '800',
-                                    color: '#EF4444',
-                                    border: '1px solid rgba(239, 68, 68, 0.4)',
-                                    borderRadius: '4px',
-                                    padding: '4px 10px',
-                                    background: 'rgba(239, 68, 68, 0.1)',
-                                    letterSpacing: '0.5px'
-                                }}
                             >
                                 RESET
                             </button>
@@ -659,13 +659,13 @@ export default function GAPlanViewer({
                 </div>
 
                 <div className={`ga-viewer-sidebar ${isSidebarOpen ? 'open' : ''}`}>
-                    <div className="sidebar-header">
+                    <div className="ga-sidebar-header-box">
                         <h4>MAPPED SECTIONS</h4>
-                        <div className="sidebar-sub-label">{mappedSections.length} AREAS DEFINED</div>
+                        <div className="ga-sidebar-sub-label-v2">{mappedSections.length} AREAS DEFINED</div>
                     </div>
 
 
-                    <div className="sections-list">
+                    <div className="ga-sections-list-container">
                         {mappedSections.map((section, idx) => {
                             const isFocused = section.id === localFocusedId;
                             return (
@@ -684,31 +684,31 @@ export default function GAPlanViewer({
                                         window.history.replaceState(null, '', `${window.location.pathname}?${query.toString()}`);
                                     }}
                                 >
-                                    <div className="section-card-header">
+                                    <div className="ga-card-header-top">
                                         <span className={`section-idx ${isFocused ? 'current' : ''}`}>
                                             {(idx + 1).toString().padStart(2, '0')}
                                         </span>
-                                        <div className="card-actions-row">
+                                        <div className="ga-card-actions-row-v2">
                                             <Pencil
                                                 size={12}
-                                                className="action-icon edit-icon"
+                                                className="ga-action-icon-refined edit-icon"
                                                 onClick={(e) => handleEditMapping(section, e)}
                                             />
                                             <Trash2
                                                 size={12}
-                                                className="action-icon trash-icon"
+                                                className="ga-action-icon-refined trash-icon"
                                                 onClick={(e) => deleteSection(section.id, e)}
                                             />
                                         </div>
                                     </div>
                                     <CropThumbnail rect={section.rect} />
-                                    <div className="section-name" style={{ textAlign: 'center', marginTop: '8px' }}>{section.title}</div>
+                                    <div className="section-name">{section.title}</div>
                                 </div>
                             );
                         })}
                     </div>
                 </div>
-            </div >
-        </div >
+            </div>
+        </div>
     );
 }

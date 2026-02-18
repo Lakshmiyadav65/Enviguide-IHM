@@ -9,6 +9,7 @@ import PendingAudits from './pages/PendingAudits';
 import PendingReviews from './pages/PendingReviews';
 import MDSdocAudit from './pages/MDSdocAudit';
 import DocumentAudit from './pages/DocumentAudit';
+import AuditReviewDetail from './pages/AuditReviewDetail';
 import './index.css';
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
         <Route path="/administration/upload-po" element={<UploadPurchaseOrder />} />
         <Route path="/administration/pending-audits" element={<PendingAudits />} />
         <Route path="/administration/pending-reviews" element={<PendingReviews />} />
+        <Route path="/administration/review-detail/:imo" element={<AuditReviewDetail />} />
         <Route path="/administration/md-sdoc-audit" element={<MDSdocAudit />} />
         <Route path="/administration/document-audit/:imo" element={<DocumentAudit />} />
         <Route path="/security" element={<Dashboard />} />

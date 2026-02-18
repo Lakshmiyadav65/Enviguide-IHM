@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import './UploadPurchaseOrder.css';
@@ -9,12 +9,10 @@ import {
     ArrowUp,
     Upload,
     X,
-    Search,
     ChevronDown,
     FileText,
     RefreshCw,
     Wand2,
-    ChevronLeft,
     CheckCircle2
 } from 'lucide-react';
 
@@ -47,8 +45,6 @@ export default function UploadPurchaseOrder() {
     const [totalRows, setTotalRows] = useState(0);
     const [excelData, setExcelData] = useState<ExcelData>([]);
 
-    // Duplicate counts for audit
-    const [duplicates, setDuplicates] = useState({ po: 0, supplier: 0, product: 0 });
 
     // Dropdown Visibility States
     const [showManagerDropdown, setShowManagerDropdown] = useState(false);
@@ -69,7 +65,6 @@ export default function UploadPurchaseOrder() {
     const [autoMappedFields, setAutoMappedFields] = useState<Record<string, boolean>>({});
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [unmappedFields, setUnmappedFields] = useState<string[]>([]);
-    const [showValidationErrors, setShowValidationErrors] = useState(false);
     const [showSuccessNotification, setShowSuccessNotification] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -144,17 +139,39 @@ export default function UploadPurchaseOrder() {
     const finalizeImport = () => {
         const selectedVessel = activeManager?.vessels.find(v => v.name === shipName);
         const totalItemsValue = calculateTotalQuantity();
+        const imo = selectedVessel?.imo || '9000000';
+
+        // Real Duplicate Detection Logic
+        let duplicatePOCount = 0;
+        let totalPOCount = 0;
+
+        if (fieldMappings.poNumber && excelData.length > 1) {
+            const poIdx = parseInt(fieldMappings.poNumber);
+            const poNumbers = excelData.slice(1).map(row => String(row[poIdx]).trim());
+            const normalizedPOs = poNumbers.map(p => p.replace(/\s+/g, ''));
+            const uniquePOs = new Set(normalizedPOs);
+            totalPOCount = uniquePOs.size;
+
+            // Count rows that have a normalized PO appearing elsewhere
+            const counts: Record<string, number> = {};
+            normalizedPOs.forEach(p => counts[p] = (counts[p] || 0) + 1);
+            duplicatePOCount = Object.values(counts).filter(c => c > 1).length;
+        }
 
         const newAudit = {
-            imoNumber: selectedVessel?.imo || '9000000',
+            imoNumber: imo,
             vesselName: shipName,
-            totalPO: 1,
+            totalPO: totalPOCount || 1,
             totalItems: totalItemsValue || 0,
-            duplicatePO: duplicates.po,
-            duplicateSupplierCode: duplicates.supplier,
-            duplicateProduct: duplicates.product,
+            duplicatePO: duplicatePOCount,
+            duplicateSupplierCode: 0,
+            duplicateProduct: 0,
             createDate: new Date().toISOString().split('T')[0]
         };
+
+        // Persist full data for the editor
+        localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(excelData));
+        localStorage.setItem(`audit_mapping_${imo}`, JSON.stringify(fieldMappings));
 
         localStorage.setItem('recentlyAddedAudit', JSON.stringify(newAudit));
         navigate('/administration/pending-audits');
@@ -170,12 +187,6 @@ export default function UploadPurchaseOrder() {
             const parsedData = await parseExcelFile(selectedFile);
             setExcelData(parsedData);
             setTotalRows(parsedData.length);
-
-            // Mock duplicate detection
-            let poD = 0;
-            const headers = parsedData[0]?.map(h => String(h).toLowerCase()) || [];
-            headers.forEach((h, idx) => { if (h.includes('duplicate')) poD++; });
-            setDuplicates({ po: poD, supplier: 0, product: 0 });
 
             const steps = 40;
             for (let i = 0; i <= steps; i++) {
@@ -428,7 +439,7 @@ export default function UploadPurchaseOrder() {
                                         if (!fieldMappings.supplierName) missing.push('Supplier Name');
                                         if (!fieldMappings.itemDescription) missing.push('Item Description');
                                         if (!fieldMappings.quantity) missing.push('Quantity');
-                                        if (missing.length > 0) { setUnmappedFields(missing); setShowValidationErrors(true); setShowErrorModal(true); } else { setShowSuccessNotification(true); }
+                                        if (missing.length > 0) { setUnmappedFields(missing); setShowErrorModal(true); } else { setShowSuccessNotification(true); }
                                     }}>CONFIRM MAPPING</button>
                                 </div>
                             </div>

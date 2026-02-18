@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import './MDSdocAudit.css';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
-import { Download, Eye, Ship } from 'lucide-react';
+import { Download, Eye, Ship, Search } from 'lucide-react';
 
 interface AuditRecord {
     imoNumber: string;
@@ -20,6 +20,7 @@ export default function MDSdocAudit() {
     const [currentPage, setCurrentPage] = useState(1);
     const recordsPerPage = 10;
     const [allRecords, setAllRecords] = useState<AuditRecord[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         const vesselNames = ['Pacific Venture', 'Nordic Star', 'Ocean Atlas', 'Arctic Peak', 'Baltic Sea', 'Caspian Ray', 'Indian Wave', 'Golden Gate', 'Silver Stream', 'Emerald Wave'];
@@ -60,9 +61,19 @@ export default function MDSdocAudit() {
         setAllRecords([...designRecords, ...fillerRecords]);
     }, []);
 
-    const totalPages = Math.ceil(allRecords.length / recordsPerPage);
+    const filteredRecords = allRecords.filter(record =>
+        record.vesselName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        record.imoNumber.includes(searchQuery)
+    );
+
+    // Reset pagination on search
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery]);
+
+    const totalPages = Math.ceil(filteredRecords.length / recordsPerPage);
     const startIndex = (currentPage - 1) * recordsPerPage;
-    const currentRecords = allRecords.slice(startIndex, startIndex + recordsPerPage);
+    const currentRecords = filteredRecords.slice(startIndex, startIndex + recordsPerPage);
 
     return (
         <div className="md-sdoc-container">
@@ -76,10 +87,21 @@ export default function MDSdocAudit() {
                             <h1>MD SDoC Audit Registry</h1>
                             <p>Registry of Material Declarations and Supplier's Declaration of Conformity pending audit.</p>
                         </div>
-                        <button className="export-audit-btn">
-                            <Download size={18} />
-                            Export Audit List
-                        </button>
+                        <div className="md-header-actions">
+                            <div className="registry-search-wrapper">
+                                <Search size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Search Vessel Name or IMO..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                            <button className="export-audit-btn">
+                                <Download size={18} />
+                                Export Audit List
+                            </button>
+                        </div>
                     </div>
 
                     <div className="registry-card" style={{ marginBottom: 0 }}>
@@ -144,7 +166,7 @@ export default function MDSdocAudit() {
                         {/* Pagination Footer */}
                         <div className="pagination">
                             <span className="pagination-info">
-                                Showing {startIndex + 1} to {Math.min(startIndex + recordsPerPage, allRecords.length)} of {allRecords.length} records in audit phase
+                                Showing {startIndex + 1} to {Math.min(startIndex + recordsPerPage, filteredRecords.length)} of {filteredRecords.length} records in audit phase
                             </span>
                             <div className="pagination-buttons">
                                 <button className="page-btn" style={{ width: 'auto', padding: '0 16px' }} onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>Previous</button>

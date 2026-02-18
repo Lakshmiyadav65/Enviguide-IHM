@@ -3,6 +3,7 @@ import { useState } from 'react';
 import './Header.css';
 
 interface HeaderProps {
+    notificationCount?: number;
     userName?: string;
     userRole?: string;
     selectedVessel?: {
@@ -12,6 +13,7 @@ interface HeaderProps {
 }
 
 export default function Header({
+    notificationCount,
     userName = 'John Administrator',
     userRole = 'Admin'
 }: HeaderProps) {
@@ -94,8 +96,8 @@ export default function Header({
                         }}
                     >
                         <Bell size={20} />
-                        {unreadCount > 0 && (
-                            <span className="notification-badge">{unreadCount}</span>
+                        {(notificationCount ?? unreadCount) > 0 && (
+                            <span className="notification-badge">{notificationCount ?? unreadCount}</span>
                         )}
                     </button>
 

@@ -55,6 +55,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   font-family: var(--font-family);
   background-color: var(--bg-gray-50);
@@ -297,7 +302,6 @@ select:focus,
   color: var(--text-secondary);
   cursor: pointer;
   border-radius: 8px;
-  /* Inner rounded corners for hover states */
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   background-color: transparent;
@@ -306,6 +310,9 @@ select:focus,
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  /* Prevent overlap */
+  min-width: 0;
 }
 
 /* HOVER STATE FOR LIST ITEMS */
@@ -333,4 +340,6 @@ select:focus,
   border-width: 0 2.5px 2.5px 0;
   transform: rotate(45deg);
   margin-right: 4px;
+  flex-shrink: 0;
+  margin-top: -4px;
 }

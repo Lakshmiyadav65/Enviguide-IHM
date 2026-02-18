@@ -167,16 +167,14 @@
     font-weight: 800;
     line-height: 1.2;
     margin: 0;
-    color: #101828;
-    /* Dark as seen in the latest design image */
+    color: #000000 !important;
 }
 
 .logo-subtitle {
     margin: 0;
     font-size: 12px;
     font-weight: 600;
-    color: #00B0FA;
-    /* Primary blue as seen in the latest design image */
+    color: #000000 !important;
     letter-spacing: 0.1px;
 }
 

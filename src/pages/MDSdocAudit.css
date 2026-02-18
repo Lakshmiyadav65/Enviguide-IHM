@@ -68,6 +68,40 @@
     margin: 0;
 }
 
+.md-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.registry-search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.registry-search-wrapper svg {
+    position: absolute;
+    left: 12px;
+    color: #94A3B8;
+    pointer-events: none;
+}
+
+.registry-search-wrapper input {
+    padding: 10px 12px 10px 38px;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    width: 280px;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.registry-search-wrapper input:focus {
+    border-color: #00B0FA;
+    box-shadow: 0 0 0 3px rgba(0, 176, 250, 0.1);
+}
+
 .export-audit-btn {
     display: flex;
     align-items: center;
