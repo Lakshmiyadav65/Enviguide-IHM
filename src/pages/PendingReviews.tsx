@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import './PendingReviews.css';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import { Download, Eye, Edit2, Trash2, Ship, X, Search } from 'lucide-react';
+import ReviewWizard from './ReviewWizard';
 
 interface ReviewRecord {
     imoNumber: string;
@@ -18,70 +18,9 @@ interface ReviewRecord {
     createDate: string;
 }
 
-interface ReviewEditorProps {
-    record: ReviewRecord;
-    onClose: () => void;
-    onSave: (updated: ReviewRecord) => void;
-}
-
-const ReviewEditor = ({ record, onClose, onSave }: ReviewEditorProps) => {
-    const [formData, setFormData] = useState({ ...record });
-
-    return (
-        <>
-            <div className="modal-backdrop-blur" onClick={onClose} />
-            <div className="send-review-modal">
-                <div className="send-review-header">
-                    <h2>EDIT REVIEW RECORD</h2>
-                    <button className="close-btn-white" onClick={onClose}><X size={18} /></button>
-                </div>
-                <div className="send-review-body">
-                    <h3>Modify <span className="vessel-highlight">{record.vesselName}</span></h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
-                        <div>
-                            <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', display: 'block', marginBottom: '4px' }}>VESSEL NAME</label>
-                            <input
-                                type="text"
-                                value={formData.vesselName}
-                                onChange={(e) => setFormData({ ...formData, vesselName: e.target.value })}
-                                style={{ width: '100%', padding: '10px', border: '1px solid #E2E8F0', borderRadius: '6px' }}
-                            />
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                            <div>
-                                <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', display: 'block', marginBottom: '4px' }}>TOTAL PO</label>
-                                <input
-                                    type="number"
-                                    value={formData.totalPO}
-                                    onChange={(e) => setFormData({ ...formData, totalPO: parseInt(e.target.value) })}
-                                    style={{ width: '100%', padding: '10px', border: '1px solid #E2E8F0', borderRadius: '6px' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '12px', fontWeight: 600, color: '#64748B', display: 'block', marginBottom: '4px' }}>TOTAL ITEMS</label>
-                                <input
-                                    type="number"
-                                    value={formData.totalItems}
-                                    onChange={(e) => setFormData({ ...formData, totalItems: parseInt(e.target.value) })}
-                                    style={{ width: '100%', padding: '10px', border: '1px solid #E2E8F0', borderRadius: '6px' }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="send-review-footer">
-                    <button className="btn-text-cancel" onClick={onClose}>CANCEL</button>
-                    <button className="btn-primary-send" onClick={() => onSave(formData)}>
-                        SAVE CHANGES
-                    </button>
-                </div>
-            </div>
-        </>
-    );
-};
+// ReviewEditor removed as per new multi-step wizard requirement
 
 export default function PendingReviews() {
-    const navigate = useNavigate();
     const [currentPage, setCurrentPage] = useState(1);
     const recordsPerPage = 10;
     const [allRecords, setAllRecords] = useState<ReviewRecord[]>([]);
@@ -167,18 +106,24 @@ export default function PendingReviews() {
         setDeletingImo(null);
     };
 
-    const handleEditSave = (updated: ReviewRecord) => {
-        const updatedList = allRecords.map(r => r.imoNumber === updated.imoNumber ? updated : r);
-        setAllRecords(updatedList);
-        localStorage.setItem('sentToReview', JSON.stringify(updatedList));
+    const handleWizardComplete = () => {
         setEditingRecord(null);
+        // Refresh or show success toast if needed
     };
 
-    // Filtering logic
-    const filteredRecords = allRecords.filter(record =>
-        record.vesselName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        record.imoNumber.includes(searchQuery)
-    );
+    // Sorting and Filtering logic
+    const filteredRecords = [...allRecords]
+        .sort((a, b) => {
+            // Sort by createDate descending (newest first)
+            // If dates are available, otherwise fall back to array order
+            const dateA = a.createDate || '';
+            const dateB = b.createDate || '';
+            return dateB.localeCompare(dateA);
+        })
+        .filter(record =>
+            record.vesselName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            record.imoNumber.includes(searchQuery)
+        );
 
     // Reset pagination on search
     useEffect(() => {
@@ -261,7 +206,7 @@ export default function PendingReviews() {
                                                     <button
                                                         className="action-btn"
                                                         title="View"
-                                                        onClick={() => navigate(`/administration/review-detail/${record.imoNumber}`)}
+                                                        onClick={() => setEditingRecord(record)}
                                                     >
                                                         <Eye size={18} />
                                                     </button>
@@ -353,10 +298,11 @@ export default function PendingReviews() {
 
             {/* Modals & Overlays */}
             {editingRecord && (
-                <ReviewEditor
-                    record={editingRecord}
+                <ReviewWizard
+                    imo={editingRecord.imoNumber}
+                    vesselName={editingRecord.vesselName}
                     onClose={() => setEditingRecord(null)}
-                    onSave={handleEditSave}
+                    onComplete={handleWizardComplete}
                 />
             )}
 

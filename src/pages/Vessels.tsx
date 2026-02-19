@@ -965,9 +965,6 @@ export default function Vessels() {
                     key={activeVesselName}
                     vesselName={activeVesselName}
                     imo={activeVessel?.imoNo || ''}
-                    filterDateFrom={poFilterDateFrom}
-                    filterDateTo={poFilterDateTo}
-                    filterCompliance={poFilterCompliance}
                 />
             );
         }
@@ -1569,8 +1566,8 @@ export default function Vessels() {
                     </div>
 
                     <div className="vessels-content-layout">
-                        {/* Secondary Sidebar - Hidden on Decks, Documents, Materials, Certificate & Reports tabs */}
-                        {activeTab !== 'decks' && activeTab !== 'documents' && activeTab !== 'materials' && activeTab !== 'certificate' && activeTab !== 'reports' && (
+                        {/* Secondary Sidebar - Hidden on Purchase, Decks, Documents, Materials, Certificate & Reports tabs */}
+                        {activeTab !== 'decks' && activeTab !== 'documents' && activeTab !== 'materials' && activeTab !== 'certificate' && activeTab !== 'reports' && activeTab !== 'purchase' && (
                             <aside className="secondary-sidebar">
                                 {activeTab === 'purchase' ? (
                                     <>
@@ -1744,9 +1741,8 @@ export default function Vessels() {
                             </aside>
                         )}
 
-                        {/* Main Section */}
                         <div className="vessels-main">
-                            <div className={`vessel-tab-content ${activeTab === 'purchase' || (activeTab === 'reports' && reportStep === 2) ? 'no-scroll no-padding' : ''}`}>
+                            <div className={`vessel-tab-content ${(activeTab === 'reports' && reportStep === 2) ? 'no-scroll no-padding' : ''}`}>
                                 {renderContent()}
                             </div>
                         </div>

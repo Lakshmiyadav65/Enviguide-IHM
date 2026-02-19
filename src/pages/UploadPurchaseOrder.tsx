@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import './UploadPurchaseOrder.css';
@@ -39,34 +39,83 @@ export default function UploadPurchaseOrder() {
     const [shipManager, setShipManager] = useState('');
     const [shipName, setShipName] = useState('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [fileSource, setFileSource] = useState('Upload from local');
     const [importProgress, setImportProgress] = useState(0);
     const [rowsProcessed, setRowsProcessed] = useState(0);
     const [totalRows, setTotalRows] = useState(0);
     const [excelData, setExcelData] = useState<ExcelData>([]);
 
-
-    // Dropdown Visibility States
     const [showManagerDropdown, setShowManagerDropdown] = useState(false);
     const [showVesselDropdown, setShowVesselDropdown] = useState(false);
 
-    // Filtered Lists
     const filteredManagers = SHIP_MANAGERS_DATA.filter(m => m.name.toLowerCase().includes(shipManager.toLowerCase()));
     const activeManager = SHIP_MANAGERS_DATA.find(m => m.name === shipManager);
     const filteredVessels = activeManager ? activeManager.vessels.filter(v => v.name.toLowerCase().includes(shipName.toLowerCase())) : [];
 
+    // Order per user request:
+    // PO number, item description, MD requested date, sent date, IMPA code, ISSA code, equipment code, equipment name, maker, model, part number, unit, quantity, Vendor Remark, Vendor email, vendor name
     const [fieldMappings, setFieldMappings] = useState({
         poNumber: '',
-        supplierName: '',
         itemDescription: '',
+        mdRequestedDate: '',
+        sentDate: '',
+        impaCode: '',
+        issaCode: '',
+        equipmentCode: '',
+        equipmentName: '',
+        maker: '',
+        model: '',
+        partNumber: '',
+        unit: '',
         quantity: '',
-        orderDate: ''
+        vendorRemark: '',
+        vendorEmail: '',
+        vendorName: ''
     });
-    const [autoMappedFields, setAutoMappedFields] = useState<Record<string, boolean>>({});
+
     const [showErrorModal, setShowErrorModal] = useState(false);
-    const [unmappedFields, setUnmappedFields] = useState<string[]>([]);
+    const [unmappedFields, setUnmappedFields] = useState<{ id: string; label: string }[]>([]);
     const [showSuccessNotification, setShowSuccessNotification] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+    const jumpToField = (fieldId: string) => {
+        setShowErrorModal(false);
+        setTimeout(() => {
+            const element = fieldRefs.current[fieldId];
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                element.classList.add('v3-highlight-field');
+                setTimeout(() => {
+                    element.classList.remove('v3-highlight-field');
+                }, 2000);
+            }
+        }, 100);
+    };
+
+    const ALL_MAPPING_FIELDS = [
+        { id: 'poNumber', label: 'PO NUMBER', req: true },
+        { id: 'itemDescription', label: 'ITEM DESCRIPTION', req: true },
+        { id: 'mdRequestedDate', label: 'MD REQUESTED DATE', req: false },
+        { id: 'sentDate', label: 'SENT DATE', req: true },
+        { id: 'impaCode', label: 'IMPA CODE', req: false },
+        { id: 'issaCode', label: 'ISSA CODE', req: false },
+        { id: 'equipmentCode', label: 'EQUIPMENT CODE', req: false },
+        { id: 'equipmentName', label: 'EQUIPMENT NAME', req: false },
+        { id: 'maker', label: 'MAKER', req: false },
+        { id: 'model', label: 'MODEL', req: false },
+        { id: 'partNumber', label: 'PART NUMBER', req: false },
+        { id: 'unit', label: 'UNIT', req: true },
+        { id: 'quantity', label: 'QUANTITY', req: true },
+        { id: 'vendorRemark', label: 'VENDOR REMARK', req: false },
+        { id: 'vendorEmail', label: 'VENDOR EMAIL', req: true },
+        { id: 'vendorName', label: 'VENDOR NAME', req: true },
+    ];
+
+    const [autoMappedFields, setAutoMappedFields] = useState<Record<string, boolean>>({});
+
+    const usedColumns = useMemo(() => {
+        return Object.values(fieldMappings).filter(v => v !== '');
+    }, [fieldMappings]);
 
     const getAcceptedFileTypes = () => source === 'Excel' ? '.xls,.xlsx' : source === 'PDF' ? '.pdf' : '.csv';
 
@@ -83,7 +132,8 @@ export default function UploadPurchaseOrder() {
                     const data = e.target?.result;
                     const workbook = XLSX.read(data, { type: 'binary' });
                     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as ExcelData;
+                    // Use defval: "" to prevent column shifting when cells are empty
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" }) as ExcelData;
                     resolve(jsonData);
                 } catch (error) { reject(error); }
             };
@@ -96,26 +146,41 @@ export default function UploadPurchaseOrder() {
         const headers = excelData[0] as string[];
         const newMappings = { ...fieldMappings };
         const newAutoMapped = { ...autoMappedFields };
+        const mappingUsed = new Set<string>();
 
-        // System target names for matching (Case-insensitive exact match logic)
-        const targets = {
-            poNumber: ['po number', 'purchase order', 'po #', 'po_number', 'ponumber'],
-            supplierName: ['supplier name', 'supplier', 'vendor', 'vendor name', 'supplier_name'],
-            itemDescription: ['item description', 'description', 'item', 'product', 'product description'],
-            quantity: ['quantity', 'qty', 'units', 'count'],
-            orderDate: ['order date', 'date', 'po date']
+        const keywords_map = {
+            poNumber: ['po number', 'purchase order', 'po #', 'po_number', 'ponumber', 'po no', 'po no.', 'order number'],
+            itemDescription: ['item description', 'description', 'item', 'product', 'product description', 'material description', 'desc'],
+            mdRequestedDate: ['md requested date', 'md_requested_date', 'requested date', 'req date', 'order date'],
+            sentDate: ['sent date', 'po sent date', 'order date', 'date sent', 'creation date'],
+            impaCode: ['impa code', 'impa', 'code impa', 'impa_code'],
+            issaCode: ['issa code', 'issa', 'code issa', 'issa_code'],
+            equipmentCode: ['equipment code', 'equipment_code', 'eq code', 'machinery code'],
+            equipmentName: ['equipment name', 'equipment', 'eq name', 'machinery'],
+            maker: ['maker', 'manufacturer', 'brand', 'mfr'],
+            model: ['model', 'model number', 'type', 'serial'],
+            partNumber: ['part number', 'part #', 'part_number', 'p/n', 'partno'],
+            unit: ['unit', 'uom', 'units', 'unit of measure'],
+            quantity: ['quantity', 'qty', 'units', 'count', 'amount'],
+            vendorRemark: ['vendor remark', 'remark', 'vendor_remark', 'notes', 'supplier remark'],
+            vendorEmail: ['vendor email', 'email', 'vendor_email', 'supplier email', 'vendor_e-mail'],
+            vendorName: ['vendor name', 'vendor', 'supplier', 'supplier name', 'mfr name'],
         };
 
-        headers.forEach((header, index) => {
-            const h = String(header).toLowerCase().trim();
-            const idx = index.toString();
+        ALL_MAPPING_FIELDS.forEach(f => {
+            const field = f.id as keyof typeof keywords_map;
+            const keywords = keywords_map[field];
 
-            Object.entries(targets).forEach(([field, keywords]) => {
-                if (keywords.includes(h)) {
+            for (let i = 0; i < headers.length; i++) {
+                const h = String(headers[i] || '').toLowerCase().trim();
+                const idx = i.toString();
+                if (keywords.includes(h) && !mappingUsed.has(idx)) {
                     (newMappings as any)[field] = idx;
                     newAutoMapped[field] = true;
+                    mappingUsed.add(idx);
+                    break;
                 }
-            });
+            }
         });
 
         setFieldMappings(newMappings);
@@ -127,88 +192,78 @@ export default function UploadPurchaseOrder() {
         setAutoMappedFields({ ...autoMappedFields, [field]: false });
     };
 
-    const calculateTotalQuantity = () => {
-        if (!fieldMappings.quantity || excelData.length <= 1) return 0;
-        const qIdx = parseInt(fieldMappings.quantity);
-        return excelData.slice(1).reduce((acc, row) => {
-            const val = parseFloat(String(row[qIdx]));
-            return acc + (isNaN(val) ? 0 : val);
-        }, 0);
-    };
-
     const finalizeImport = () => {
-        const selectedVessel = activeManager?.vessels.find(v => v.name === shipName);
-        const totalItemsValue = calculateTotalQuantity();
-        const imo = selectedVessel?.imo || '9000000';
+        // Find IMO for the vessel
+        const manager = SHIP_MANAGERS_DATA.find(m => m.name === shipManager);
+        const vessel = manager?.vessels.find(v => v.name === shipName);
+        const imo = vessel?.imo || '9999999';
 
-        // Real Duplicate Detection Logic
-        let duplicatePOCount = 0;
-        let totalPOCount = 0;
-
-        if (fieldMappings.poNumber && excelData.length > 1) {
-            const poIdx = parseInt(fieldMappings.poNumber);
-            const poNumbers = excelData.slice(1).map(row => String(row[poIdx]).trim());
-            const normalizedPOs = poNumbers.map(p => p.replace(/\s+/g, ''));
-            const uniquePOs = new Set(normalizedPOs);
-            totalPOCount = uniquePOs.size;
-
-            // Count rows that have a normalized PO appearing elsewhere
-            const counts: Record<string, number> = {};
-            normalizedPOs.forEach(p => counts[p] = (counts[p] || 0) + 1);
-            duplicatePOCount = Object.values(counts).filter(c => c > 1).length;
-        }
-
-        const newAudit = {
-            imoNumber: imo,
-            vesselName: shipName,
-            totalPO: totalPOCount || 1,
-            totalItems: totalItemsValue || 0,
-            duplicatePO: duplicatePOCount,
-            duplicateSupplierCode: 0,
-            duplicateProduct: 0,
-            createDate: new Date().toISOString().split('T')[0]
-        };
-
-        // Persist full data for the editor
+        // 1. Save data rows
         localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(excelData));
+        // 2. Save mapping
         localStorage.setItem(`audit_mapping_${imo}`, JSON.stringify(fieldMappings));
 
-        localStorage.setItem('recentlyAddedAudit', JSON.stringify(newAudit));
+        // 3. Update audit_registry_main
+        const existingRegistry = JSON.parse(localStorage.getItem('audit_registry_main') || '[]');
+        const poColIdx = fieldMappings.poNumber ? parseInt(fieldMappings.poNumber) : -1;
+        const itemColIdx = fieldMappings.itemDescription ? parseInt(fieldMappings.itemDescription) : -1;
+
+        let totalPO = 0;
+        let dupPO = 0;
+        if (poColIdx !== -1 && excelData.length > 1) {
+            const pos = excelData.slice(1).map(r => String(r[poColIdx] || '').trim()).filter(p => p !== '');
+            totalPO = new Set(pos).size;
+            const counts: Record<string, number> = {};
+            pos.forEach(p => counts[p] = (counts[p] || 0) + 1);
+            dupPO = Object.values(counts).filter(c => c > 1).length;
+        }
+
+        const newAudit: any = {
+            imoNumber: imo,
+            vesselName: shipName,
+            totalPO: totalPO,
+            totalItems: excelData.length - 1,
+            duplicatePO: dupPO,
+            duplicateSupplierCode: 0,
+            duplicateProduct: 0,
+            createDate: new Date().toISOString().split('T')[0],
+        };
+
+        // If duplicate was already there, update it
+        const entryIdx = existingRegistry.findIndex((r: any) => r.imoNumber === imo);
+        if (entryIdx !== -1) {
+            existingRegistry[entryIdx] = newAudit;
+        } else {
+            existingRegistry.unshift(newAudit);
+        }
+
+        localStorage.setItem('audit_registry_main', JSON.stringify(existingRegistry));
+        localStorage.removeItem('recentlyAddedAudit'); // Clear old temporary flag if any
+
         navigate('/administration/pending-audits');
     };
 
     const handleStartImport = async () => {
         if (!selectedFile || !shipManager || !shipName) return;
-        setShowModal(false);
-        setShowImportingModal(true);
-        setImportProgress(0);
-
+        setShowModal(false); setShowImportingModal(true); setImportProgress(0);
         try {
             const parsedData = await parseExcelFile(selectedFile);
-            setExcelData(parsedData);
-            setTotalRows(parsedData.length);
-
+            setExcelData(parsedData); setTotalRows(parsedData.length);
             const steps = 40;
             for (let i = 0; i <= steps; i++) {
                 await new Promise(r => setTimeout(r, 40));
                 setImportProgress((i / steps) * 100);
                 setRowsProcessed(Math.floor((i / steps) * parsedData.length));
             }
-
-            setShowImportingModal(false);
-            setShowDataViewer(true);
-        } catch (error) {
-            setShowImportingModal(false);
-            alert('File parsing failed');
-        }
+            setShowImportingModal(false); setShowDataViewer(true);
+        } catch (error) { setShowImportingModal(false); alert('File parsing failed'); }
     };
 
     const getMappedCount = () => {
         let count = 0;
-        if (fieldMappings.poNumber) count++;
-        if (fieldMappings.supplierName) count++;
-        if (fieldMappings.itemDescription) count++;
-        if (fieldMappings.quantity) count++;
+        ALL_MAPPING_FIELDS.forEach(f => {
+            if (fieldMappings[f.id as keyof typeof fieldMappings]) count++;
+        });
         return count;
     };
 
@@ -277,22 +332,14 @@ export default function UploadPurchaseOrder() {
                                             )}
                                         </div>
                                     </div>
-                                    <div className="modal-field"><label>FILES*</label>
-                                        <div className="custom-select">
-                                            <select value={fileSource} onChange={(e) => setFileSource(e.target.value)}>
-                                                <option value="Upload from local">Upload from local</option>
-                                            </select>
-                                            <ChevronDown size={16} className="select-icon" />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="modal-field full-width"><label>CHOOSE FILE*</label>
-                                    <div className="file-upload-area" onClick={() => fileInputRef.current?.click()}>
-                                        <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept={getAcceptedFileTypes()} style={{ display: 'none' }} />
-                                        <div className={selectedFile ? "file-selected" : "file-placeholder"}>
-                                            <span className="file-label">description</span>
-                                            <span className="file-name">{selectedFile ? selectedFile.name : "No file selected"}</span>
-                                            <button className="upload-btn-small">upload</button>
+                                    <div className="modal-field"><label>CHOOSE FILE*</label>
+                                        <div className="file-upload-area" onClick={() => fileInputRef.current?.click()}>
+                                            <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept={getAcceptedFileTypes()} style={{ display: 'none' }} />
+                                            <div className={selectedFile ? "file-selected" : "file-placeholder"}>
+                                                <span className="file-label">description</span>
+                                                <span className="file-name" style={{ fontSize: '12px' }}>{selectedFile ? selectedFile.name : "No file..."}</span>
+                                                <button className="upload-btn-small">upload</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -315,22 +362,16 @@ export default function UploadPurchaseOrder() {
                             </div>
                             <div className="v3-modal-body">
                                 <div className="v3-currently-importing">
-                                    <div className="v3-file-icon-box">
-                                        <FileText size={24} />
-                                    </div>
+                                    <div className="v3-file-icon-box"><FileText size={24} /></div>
                                     <div className="v3-import-info">
                                         <div className="v3-info-label">CURRENTLY IMPORTING</div>
                                         <div className="v3-info-filename">{selectedFile?.name}</div>
                                     </div>
                                 </div>
                                 <div className="v3-progress-container">
-                                    <div className="v3-progress-bar-bg">
-                                        <div className="v3-progress-bar-fill" style={{ width: `${importProgress}%` }} />
-                                    </div>
+                                    <div className="v3-progress-bar-bg"><div className="v3-progress-bar-fill" style={{ width: `${importProgress}%` }} /></div>
                                     <div className="v3-progress-text">Validating PO entries and checking for hazardous material matches...</div>
-                                    <div className="v3-rows-badge">
-                                        ROWS PROCESSED: {rowsProcessed} / {totalRows}
-                                    </div>
+                                    <div className="v3-rows-badge">ROWS PROCESSED: {rowsProcessed} / {totalRows}</div>
                                 </div>
                             </div>
                             <div className="v3-modal-footer">
@@ -358,12 +399,9 @@ export default function UploadPurchaseOrder() {
                                     <div className="v3-status-dot" style={{ background: '#10B981', boxShadow: 'none', width: '6px', height: '6px' }} />
                                     FILE: {selectedFile?.name}
                                 </div>
-                                <button className="v3-close-view" onClick={() => setShowDataViewer(false)}>
-                                    CLOSE VIEW <X size={16} />
-                                </button>
+                                <button className="v3-close-view" onClick={() => setShowDataViewer(false)}>CLOSE VIEW <X size={16} /></button>
                             </div>
                         </div>
-
                         <div className="v3-main-body">
                             <div className="v3-preview-section">
                                 <div className="v3-section-header">
@@ -375,9 +413,7 @@ export default function UploadPurchaseOrder() {
                                 </div>
                                 <div className="v3-table-container">
                                     <table className="v3-table">
-                                        <thead>
-                                            <tr>{excelData[0]?.map((h, i) => <th key={i}>{h}</th>)}</tr>
-                                        </thead>
+                                        <thead><tr>{excelData[0]?.map((h, i) => <th key={i}>{h}</th>)}</tr></thead>
                                         <tbody>
                                             {excelData.slice(1, 13).map((row, ri) => (
                                                 <tr key={ri}>{row.map((c, ci) => <td key={ci}>{String(c || '')}</td>)}</tr>
@@ -386,37 +422,41 @@ export default function UploadPurchaseOrder() {
                                     </table>
                                 </div>
                             </div>
-
                             <div className="v3-sidebar">
                                 <div className="v3-sidebar-content">
                                     <div className="v3-sidebar-header">
-                                        <h3>Field Mapping</h3>
-                                        <button className="v3-map-all-btn" onClick={handleMapAll}>
-                                            <Wand2 size={12} /> MAP ALL
-                                        </button>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <h3>Field Mapping</h3>
+                                        </div>
+                                        <button className="v3-map-all-btn" onClick={handleMapAll}><Wand2 size={12} /> MAP ALL</button>
                                     </div>
-                                    <p className="v3-sidebar-subtitle">Assign Excel columns to the required platform data fields.</p>
-
+                                    <p className="v3-sidebar-subtitle">Assign Excel columns to the platform data fields.</p>
                                     <div className="v3-mapping-fields">
-                                        {[
-                                            { id: 'poNumber', label: 'PO NUMBER*', req: true },
-                                            { id: 'supplierName', label: 'SUPPLIER NAME*', req: true },
-                                            { id: 'itemDescription', label: 'ITEM DESCRIPTION*', req: true },
-                                            { id: 'quantity', label: 'QUANTITY*', req: true },
-                                            { id: 'orderDate', label: 'ORDER DATE', req: false }
-                                        ].map(f => (
-                                            <div key={f.id} className="v3-mapping-field">
+                                        {ALL_MAPPING_FIELDS.map(f => (
+                                            <div
+                                                key={f.id}
+                                                className="v3-mapping-field"
+                                                ref={el => { fieldRefs.current[f.id] = el; }}
+                                            >
                                                 <div className="v3-field-labels">
                                                     <label>{f.label}</label>
                                                     {fieldMappings[f.id as keyof typeof fieldMappings] && autoMappedFields[f.id] ?
                                                         <span className="v3-auto-matched-badge">AUTO-MATCHED</span> :
-                                                        (f.req ? <span className="v3-optional-badge" style={{ color: '#EF4444' }}>REQUIRED</span> : <span className="v3-optional-badge">OPTIONAL</span>)
+                                                        (fieldMappings[f.id as keyof typeof fieldMappings] ? <span className="v3-optional-badge">MAPPED</span> : null)
                                                     }
                                                 </div>
                                                 <div className={`v3-select-box ${fieldMappings[f.id as keyof typeof fieldMappings] ? 'active' : ''}`}>
-                                                    <select value={fieldMappings[f.id as keyof typeof fieldMappings]} onChange={(e) => handleManualMappingChange(f.id, e.target.value)}>
+                                                    <select
+                                                        value={fieldMappings[f.id as keyof typeof fieldMappings]}
+                                                        onChange={(e) => handleManualMappingChange(f.id, e.target.value)}
+                                                    >
                                                         <option value="">Select Column...</option>
-                                                        {excelData[0]?.map((h, i) => <option key={i} value={i.toString()}>{h}</option>)}
+                                                        {excelData[0]?.map((h, i) => {
+                                                            const colIdx = i.toString();
+                                                            const isUsed = usedColumns.includes(colIdx) && fieldMappings[f.id as keyof typeof fieldMappings] !== colIdx;
+                                                            if (isUsed) return null;
+                                                            return <option key={i} value={colIdx}>{h || `Column ${i + 1}`}</option>;
+                                                        })}
                                                     </select>
                                                     <ChevronDown size={14} className="v3-chevron" />
                                                 </div>
@@ -424,49 +464,35 @@ export default function UploadPurchaseOrder() {
                                         ))}
                                     </div>
                                 </div>
-
-                                <div className="v3-sidebar-footer">
+                                <div className="v3-sidebar-footer" style={{ padding: '24px 32px', borderTop: '1px solid #F1F5F9' }}>
                                     <div className="v3-mandatory-status">
-                                        <span className="v3-mandatory-label">Mandatory fields mapped</span>
-                                        <span className="v3-mandatory-count">{getMappedCount()} / 4</span>
+                                        <span className="v3-mandatory-label">Mapping Progress</span>
+                                        <span className="v3-mandatory-count">{getMappedCount()} / {ALL_MAPPING_FIELDS.length}</span>
                                     </div>
                                     <div className="v3-footer-progress-bg">
-                                        <div className="v3-footer-progress-fill" style={{ width: `${(getMappedCount() / 4) * 100}%` }} />
+                                        <div className="v3-footer-progress-fill" style={{ width: `${(getMappedCount() / ALL_MAPPING_FIELDS.length) * 100}%` }} />
                                     </div>
                                     <button className="v3-confirm-mapping-btn" onClick={() => {
-                                        const missing = [];
-                                        if (!fieldMappings.poNumber) missing.push('PO Number');
-                                        if (!fieldMappings.supplierName) missing.push('Supplier Name');
-                                        if (!fieldMappings.itemDescription) missing.push('Item Description');
-                                        if (!fieldMappings.quantity) missing.push('Quantity');
-                                        if (missing.length > 0) { setUnmappedFields(missing); setShowErrorModal(true); } else { setShowSuccessNotification(true); }
+                                        const unmapped = ALL_MAPPING_FIELDS.filter(f => f.req && !fieldMappings[f.id as keyof typeof fieldMappings]);
+                                        if (unmapped.length > 0) {
+                                            setUnmappedFields(unmapped);
+                                            setShowErrorModal(true);
+                                        } else {
+                                            setShowSuccessNotification(true);
+                                        }
                                     }}>CONFIRM MAPPING</button>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="v3-global-footer">
-                            <div className="v3-footer-item">
-                                <span className="v3-footer-label">TOTAL RECORDS FOUND:</span>
-                                <span className="v3-footer-value">{excelData.length - 1}</span>
-                            </div>
-                            <div className="v3-footer-item">
-                                <span className="v3-footer-label">VALIDATION ERRORS:</span>
-                                <div className="v3-validation-badge">
-                                    <CheckCircle2 size={16} /> 0
-                                </div>
-                            </div>
-                            <div className="v3-system-status">
-                                <div className="v3-status-dot" />
-                                SYSTEM READY FOR IMPORT
-                            </div>
-                        </div>
-
                         {showSuccessNotification && (
                             <div className="success-notification">
-                                <div style={{ color: 'white' }}>
-                                    <div style={{ fontWeight: 700 }}>Mapping Confirmed</div>
-                                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>Your data is ready for final audit.</div>
+                                <div className="success-content">
+                                    <div className="success-icon"><CheckCircle2 size={20} color="#10B981" fill="#DCFCE7" /></div>
+                                    <div className="success-text">
+                                        <div className="success-title">Mapping Complete</div>
+                                        <div className="success-desc">You can now proceed to finalize the import.</div>
+                                    </div>
                                 </div>
                                 <button className="finalize-import-btn" onClick={finalizeImport}>FINALIZE IMPORT</button>
                             </div>
@@ -477,10 +503,39 @@ export default function UploadPurchaseOrder() {
                 {showErrorModal && (
                     <>
                         <div className="modal-backdrop" onClick={() => setShowErrorModal(false)} />
-                        <div className="error-modal" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'white', padding: '32px', borderRadius: '12px', zIndex: 10001, maxWidth: '400px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', color: '#EF4444' }}><X size={24} /> <h3 style={{ margin: 0, color: '#0F172A' }}>Missing Fields</h3></div>
-                            <p style={{ fontSize: '14px', color: '#64748B' }}>Please map all required fields: {unmappedFields.join(', ')}</p>
-                            <button className="v3-confirm-mapping-btn" style={{ marginTop: '20px' }} onClick={() => setShowErrorModal(false)}>BACK TO MAPPING</button>
+                        <div className="v3-error-modal">
+                            <div className="v3-error-header">
+                                <div className="v3-error-title-group">
+                                    <div className="v3-error-icon"><RefreshCw size={18} color="#EF4444" /></div>
+                                    <h3>Incomplete Mapping</h3>
+                                </div>
+                                <button className="v3-error-close" onClick={() => setShowErrorModal(false)}><X size={20} /></button>
+                            </div>
+                            <div className="v3-error-body">
+                                <p className="v3-error-summary">There are <strong>{unmappedFields.length} fields</strong> that still need to be mapped before importing.</p>
+                                <div className="v3-error-cards">
+                                    {unmappedFields.map(field => (
+                                        <div key={field.id} className="v3-error-card" onClick={() => jumpToField(field.id)}>
+                                            <div className="v3-card-left">
+                                                <div className="v3-card-icon"><RefreshCw size={14} color="#EF4444" /></div>
+                                                <div className="v3-card-info">
+                                                    <span className="v3-card-label">{field.label}</span>
+                                                    <span className="v3-card-status">PENDING MAPPING</span>
+                                                </div>
+                                            </div>
+                                            <ArrowUp size={16} className="v3-card-arrow" style={{ transform: 'rotate(90deg)' }} />
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="v3-error-info-box">
+                                    <RefreshCw size={16} color="#3B82F6" />
+                                    <p>Select a corresponding column from your file for each label listed above.</p>
+                                </div>
+                            </div>
+                            <div className="v3-error-footer">
+                                <button className="v3-error-btn-cancel" onClick={() => { setShowErrorModal(false); setShowDataViewer(false); }}>CANCEL IMPORT</button>
+                                <button className="v3-error-btn-back" onClick={() => setShowErrorModal(false)}>BACK TO MAPPING</button>
+                            </div>
                         </div>
                     </>
                 )}

@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import './PendingAudits.css';
 import './AuditEditor.css';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
-import { Search, ChevronDown, Download, Edit2, Send, Trash2, X, CheckCircle2, XCircle, Plus, Filter, Wand2 } from 'lucide-react';
+import { Search, ChevronDown, Download, Edit2, Send, Trash2, X, CheckCircle2, XCircle } from 'lucide-react';
 
 interface AuditRecord {
     imoNumber: string;
@@ -24,10 +24,13 @@ interface AuditEditorProps {
     onSave: (newSummary: Partial<AuditRecord>) => void;
 }
 
-const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorProps) => {
+const AuditEditorOverlay = ({ imo, onClose, onSave }: AuditEditorProps) => {
     const [data, setData] = useState<any[][]>([]);
     const [visibleColumns, setVisibleColumns] = useState<boolean[]>([]);
     const [poColIdx, setPoColIdx] = useState<number | null>(null);
+    const [rowActions, setRowActions] = useState<Record<number, string>>({});
+    const [currentDupGroupIdx, setCurrentDupGroupIdx] = useState(0);
+    const [, setHistory] = useState<{ data: any[][]; actions: Record<number, string> }[]>([]);
 
     useEffect(() => {
         const rows = localStorage.getItem(`audit_rows_${imo}`);
@@ -43,7 +46,6 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
             const savedVisibility = localStorage.getItem(`audit_visible_cols_${imo}`);
             if (savedVisibility) {
                 const parsedVis = JSON.parse(savedVisibility);
-                // Ensure length matches in case columns were added/removed externally or logic changed
                 if (parsedVis.length === parsedData[0]?.length) {
                     setVisibleColumns(parsedVis);
                 } else {
@@ -55,58 +57,186 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
         }
     }, [imo]);
 
-    const getDuplicateRows = () => {
-        if (poColIdx === null || data.length <= 1) return new Set<number>();
-        const duplicates = new Set<number>();
-        const counts: Record<string, number[]> = {};
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStartValue, setDragStartValue] = useState('');
+    const [dragStartCi, setDragStartCi] = useState<number | null>(null);
 
+    // Robust Undo Logic
+    const performUndo = useCallback(() => {
+        setHistory(prevHistory => {
+            if (prevHistory.length === 0) return prevHistory;
+            const lastState = prevHistory[prevHistory.length - 1];
+            setData(lastState.data);
+            setRowActions(lastState.actions);
+            return prevHistory.slice(0, -1);
+        });
+    }, []);
+
+    // Global Key Listener for Ctrl+Z
+    useEffect(() => {
+        const handleKeys = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+                e.preventDefault();
+                performUndo();
+            }
+        };
+        window.addEventListener('keydown', handleKeys);
+        return () => window.removeEventListener('keydown', handleKeys);
+    }, [performUndo]);
+
+    // Handle Global Mouse Up for Dragging
+    useEffect(() => {
+        const handleGlobalMouseUp = () => {
+            if (isDragging) {
+                setIsDragging(false);
+                setDragStartCi(null);
+            }
+        };
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    }, [isDragging]);
+
+    const duplicateGroups = (() => {
+        if (poColIdx === null || data.length <= 1) return [];
+        const counts: Record<string, number[]> = {};
         data.slice(1).forEach((row, idx) => {
-            // Perfect comparison: strip all whitespaces
-            const po = String(row[poColIdx] || '').replace(/\s+/g, '');
+            const originalIdx = idx + 1;
+            const action = rowActions[originalIdx];
+            if (action === 'D' || action === 'R') return;
+
+            const po = String(row[poColIdx!] || '').trim();
             if (!po) return;
             if (!counts[po]) counts[po] = [];
-            counts[po].push(idx + 1); // +1 because slice
+            counts[po].push(originalIdx);
         });
 
-        Object.values(counts).forEach(indices => {
-            if (indices.length > 1) indices.forEach(i => duplicates.add(i));
+        return Object.values(counts)
+            .filter(indices => indices.length > 1)
+            .map(indices => indices.map(i => ({ row: data[i], originalIdx: i })));
+    })();
+
+    const pushToHistory = useCallback(() => {
+        setHistory(prev => {
+            const snapshot = {
+                data: JSON.parse(JSON.stringify(data)),
+                actions: { ...rowActions }
+            };
+            return [...prev.slice(-49), snapshot];
         });
-        return duplicates;
+    }, [data, rowActions]);
+
+    const handleUpdateCell = (originalIdx: number, ci: number, val: string) => {
+        setData(prevData => {
+            const newData = JSON.parse(JSON.stringify(prevData));
+            newData[originalIdx][ci] = val;
+            return newData;
+        });
     };
 
-    const duplicateRows = getDuplicateRows();
-
-    const handleUpdateCell = (ri: number, ci: number, val: string) => {
-        const newData = [...data];
-        newData[ri][ci] = val;
-        setData(newData);
+    // --- Drag-to-Fill Logic ---
+    const handleCellMouseDown = (val: string, ci: number) => {
+        pushToHistory();
+        setIsDragging(true);
+        setDragStartValue(val);
+        setDragStartCi(ci);
     };
 
-    const handleRemoveRow = (ri: number) => {
-        setData(data.filter((_, i) => i !== ri));
+    const handleCellMouseEnter = (originalIdx: number, ci: number) => {
+        if (isDragging && dragStartCi === ci) {
+            setData(prevData => {
+                const newData = JSON.parse(JSON.stringify(prevData));
+                newData[originalIdx][ci] = dragStartValue;
+                return newData;
+            });
+        }
     };
 
-    const handleAddRow = () => {
-        const newRow = new Array(data[0]?.length || 0).fill('');
-        setData([...data, newRow]);
+    const handleKeyDown = (e: React.KeyboardEvent, ri: number, ci: number) => {
+        if ((e.ctrlKey || e.metaKey) && ['v', 'c', 'a', 'V', 'C', 'A'].includes(e.key)) {
+            return;
+        }
+
+        const rowCount = currentGroup.length;
+        const colIndices = visibleColumns.map((v, i) => v ? i : -1).filter(v => v !== -1);
+        const colPos = colIndices.indexOf(ci);
+
+        let nextRi = ri;
+        let nextCiPos = colPos;
+
+        if (e.key === 'ArrowDown') {
+            nextRi = Math.min(ri + 1, rowCount - 1);
+        } else if (e.key === 'ArrowUp') {
+            nextRi = Math.max(ri - 1, 0);
+        } else if (e.key === 'ArrowRight' && (e.target as HTMLInputElement).selectionEnd === (e.target as HTMLInputElement).value.length) {
+            nextCiPos = Math.min(colPos + 1, colIndices.length - 1);
+        } else if (e.key === 'ArrowLeft' && (e.target as HTMLInputElement).selectionStart === 0) {
+            nextCiPos = Math.max(colPos - 1, 0);
+        } else if (e.key === 'Enter') {
+            nextRi = Math.min(ri + 1, rowCount - 1);
+        } else if (e.key === 'Tab') {
+            if (e.shiftKey) {
+                nextCiPos = Math.max(colPos - 1, 0);
+            } else {
+                nextCiPos = Math.min(colPos + 1, colIndices.length - 1);
+            }
+        } else {
+            return;
+        }
+
+        if (nextRi !== ri || nextCiPos !== colPos) {
+            e.preventDefault();
+            const nextCi = colIndices[nextCiPos];
+            const nextInput = document.querySelector(`input[data-ri="${nextRi}"][data-ci="${nextCi}"]`) as HTMLInputElement;
+            if (nextInput) {
+                nextInput.focus();
+                setTimeout(() => nextInput.select(), 0);
+            }
+        }
     };
 
-    const handleAddColumn = () => {
-        const colName = prompt("Enter new column name:", "New Column");
-        if (!colName) return;
-        setData(data.map((row, i) => i === 0 ? [...row, colName] : [...row, '']));
-        setVisibleColumns([...visibleColumns, true]);
+    const setRowAction = (originalIdx: number, action: string) => {
+        pushToHistory();
+        setRowActions(prev => ({ ...prev, [originalIdx]: action }));
+    };
+
+    const applyActionToGroup = (action: string) => {
+        const group = duplicateGroups[currentDupGroupIdx];
+        if (!group) return;
+
+        pushToHistory();
+        setRowActions(prevActions => {
+            const updates = { ...prevActions };
+            if (action === 'DI') {
+                group.forEach((item, idx) => {
+                    updates[item.originalIdx] = idx === 0 ? 'DI' : 'D';
+                });
+                if (currentDupGroupIdx >= duplicateGroups.length - 1 && currentDupGroupIdx > 0) {
+                    setCurrentDupGroupIdx(p => p - 1);
+                }
+            } else {
+                group.forEach(item => {
+                    updates[item.originalIdx] = action;
+                });
+            }
+            return updates;
+        });
     };
 
     const handleSave = () => {
-        localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(data));
+        // Filter out rows marked as D (Delete) or R (Reject)
+        const filteredData = [data[0], ...data.slice(1).filter((_, i) => {
+            const status = rowActions[i + 1];
+            return status !== 'D' && status !== 'R';
+        })];
+
+        localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(filteredData));
         localStorage.setItem(`audit_visible_cols_${imo}`, JSON.stringify(visibleColumns));
 
         // Recalculate summary
         let poD = 0;
         let totalPO = 0;
-        if (poColIdx !== null && data.length > 1) {
-            const pos = data.slice(1).map(r => String(r[poColIdx] || '').trim());
+        if (poColIdx !== null && filteredData.length > 1) {
+            const pos = filteredData.slice(1).map(r => String(r[poColIdx] || '').trim()).filter(p => p !== '');
             totalPO = new Set(pos).size;
             const counts: Record<string, number> = {};
             pos.forEach(p => counts[p] = (counts[p] || 0) + 1);
@@ -116,94 +246,151 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
         onSave({
             totalPO,
             duplicatePO: poD,
-            totalItems: data.length - 1
+            totalItems: filteredData.length - 1
         });
         onClose();
     };
 
-    if (data.length === 0) return <div className="audit-editor-overlay"><div className="editor-header"><h2>Loading...</h2><X onClick={onClose} /></div></div>;
+    if (data.length === 0) return null;
+
+    if (duplicateGroups.length === 0) {
+        return (
+            <div className="audit-editor-overlay">
+                <div className="editor-header">
+                    <h2>Audit Duplicate Purchase Orders</h2>
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+                    <div style={{ padding: '32px', background: '#F0FDF4', borderRadius: '50%', color: '#16A34A' }}>
+                        <CheckCircle2 size={48} />
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                        <h3 style={{ fontSize: '20px', color: '#1E293B', margin: '0 0 8px 0' }}>All Conflicts Resolved</h3>
+                        <p style={{ color: '#64748B', fontSize: '14px' }}>There are no more duplicate POs in this file.</p>
+                    </div>
+                </div>
+                <div className="v3-dup-footer">
+                    <div />
+                    <button className="v3-dup-btn close" onClick={handleSave}>Close & Update Registry</button>
+                </div>
+            </div>
+        );
+    }
+
+    const currentGroup = duplicateGroups[currentDupGroupIdx] || [];
 
     return (
         <div className="audit-editor-overlay">
             <div className="editor-header">
-                <div>
-                    <h2 style={{ margin: 0, fontSize: '18px' }}>AUDIT DATA EDITOR: {vesselName}</h2>
-                    <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>IMO: {imo} | Resolve duplicates and refine PO data entries</div>
+                <h2>Audit Duplicate Purchase Orders</h2>
+            </div>
+
+            <div className="v3-dup-toolbar">
+                <div className="v3-dup-columns">
+                    <label>Show / Hide Columns</label>
+                    <div className="v3-dup-checkboxes">
+                        {data[0]?.map((col, i) => (
+                            <label key={i}>
+                                <input
+                                    type="checkbox"
+                                    checked={visibleColumns[i]}
+                                    onChange={() => {
+                                        const next = [...visibleColumns];
+                                        next[i] = !next[i];
+                                        setVisibleColumns(next);
+                                    }}
+                                />
+                                {String(col || `Field ${i + 1}`)}
+                            </label>
+                        ))}
+                    </div>
                 </div>
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                    <button className="editor-action-btn btn-save" onClick={handleSave}>SAVE & FINALIZE</button>
-                    <X size={24} style={{ cursor: 'pointer' }} onClick={onClose} />
+
+                <div className="v3-dup-nav">
+                    <button
+                        className="v3-dup-nav-btn"
+                        onClick={() => setCurrentDupGroupIdx(p => Math.max(0, p - 1))}
+                        disabled={currentDupGroupIdx === 0}
+                    >
+                        Previous PO
+                    </button>
+                    <button
+                        className="v3-dup-nav-btn active"
+                        onClick={() => setCurrentDupGroupIdx(p => Math.min(duplicateGroups.length - 1, p + 1))}
+                        disabled={currentDupGroupIdx === duplicateGroups.length - 1}
+                    >
+                        Next PO
+                    </button>
+                    <span className="v3-dup-count">{currentDupGroupIdx + 1}/{duplicateGroups.length}</span>
                 </div>
             </div>
 
-            <div className="editor-controls">
-                <div className="column-visibility-row">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '12px', color: '#64748B', fontSize: '12px', fontWeight: 700 }}>
-                        <Filter size={14} /> MANAGE COLUMNS:
-                    </div>
-                    {data[0]?.map((col, i) => (
-                        <label key={i} className={`column-checkbox ${visibleColumns[i] ? 'active' : ''}`}>
-                            <input
-                                type="checkbox"
-                                checked={visibleColumns[i]}
-                                onChange={() => {
-                                    const next = [...visibleColumns];
-                                    next[i] = !next[i];
-                                    setVisibleColumns(next);
-                                }}
-                                style={{ display: 'none' }}
-                            />
-                            {visibleColumns[i] ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
-                            {String(col || `Col ${i + 1}`).toUpperCase()}
-                        </label>
-                    ))}
-                </div>
-                <div className="table-actions">
-                    <button className="editor-action-btn btn-add" style={{ background: '#F0F9FF', borderColor: '#00B0FA', color: '#00B0FA' }} onClick={() => alert(`${duplicateRows.size} duplicate rows identified using space-insensitive comparison.`)}>
-                        <Wand2 size={14} /> CALCULATE DUPLICATES
-                    </button>
-                    <button className="editor-action-btn btn-add" onClick={handleAddRow}><Plus size={14} /> ADD ROW</button>
-                    <button className="editor-action-btn btn-add" onClick={handleAddColumn}><Plus size={14} /> ADD COLUMN</button>
-                </div>
-            </div>
+            <p className="v3-dup-subtitle">Duplicates in Audit File:</p>
 
             <div className="editor-table-container">
                 <table className="editor-table">
                     <thead>
                         <tr>
-                            <th style={{ width: '40px', minWidth: '40px', textAlign: 'center' }}>#</th>
+                            <th style={{ minWidth: '220px' }}>Action</th>
                             {data[0].map((col, i) => visibleColumns[i] && (
-                                <th key={i}>{String(col).toUpperCase()}</th>
+                                <th key={i}>{String(col)}</th>
                             ))}
-                            <th style={{ width: '60px', minWidth: '60px', textAlign: 'center' }}>ACTIONS</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {data.slice(1).map((row, ri) => {
-                            const actualIdx = ri + 1;
-                            const isDup = duplicateRows.has(actualIdx);
-                            return (
-                                <tr key={ri} className={isDup ? 'row-duplicate' : ''}>
-                                    <td style={{ textAlign: 'center', background: '#F8FAFC', fontWeight: 600 }}>{actualIdx}</td>
-                                    {row.map((cell, ci) => visibleColumns[ci] && (
-                                        <td
-                                            key={ci}
-                                            className="cell-editable"
-                                            contentEditable
-                                            suppressContentEditableWarning
-                                            onBlur={(e) => handleUpdateCell(actualIdx, ci, e.target.innerText)}
-                                        >
-                                            {String(cell || '')}
-                                        </td>
-                                    ))}
-                                    <td style={{ textAlign: 'center' }}>
-                                        <Trash2 size={16} className="remove-row-btn" onClick={() => handleRemoveRow(actualIdx)} />
+                        {currentGroup.map(({ row, originalIdx }, ri) => (
+                            <tr key={originalIdx}>
+                                <td>
+                                    <div className="v3-action-chips">
+                                        {[
+                                            { code: 'U', label: 'U' },
+                                            { code: 'A', label: 'A' },
+                                            { code: 'DI', label: 'D&I' },
+                                            { code: 'D', label: 'D' },
+                                            { code: 'R', label: 'R' },
+                                            { code: 'H', label: 'H' }
+                                        ].map(chip => (
+                                            <span
+                                                key={chip.code}
+                                                className={`chip ${rowActions[originalIdx] === chip.code ? `active-${chip.code.toLowerCase()}` : ''}`}
+                                                onClick={() => setRowAction(originalIdx, chip.code)}
+                                            >
+                                                {chip.label}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </td>
+                                {row.map((cell: any, ci: number) => visibleColumns[ci] && (
+                                    <td key={ci}>
+                                        <input
+                                            type="text"
+                                            className={`v3-dup-table-input ${isDragging && dragStartCi === ci ? 'is-dragging-cell' : ''}`}
+                                            value={String(cell || '')}
+                                            onChange={(e) => handleUpdateCell(originalIdx, ci, e.target.value)}
+                                            onKeyDown={(e) => handleKeyDown(e, ri, ci)}
+                                            onMouseDown={() => handleCellMouseDown(String(cell || ''), ci)}
+                                            onMouseEnter={() => handleCellMouseEnter(originalIdx, ci)}
+                                            onFocus={() => pushToHistory()}
+                                            onClick={(e) => (e.target as HTMLInputElement).select()}
+                                            data-ri={ri}
+                                            data-ci={ci}
+                                            title={String(cell || '')}
+                                        />
                                     </td>
-                                </tr>
-                            );
-                        })}
+                                ))}
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
+            </div>
+
+            <div className="v3-dup-footer">
+                <div className="v3-dup-footer-left">
+                    <button className="v3-dup-btn" onClick={() => applyActionToGroup('U')}>Update (U)</button>
+                    <button className="v3-dup-btn" onClick={() => applyActionToGroup('DI')}>Delete & Insert (D&I)</button>
+                    <button className="v3-dup-btn reject" onClick={() => applyActionToGroup('R')}>Reject (R)</button>
+                    <button className="v3-dup-btn" onClick={() => applyActionToGroup('H')}>Hold</button>
+                </div>
+                <button className="v3-dup-btn close" onClick={handleSave}>Close</button>
             </div>
         </div>
     );
@@ -325,9 +512,10 @@ export default function PendingAudits() {
             const newSent = {
                 ...selectedVessel,
                 reviewStatus: 'Pending',
+                createDate: new Date().toISOString().split('T')[0], // Use current date
                 assignedTo: { name: 'Unassigned', avatar: 'https://i.pravatar.cc/150?u=unassigned' }
             };
-            localStorage.setItem('sentToReview', JSON.stringify([...existingSent, newSent]));
+            localStorage.setItem('sentToReview', JSON.stringify([newSent, ...existingSent]));
         }
         setShowReviewModal(false);
         setShowSuccessToast(true);
@@ -462,7 +650,11 @@ export default function PendingAudits() {
                                                         </div>
                                                     ) : (
                                                         <>
-                                                            <button className="action-btn edit-btn" onClick={() => handleEdit(record.imoNumber)} title="Edit"><Edit2 size={16} /></button>
+                                                            {record.duplicatePO > 0 ? (
+                                                                <button className="action-btn edit-btn" onClick={() => handleEdit(record.imoNumber)} title="Edit"><Edit2 size={16} /></button>
+                                                            ) : (
+                                                                <span className="na-status-text">NA</span>
+                                                            )}
                                                             <button className="action-btn send-btn" onClick={() => handleSend(record.imoNumber)} title="Send"><Send size={16} /></button>
                                                             <button className="action-btn delete-btn" onClick={() => handleDelete(record.imoNumber)} title="Delete"><Trash2 size={16} /></button>
                                                         </>

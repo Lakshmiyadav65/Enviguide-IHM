@@ -1,891 +1,402 @@
 
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { ShoppingCart, Plus, ChevronDown, Info, MoreVertical, X, Upload, Save, Eye, Edit2, Trash2, File, Package, FileCheck, AlertCircle, Check } from 'lucide-react';
-
+import { useState, useMemo, useRef } from 'react';
+import {
+    Plus, ChevronDown, ChevronUp, X, Search, RotateCw,
+    Calendar, Filter, Edit2, Trash2, Info,
+    ArrowUpDown, RefreshCw, FileText, Layout
+} from 'lucide-react';
 import './PurchaseOrderView.css';
 
-interface PurchaseOrder {
+interface PurchaseOrderItem {
     id: string;
-    dateRequested: string;
-    items: number;
-    mdStatus: string;
-    compliance: string;
+    emailStatus: string;
+    ihmProductCode: string;
+    poNumber: string;
+    mdsReq: string;
+    mdsRec: string;
+    itemDescription: string;
+    orderDate: string;
+    quantityTotal: string;
+    unit: string;
+    selected?: boolean;
+    category: string;
 }
 
-interface SupplierPO {
-    id: string;
-    name: string;
-    refId: string;
-    totalItems: string;
-    mds: string;
-    ihmStatus: string;
-    pos: PurchaseOrder[];
-}
+const FILTER_TAGS = [
+    'Pending Mds', 'Received Mds', 'Tracked Items', 'Non Tracked Items',
+    'Request Pending', 'Reminder 1', 'Reminder 2', 'Non-Responsive Supplier',
+    'HM Red', 'HM Green', 'PCHM', 'Non HM', 'Review Repeated Items', 'All'
+];
 
-const VESSEL_SPECIFIC_POS: Record<string, SupplierPO[]> = {
-    'MV Ocean Pioneer': [
-        {
-            id: 'op-1',
-            name: 'Pioneer Marine Supplies',
-            refId: '[ VS | 000101 | PMS ]',
-            totalItems: '42(6)',
-            mds: '30 / 42',
-            ihmStatus: '25 | 42',
-            pos: [
-                { id: 'PO-9901', dateRequested: 'Jan 15, 2024', items: 24, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-9905', dateRequested: 'Feb 02, 2024', items: 8, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-9910', dateRequested: 'Feb 10, 2024', items: 12, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-9915', dateRequested: 'Feb 15, 2024', items: 15, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-9920', dateRequested: 'Feb 20, 2024', items: 20, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-9925', dateRequested: 'Feb 25, 2024', items: 10, mdStatus: 'MD Verified', compliance: 'Verified' }
-            ]
-        },
-        {
-            id: 'op-2',
-            name: 'Atlantic Equipment Co.',
-            refId: '[ VS | 000102 | AEC ]',
-            totalItems: '25(4)',
-            mds: '18 / 25',
-            ihmStatus: '12 | 25',
-            pos: [
-                { id: 'PO-9942', dateRequested: 'Mar 10, 2024', items: 15, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-9945', dateRequested: 'Mar 15, 2024', items: 5, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-9948', dateRequested: 'Mar 18, 2024', items: 10, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-9952', dateRequested: 'Mar 22, 2024', items: 18, mdStatus: 'MD Pending', compliance: 'Not Verified' }
-            ]
-        },
-        {
-            id: 'op-5',
-            name: 'North Sea Logistics',
-            refId: '[ VS | 000105 | NSL ]',
-            totalItems: '35(3)',
-            mds: '20 / 35',
-            ihmStatus: '15 | 35',
-            pos: [
-                { id: 'PO-9980', dateRequested: 'Apr 25, 2024', items: 10, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-9985', dateRequested: 'Apr 28, 2024', items: 25, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-9990', dateRequested: 'May 02, 2024', items: 12, mdStatus: 'MD Verified', compliance: 'Verified' }
-            ]
+const initializeData = () => {
+    let allItems: PurchaseOrderItem[] = [];
+    FILTER_TAGS.forEach((tag, tagIdx) => {
+        if (tag === 'All') return;
+        for (let sIdx = 0; sIdx < 5; sIdx++) {
+            const sid = `${tag.replace(/\s+/g, '-').toLowerCase()}-s-${sIdx}`;
+            for (let i = 0; i < 5; i++) {
+                allItems.push({
+                    id: `${sid}-item-${i}`,
+                    emailStatus: tag === 'Pending Mds' ? 'SENT' : 'NOT SENT',
+                    ihmProductCode: `IHM|00${tagIdx}${sIdx}|${i}`,
+                    poNumber: `PO-${tagIdx}-${100 + i}`,
+                    mdsReq: tag === 'Pending Mds' ? '01/01/2024' : '',
+                    mdsRec: tag === 'Received Mds' ? '05/01/2024' : '',
+                    itemDescription: `Component ${tag} type ${i}`,
+                    orderDate: `2024-01-${10 + i}`,
+                    quantityTotal: `${i} | ${i + 2} | 0`,
+                    unit: 'Piece',
+                    category: tag,
+                    selected: false
+                });
+            }
         }
-    ],
-    'ACOSTA': [
-        {
-            id: '1',
-            name: 'RMS Marine Service Company Ltd',
-            refId: '( VS | 80812 | RMSCL )',
-            totalItems: '52(6)',
-            mds: '35 / 52',
-            ihmStatus: '28 | 52',
-            pos: [
-                { id: 'PO-8821', dateRequested: 'Oct 24, 2023', items: 12, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-8825', dateRequested: 'Oct 30, 2023', items: 8, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-8830', dateRequested: 'Nov 05, 2023', items: 20, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-8835', dateRequested: 'Nov 10, 2023', items: 14, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-8840', dateRequested: 'Nov 15, 2023', items: 22, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-8845', dateRequested: 'Nov 20, 2023', items: 15, mdStatus: 'MD Pending', compliance: 'Not Verified' }
-            ]
-        },
-        {
-            id: '2',
-            name: 'Jotun Cosco Marine Coatings (HK) Limited',
-            refId: '( VS|000037|JCMCL )',
-            totalItems: '45(5)',
-            mds: '28 / 45',
-            ihmStatus: '22 | 45',
-            pos: [
-                { id: 'PO-8900', dateRequested: 'Nov 12, 2023', items: 4, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-8910', dateRequested: 'Nov 20, 2023', items: 42, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-8920', dateRequested: 'Nov 25, 2023', items: 18, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-8930', dateRequested: 'Dec 02, 2023', items: 25, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-8940', dateRequested: 'Dec 10, 2023', items: 10, mdStatus: 'MD Pending', compliance: 'Not Verified' }
-            ]
-        },
-        {
-            id: '3',
-            name: 'STOP AEVE',
-            refId: '( VS | 000427 | SA )',
-            totalItems: '76(5)',
-            mds: '45 / 76',
-            ihmStatus: '35 | 76',
-            pos: [
-                { id: 'PO-9001', dateRequested: 'Dec 05, 2023', items: 50, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-9005', dateRequested: 'Dec 15, 2023', items: 30, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-9010', dateRequested: 'Dec 20, 2023', items: 25, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-9015', dateRequested: 'Dec 25, 2023', items: 12, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-9020', dateRequested: 'Dec 30, 2023', items: 40, mdStatus: 'MD Verified', compliance: 'Verified' }
-            ]
-        },
-        {
-            id: '6',
-            name: 'Med Sea Spares',
-            refId: '( VS | 000800 | MSS )',
-            totalItems: '42(4)',
-            mds: '30 / 42',
-            ihmStatus: '25 | 42',
-            pos: [
-                { id: 'PO-9310', dateRequested: 'Mar 05, 2024', items: 15, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-9315', dateRequested: 'Mar 10, 2024', items: 7, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-9320', dateRequested: 'Mar 15, 2024', items: 20, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-9325', dateRequested: 'Mar 20, 2024', items: 12, mdStatus: 'MD Verified', compliance: 'Verified' }
-            ]
-        }
-    ],
-    'AFIF': [
-        {
-            id: 'af-1',
-            name: 'Global Container Solutions',
-            refId: '[ VS | 000201 | GCS ]',
-            totalItems: '35(5)',
-            mds: '22 / 35',
-            ihmStatus: '18 | 35',
-            pos: [
-                { id: 'PO-7701', dateRequested: 'Jan 20, 2024', items: 30, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-7705', dateRequested: 'Jan 25, 2024', items: 15, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-7710', dateRequested: 'Jan 30, 2024', items: 25, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-7715', dateRequested: 'Feb 05, 2024', items: 10, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-7720', dateRequested: 'Feb 10, 2024', items: 20, mdStatus: 'MD Verified', compliance: 'Verified' }
-            ]
-        },
-        {
-            id: 'af-3',
-            name: 'Red Sea Marine',
-            refId: '[ VS | 000203 | RSM ]',
-            totalItems: '45(4)',
-            mds: '30 / 45',
-            ihmStatus: '22 | 45',
-            pos: [
-                { id: 'PO-7760', dateRequested: 'Mar 20, 2024', items: 20, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-7765', dateRequested: 'Mar 25, 2024', items: 12, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-7770', dateRequested: 'Mar 30, 2024', items: 15, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-7775', dateRequested: 'Apr 05, 2024', items: 28, mdStatus: 'MD Verified', compliance: 'Verified' }
-            ]
-        }
-    ],
-    'PACIFIC HORIZON': [
-        {
-            id: 'ph-1',
-            name: 'Horizon Logistics Group',
-            refId: '[ VS | 000301 | HLG ]',
-            totalItems: '55(6)',
-            mds: '38 / 55',
-            ihmStatus: '30 | 55',
-            pos: [
-                { id: 'PO-6601', dateRequested: 'Feb 15, 2024', items: 10, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-6610', dateRequested: 'Feb 20, 2024', items: 25, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-6620', dateRequested: 'Feb 25, 2024', items: 18, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-6630', dateRequested: 'Mar 01, 2024', items: 40, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-6640', dateRequested: 'Mar 05, 2024', items: 30, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-6650', dateRequested: 'Mar 10, 2024', items: 22, mdStatus: 'MD Verified', compliance: 'Verified' }
-            ]
-        },
-        {
-            id: 'ph-2',
-            name: 'Pacific Rim Marine',
-            refId: '[ VS | 000302 | PRM ]',
-            totalItems: '60(4)',
-            mds: '42 / 60',
-            ihmStatus: '35 | 60',
-            pos: [
-                { id: 'PO-6670', dateRequested: 'Apr 10, 2024', items: 30, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-6675', dateRequested: 'Apr 15, 2024', items: 15, mdStatus: 'MD Pending', compliance: 'Not Verified' },
-                { id: 'PO-6680', dateRequested: 'Apr 20, 2024', items: 25, mdStatus: 'MD Verified', compliance: 'Verified' },
-                { id: 'PO-6685', dateRequested: 'Apr 25, 2024', items: 40, mdStatus: 'MD Verified', compliance: 'Verified' }
-            ]
-        }
-    ],
-    'MV NORTH STAR': []
+    });
+    return allItems;
 };
 
+const getSupplierMeta = (filter: string) => {
+    const suffix = filter === 'All' ? 'GEN' : filter.substring(0, 3).toUpperCase();
+    return [
+        { id: 's1', name: `${filter} - Henry Marine A/S`, ref: `( IHM|0${suffix}|ALP )` },
+        { id: 's2', name: `${filter} - Varuna Sentinels BV`, ref: `( IHM|1${suffix}|BET )` },
+        { id: 's3', name: `${filter} - Pole Star Space Applications Ltd`, ref: `( IHM|2${suffix}|GAM )` },
+        { id: 's4', name: `${filter} - Martek Marine Ltd`, ref: `( IHM|3${suffix}|DEL )` },
+        { id: 's5', name: `${filter} - Survitec Safety Solutions Norway AS`, ref: `( IHM|4${suffix}|EPS )` },
+    ];
+};
 
-export default function PurchaseOrderView({
-    vesselName,
-    imo,
-    filterDateFrom = '',
-    filterDateTo = '',
-    filterCompliance = 'All'
-}: {
-    vesselName: string;
-    imo: string;
-    filterDateFrom?: string;
-    filterDateTo?: string;
-    filterCompliance?: string;
-}) {
-    const suppliersData = useMemo(() => VESSEL_SPECIFIC_POS[vesselName] || [], [vesselName]);
-    const [suppliers, setSuppliers] = useState<SupplierPO[]>(suppliersData);
-    const [expandedSuppliers, setExpandedSuppliers] = useState<string[]>([]);
-    const [openActionDropdown, setOpenActionDropdown] = useState<string | null>(null);
-    const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false);
-    const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
-    const [expandedFormSections, setExpandedFormSections] = useState<string[]>(['general']);
-    const [showToast, setShowToast] = useState(false);
-    const [lastSavedPO, setLastSavedPO] = useState('');
+export default function PurchaseOrderView({ vesselName, imo }: { vesselName: string; imo: string }) {
+    const [isFilterOpen, setIsFilterOpen] = useState(false);
+    const [activeFilter, setActiveFilter] = useState('All');
+    const [openSuppliers, setOpenSuppliers] = useState<string[]>([]);
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [keyword, setKeyword] = useState('');
+    const [filterSearch, setFilterSearch] = useState('');
+    const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData());
 
-    /* Internal filter state removed in favor of props from parent */
+    const dateFromRef = useRef<HTMLInputElement>(null);
+    const dateToRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        setSuppliers(suppliersData);
-        setExpandedSuppliers([]);
-    }, [suppliersData]);
-
-    const filteredSuppliers = useMemo(() => {
-        return suppliers.map(supplier => {
-            const filteredPOs = supplier.pos.filter(po => {
-                const poDate = new Date(po.dateRequested);
-                const fromDate = filterDateFrom ? new Date(filterDateFrom) : null;
-                const toDate = filterDateTo ? new Date(filterDateTo) : null;
-
-                const matchesDate = (!fromDate || poDate >= fromDate) && (!toDate || poDate <= toDate);
-
-                // Normalize for comparison
-                const normalizeCompliance = (status: string) => status.trim().toLowerCase();
-                const filterVal = filterCompliance === 'All' ? 'all' : normalizeCompliance(filterCompliance);
-                const poVal = normalizeCompliance(po.compliance);
-                const poMdStatus = normalizeCompliance(po.mdStatus);
-
-                // Check against both compliance field AND mdStatus if the user selects "MD Pending"
-                // This covers cases where 'MD Pending' might be in the mdStatus column instead of compliance
-                const matchesCompliance =
-                    filterVal === 'all' ||
-                    poVal === filterVal ||
-                    (filterVal === 'md pending' && poMdStatus === 'md pending');
-
-                return matchesDate && matchesCompliance;
-            });
-
-            if (filteredPOs.length === 0) return null;
-
-            return {
-                ...supplier,
-                pos: filteredPOs,
-            };
-        }).filter(Boolean) as SupplierPO[];
-    }, [suppliers, filterDateFrom, filterDateTo, filterCompliance]);
-
-    // Auto-expand/collapse based on filter state
-    useEffect(() => {
-        const isFiltering = filterDateFrom || filterDateTo || filterCompliance !== 'All';
-
-        if (isFiltering) {
-            // If we are filtering, expand all found suppliers so the user sees results immediately
-            const visibleIds = filteredSuppliers.map(s => s.id);
-            setExpandedSuppliers(visibleIds);
-        } else {
-            // If filters are cleared, collapse all
-            setExpandedSuppliers([]);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [filterDateFrom, filterDateTo, filterCompliance]); // Only depend on filter criteria, not filtered results
-
-    // Form states
-    const [formData, setFormData] = useState({
-        poNumber: '',
-        supplier: '',
-        orderDate: '',
-        partNumber: '',
-        itemDescription: '',
-        impaCode: '',
-        issaCode: '',
-        equipmentCode: '',
-        equipmentName: '',
-        maker: '',
-        model: '',
-        unit: '',
-        quantity: '',
-        items: '',
-        mdsRequestedDate: '',
-        mdsReceivedDate: '',
-        mdsFile: null as File | null,
-        sdocsFile: null as File | null,
-        hmStatus: 'Non HM',
-        suspected: false,
-        multipleHazmat: false,
-        vendorRemark: '',
-        remark: ''
-    });
-
-    const mdFileInputRef = useRef<HTMLInputElement>(null);
-    const sdocFileInputRef = useRef<HTMLInputElement>(null);
-
-    const handleFileUpload = (type: 'mds' | 'sdocs') => {
-        if (type === 'mds') mdFileInputRef.current?.click();
-        else sdocFileInputRef.current?.click();
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'mds' | 'sdocs') => {
-        const file = e.target.files?.[0] || null;
-        if (type === 'mds') setFormData(prev => ({ ...prev, mdsFile: file }));
-        else setFormData(prev => ({ ...prev, sdocsFile: file }));
-    };
-
-    const toggleSupplier = (id: string) => {
-        setExpandedSuppliers((prev: string[]) =>
-            prev.includes(id) ? prev.filter((i: string) => i !== id) : [...prev, id]
-        );
-    };
-
-    const toggleFormSection = (section: string) => {
-        setExpandedFormSections(prev =>
-            prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]
-        );
-    };
-
-    const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { name, value, type } = e.target;
-        if (type === 'checkbox') {
-            const checked = (e.target as HTMLInputElement).checked;
-            setFormData(prev => ({ ...prev, [name]: checked }));
-        } else {
-            setFormData(prev => ({ ...prev, [name]: value }));
-        }
-    };
-
-    const handleSavePO = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        const newPO: PurchaseOrder = {
-            id: formData.poNumber,
-            dateRequested: new Date(formData.orderDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-            items: parseInt(formData.quantity) || 0,
-            mdStatus: 'MD Pending',
-            compliance: 'Not Verified'
-        };
-
-        const updatedSuppliers = suppliers.map(s => {
-            if (s.name === formData.supplier) {
-                return {
-                    ...s,
-                    pos: [newPO, ...s.pos],
-                    totalItems: (parseInt(s.totalItems.split('(')[0]) + newPO.items) + '(' + (parseInt(s.totalItems.split('(')[1]) + 1) + ')'
-                };
+    const currentSuppliers = useMemo(() => {
+        const filteredItems = allItems.filter(item => {
+            if (activeFilter !== 'All' && item.category !== activeFilter) return false;
+            if (dateFrom || dateTo) {
+                const itemDate = new Date(item.orderDate);
+                const fromDate = dateFrom ? new Date(dateFrom) : null;
+                const toDate = dateTo ? new Date(dateTo) : null;
+                if (fromDate && itemDate < fromDate) return false;
+                if (toDate && itemDate > toDate) return false;
             }
-            return s;
+            if (keyword && !item.itemDescription.toLowerCase().includes(keyword.toLowerCase())) return false;
+            return true;
         });
 
-        setSuppliers(updatedSuppliers);
-        setLastSavedPO(formData.poNumber);
-        setIsAddDrawerOpen(false);
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 4000);
-        setFormData({
-            poNumber: '',
-            supplier: '',
-            orderDate: '',
-            partNumber: '',
-            itemDescription: '',
-            impaCode: '',
-            issaCode: '',
-            equipmentCode: '',
-            equipmentName: '',
-            maker: '',
-            model: '',
-            unit: '',
-            quantity: '',
-            items: '',
-            mdsRequestedDate: '',
-            mdsReceivedDate: '',
-            mdsFile: null,
-            sdocsFile: null,
-            hmStatus: 'Non HM',
-            suspected: false,
-            multipleHazmat: false,
-            vendorRemark: '',
-            remark: ''
-        });
+        const meta = getSupplierMeta(activeFilter);
+        return meta.map((s, idx) => {
+            const supplierItems = filteredItems.slice(idx * 5, (idx + 1) * 5);
+            return {
+                ...s,
+                totalItems: `${supplierItems.length * 2}(${supplierItems.length})`,
+                mds: `${supplierItems.filter(i => i.mdsRec).length} / ${supplierItems.length}`,
+                hm: `0 | ${supplierItems.length > 2 ? 4 : 0}`,
+                items: supplierItems
+            };
+        }).filter(s => s.items.length > 0);
+    }, [activeFilter, dateFrom, dateTo, keyword, allItems]);
+
+    const selectedCount = allItems.filter(i => i.selected).length;
+    const isAnySupplierOpen = openSuppliers.length > 0;
+
+    const toggleItemSelection = (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setAllItems(prev => prev.map(item => item.id === id ? { ...item, selected: !item.selected } : item));
     };
 
-    const hasPOs = suppliers.length > 0;
+    const toggleAllInSupplier = (items: PurchaseOrderItem[], checked: boolean) => {
+        const ids = items.map(i => i.id);
+        setAllItems(prev => prev.map(item => ids.includes(item.id) ? { ...item, selected: checked } : item));
+    };
 
-    const stats = useMemo(() => {
-        let totalPOs = 0;
-        let mdsRequested = 0;
-        let mdsReceived = 0;
-        let hmRed = 0;
-        let hmGreen = 0;
-        let pchm = 0;
-
-        suppliers.forEach(s => {
-            totalPOs += s.pos.length;
-            s.pos.forEach(po => {
-                mdsRequested += po.items;
-                if (po.mdStatus === 'MD Verified') {
-                    mdsReceived += po.items;
-                    hmGreen += Math.floor(po.items * 0.82);
-                    pchm += Math.floor(po.items * 0.08);
-                } else {
-                    hmRed += Math.floor(po.items * 0.15);
+    const handleRequestMDs = () => {
+        if (selectedCount > 0 && activeFilter === 'Request Pending') {
+            setAllItems(prev => prev.map(item => {
+                if (item.selected && item.category === 'Request Pending') {
+                    return {
+                        ...item,
+                        category: 'Pending Mds',
+                        emailStatus: 'SENT',
+                        mdsReq: new Date().toLocaleDateString('en-GB'),
+                        selected: false
+                    };
                 }
-            });
-        });
-
-        return {
-            totalPOs,
-            mdsRequested,
-            mdsReceived,
-            mdsPending: mdsRequested - mdsReceived,
-            hmRed: hmRed || Math.floor(mdsRequested * 0.04),
-            hmGreen: hmGreen || Math.floor(mdsRequested * 0.45),
-            pchm: pchm || Math.floor(mdsRequested * 0.05)
-        };
-    }, [suppliers]);
+                return item;
+            }));
+            alert('Complete request MDs & SDoCs: Status updated to PENDING MDs.');
+        }
+    };
 
     return (
-        <div className={`purchase-orders-container ${isAddDrawerOpen ? 'drawer-open' : ''}`}>
-            {showToast && (
-                <div className="toast-notification">
-                    <div className="toast-icon">
-                        <Check size={20} color="white" />
-                    </div>
-                    <div className="toast-content">
-                        <h4>Purchase Order Saved</h4>
-                        <p>PO #{lastSavedPO} has been successfully added to the registry</p>
-                    </div>
-                    <button className="toast-undo" onClick={() => setShowToast(false)}>Undo</button>
-                    <X size={18} className="toast-close" onClick={() => setShowToast(false)} />
-                </div>
-            )}
+        <div className="po-v4-main-wrapper">
+            <div className="po-v4-scroll-content">
+                <div className="po-v4-container-limited">
+                    {/* Filters Section */}
+                    <div className={`po-v4-filters-box-premium ${isFilterOpen ? 'expanded' : ''}`}>
+                        <div className="po-v4-filters-header-premium" onClick={() => setIsFilterOpen(!isFilterOpen)}>
+                            <div className="po-v4-filters-title-main">
+                                <Filter size={18} />
+                                <span>Filters</span>
+                            </div>
+                            <div className="po-v4-filters-search-styled">
+                                {/* No icon here as per instruction */}
+                                <input
+                                    type="text"
+                                    placeholder="Search based on filters"
+                                    value={filterSearch}
+                                    onChange={(e) => setFilterSearch(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            </div>
+                            {isFilterOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        </div>
 
-            {/* Removed Filter Button from header as per request */}
-            <div className="po-header-row">
-                <div className="po-title-section">
-                    <h2>Purchase Orders – {vesselName}</h2>
-                    <span className="imo-badge-small">
-                        <Info size={12} /> IMO: {imo}
-                    </span>
-                </div>
-                <div className="po-actions-right">
-                    <button className="add-po-btn" onClick={() => setIsAddDrawerOpen(true)}>
-                        <Plus size={18} /> Add Purchase Order
-                    </button>
+                        {isFilterOpen && (
+                            <div className="po-v4-filters-content-premium">
+                                <div className="po-v4-filters-row-premium">
+                                    <div className="po-v4-date-inputs-group">
+                                        <div className="po-v4-date-field-styled" onClick={() => dateFromRef.current?.showPicker()}>
+                                            <label>Order From Date</label>
+                                            <div className="po-v4-date-input-wrapper">
+                                                <input
+                                                    ref={dateFromRef}
+                                                    type="date"
+                                                    value={dateFrom}
+                                                    onChange={(e) => setDateFrom(e.target.value)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="po-v4-date-native-input"
+                                                />
+                                                <Calendar size={16} className="po-v4-calendar-icon-styled" />
+                                            </div>
+                                        </div>
+                                        <div className="po-v4-date-field-styled" onClick={() => dateToRef.current?.showPicker()}>
+                                            <label>Order To Date</label>
+                                            <div className="po-v4-date-input-wrapper">
+                                                <input
+                                                    ref={dateToRef}
+                                                    type="date"
+                                                    value={dateTo}
+                                                    onChange={(e) => setDateTo(e.target.value)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="po-v4-date-native-input"
+                                                />
+                                                <Calendar size={16} className="po-v4-calendar-icon-styled" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {/* HORIZONTAL Filter Actions as per latest request */}
+                                    <div className="po-v4-filter-actions-horizontal-group">
+                                        <button type="button" className="po-v4-btn-circle-action-styled search" title="Search"><Search size={18} /></button>
+                                        <button type="button" className="po-v4-btn-circle-action-styled reset" title="Reset" onClick={(e) => { e.stopPropagation(); setDateFrom(''); setDateTo(''); setActiveFilter('All'); setKeyword(''); }}><RefreshCw size={18} /></button>
+                                    </div>
+                                </div>
+
+                                <div className="po-v4-tags-container-premium" onClick={(e) => e.stopPropagation()}>
+                                    {FILTER_TAGS.map(tag => (
+                                        <button
+                                            key={tag}
+                                            type="button"
+                                            className={`po-v4-tag-item-premium ${activeFilter === tag ? 'active' : ''}`}
+                                            onClick={(e) => { e.stopPropagation(); setActiveFilter(tag); }}
+                                        >
+                                            {tag}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="po-v4-keyword-search-premium" onClick={(e) => e.stopPropagation()}>
+                                    <div className="po-v4-keyword-label-row">
+                                        <label>Keywords</label>
+                                        <div className="po-v4-keyword-input-box">
+                                            <Search size={14} />
+                                            <input
+                                                type="text"
+                                                placeholder="Search based on keyword"
+                                                className="po-v4-keyword-input-field"
+                                                value={keyword}
+                                                onChange={(e) => setKeyword(e.target.value)}
+                                            />
+                                        </div>
+                                        <ChevronDown size={14} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Top strip containing only the soft search now */}
+                    <div className="po-v4-top-strip-clean">
+                        <div className="po-v4-soft-search-box-premium">
+                            <Search size={16} />
+                            <input type="text" placeholder="Search..." className="po-v4-soft-search-input-premium" />
+                        </div>
+                    </div>
+
+                    {/* Details Block */}
+                    <div className="po-v4-details-section-premium">
+                        <div className="po-v4-details-section-title">
+                            <span>Details</span>
+                        </div>
+                        <div className="po-v4-suppliers-list-structured">
+                            {currentSuppliers.map(supplier => (
+                                <div key={supplier.id} className={`po-v4-supplier-item-v4 ${openSuppliers.includes(supplier.id) ? 'is-open' : ''}`}>
+                                    <div className="po-v4-supplier-header-v4" onClick={(e) => setOpenSuppliers(prev => prev.includes(supplier.id) ? prev.filter(id => id !== supplier.id) : [...prev, supplier.id])}>
+                                        <div className="po-v4-sup-info-v4">
+                                            <div className="po-v4-sup-ref-tag">{supplier.ref}</div>
+                                            <div className="po-v4-sup-name-title">{supplier.name}</div>
+                                        </div>
+                                        <div className="po-v4-sup-metrics-v4">
+                                            <div className="po-v4-sup-metric-pill">
+                                                <span className="lbl">Total Items Supplied (POs)</span>
+                                                <span className="val">{supplier.totalItems}</span>
+                                            </div>
+                                            <div className="po-v4-sup-metric-pill">
+                                                <span className="lbl">MDS</span>
+                                                <span className="val">{supplier.mds}</span>
+                                            </div>
+                                            <div className="po-v4-sup-metric-pill">
+                                                <span className="lbl">HM</span>
+                                                <span className="val">{supplier.hm}</span>
+                                            </div>
+                                            <ChevronDown size={20} className={`po-v4-arrow-icon ${openSuppliers.includes(supplier.id) ? 'up' : ''}`} />
+                                        </div>
+                                    </div>
+
+                                    {openSuppliers.includes(supplier.id) && (
+                                        <div className="po-v4-supplier-details-v4">
+                                            {/* Localized Toolbar just above the column headers */}
+                                            <div className="po-v4-table-toolbar-localized">
+                                                <div className="po-v4-action-icons-localized">
+                                                    {selectedCount > 0 && (
+                                                        <div className="po-v4-action-item-local tooltip-p" onClick={handleRequestMDs}>
+                                                            <div className="po-v4-circle-btn-v4 active">
+                                                                <FileText size={18} />
+                                                            </div>
+                                                            <span className="po-v4-tooltip-text">Complete request MDs & SDoCs</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="po-v4-action-item-local tooltip-p">
+                                                        <div className="po-v4-circle-btn-v4 active">
+                                                            <RotateCw size={18} />
+                                                        </div>
+                                                        <span className="po-v4-tooltip-text">Refresh Data</span>
+                                                    </div>
+                                                    <div className="po-v4-action-item-local tooltip-p">
+                                                        <div className="po-v4-circle-btn-v4 active">
+                                                            <Layout size={18} />
+                                                        </div>
+                                                        <span className="po-v4-tooltip-text">Layout Settings</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="po-v4-table-master-wrapper">
+                                                <table className="po-v4-table-styled-premium">
+                                                    <thead>
+                                                        <tr>
+                                                            <th className="ch-col">
+                                                                <input type="checkbox" className="po-v4-header-checkbox-v4" checked={supplier.items.length > 0 && supplier.items.every(i => i.selected)} onChange={(e) => toggleAllInSupplier(supplier.items, e.target.checked)} onClick={(e) => e.stopPropagation()} />
+                                                            </th>
+                                                            <th className="ac-col">Action</th>
+                                                            <th className="em-col">Email Status</th>
+                                                            <th className="ihm-col">IHM Product Code</th>
+                                                            <th className="po-col">PO Number</th>
+                                                            <th className="mdr-col">MDs SDoCs Req</th>
+                                                            <th className="mdc-col">MDs SDoCs Rec</th>
+                                                            <th className="it-col">Item Description</th>
+                                                            <th className="da-col">Order Date</th>
+                                                            <th className="qt-col">Quantity</th>
+                                                            <th className="un-col">Unit</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {supplier.items.map(item => (
+                                                            <tr key={item.id} className={item.selected ? 'row-is-selected' : ''}>
+                                                                <td className="ch-col">
+                                                                    <div className={`po-v4-row-action-checkbox-styled ${item.selected ? 'checked' : ''}`} onClick={(e) => toggleItemSelection(item.id, e)}>
+                                                                        {item.selected && <span className="check-icon-v4">✓</span>}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="ac-col">
+                                                                    <div className="po-v4-row-action-btns-premium">
+                                                                        <button type="button" className="po-v4-action-icon-btn-v4 view" title="View Document"><FileText size={14} /></button>
+                                                                        <button type="button" className="po-v4-action-icon-btn-v4 edit" title="Edit Item"><Edit2 size={14} /></button>
+                                                                        <button type="button" className="po-v4-action-icon-btn-v4 delete" title="Delete Item"><Trash2 size={14} /></button>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="em-col">{item.emailStatus}</td>
+                                                                <td className="ihm-col">{item.ihmProductCode}</td>
+                                                                <td className="po-col">{item.poNumber}</td>
+                                                                <td className="mdr-col">{item.mdsReq}</td>
+                                                                <td className="mdc-col">{item.mdsRec}</td>
+                                                                <td className="it-col">{item.itemDescription}</td>
+                                                                <td className="da-col">{item.orderDate}</td>
+                                                                <td className="qt-col">
+                                                                    <span className="q-p red">{item.quantityTotal.split('|')[0]}</span>
+                                                                    <span className="q-s">|</span>
+                                                                    <span className="q-p green">{item.quantityTotal.split('|')[1]}</span>
+                                                                    <span className="q-s">|</span>
+                                                                    <span className="q-p blue">{item.quantityTotal.split('|')[2]}</span>
+                                                                </td>
+                                                                <td className="un-col">{item.unit}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div className="po-v4-supplier-footer-v4">
+                                                {supplier.items.filter(i => i.selected).length} selected / {supplier.items.length} total
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-
-
-
-
-
-            {hasPOs ? (
-                <div className="supplier-list">
-                    {filteredSuppliers.length > 0 ? (
-                        filteredSuppliers.map((supplier) => (
-                            <div key={supplier.id} className="supplier-card">
-                                <div className="supplier-header" onClick={() => toggleSupplier(supplier.id)}>
-                                    <div className="supplier-main-info">
-                                        <div className="supplier-ref-id">{supplier.refId}</div>
-                                        <h3 className="supplier-name-bold">{supplier.name}</h3>
-                                    </div>
-                                    <div className="supplier-stats-row">
-                                        <div className="stat-group">
-                                            <div className="stat-label">Total Items</div>
-                                            <div className="stat-value">{supplier.totalItems}</div>
-                                        </div>
-                                        <div className="stat-group">
-                                            <div className="stat-label">MDs</div>
-                                            <div className="stat-value">{supplier.mds}</div>
-                                        </div>
-                                        <div className="stat-group">
-                                            <div className="stat-label">HM Status</div>
-                                            <div className="stat-value status-hm">
-                                                <span className="hm-red">{supplier.ihmStatus.split('|')[0]}</span>
-                                                <span className="hm-divider">|</span>
-                                                <span className="hm-total">{supplier.ihmStatus.split('|')[1]}</span>
-                                            </div>
-                                        </div>
-                                        <div className={`accordion-arrow ${expandedSuppliers.includes(supplier.id) ? 'expanded' : ''}`}>
-                                            <ChevronDown size={18} />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {expandedSuppliers.includes(supplier.id) && (
-                                    <div className="po-table-expanded-container">
-                                        <table className="po-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>PO ID</th>
-                                                    <th>DATE REQUESTED</th>
-                                                    <th>ITEMS</th>
-                                                    <th>MD STATUS</th>
-                                                    <th>COMPLIANCE</th>
-                                                    <th className="action-col">ACTION</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {supplier.pos.map((po) => (
-                                                    <tr key={po.id}>
-                                                        <td className="po-id-cell">{po.id}</td>
-                                                        <td>{po.dateRequested}</td>
-                                                        <td className="font-bold">{po.items}</td>
-                                                        <td>
-                                                            <span className={`status-pill-md ${po.mdStatus.toLowerCase().replace(' ', '-')}`}>
-                                                                {po.mdStatus}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <div className="compliance-cell">
-                                                                <div className={`compliance-dot ${po.compliance.toLowerCase().replace(' ', '-')}`}></div>
-                                                                {po.compliance}
-                                                            </div>
-                                                        </td>
-                                                        <td className="action-col">
-                                                            <button
-                                                                className="dots-style"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenActionDropdown(openActionDropdown === po.id ? null : po.id);
-                                                                }}
-                                                            >
-                                                                <MoreVertical size={16} />
-                                                            </button>
-                                                            {openActionDropdown === po.id && (
-                                                                <div className="action-dropdown shadow-xl">
-                                                                    <button className="dropdown-item">
-                                                                        <Eye size={14} />
-                                                                        <span>View Details</span>
-                                                                    </button>
-                                                                    <button className="dropdown-item">
-                                                                        <Edit2 size={14} />
-                                                                        <span>Edit PO</span>
-                                                                    </button>
-                                                                    <button className="dropdown-item delete">
-                                                                        <Trash2 size={14} />
-                                                                        <span>Delete</span>
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                        ))
-                    ) : (
-                        <div className="no-filter-results">
-                            <p>No purchase orders found matching your filters.</p>
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div className="empty-po-fixed-layout">
-                    <div className="empty-po-card">
-                        <div className="empty-icon-wrapper">
-                            <ShoppingCart size={64} color="#00B0FA" strokeWidth={1} />
-                        </div>
-                        <h2>No Purchase Orders Yet</h2>
-                        <p>There are no purchase orders recorded for {vesselName}.<br />Start by adding your first purchase order to begin monitoring.</p>
-                        <button className="add-po-btn-large" onClick={() => setIsAddDrawerOpen(true)}>
-                            <Plus size={20} />
-                            <span>Add First Purchase Order</span>
-                        </button>
+            {/* Metrics Summary footer - Unified Design */}
+            <div className="po-v4-fixed-metrics-footer-premium">
+                <div className="metric-items-group-premium">
+                    <div className="metric-item-v4">
+                        <span className="label-v4">TOTAL POS:</span>
+                        <span className="value-v4">865</span>
                     </div>
-                </div>
-            )}
-
-            {hasPOs && (
-                <div className="po-summary-premium">
-                    <div className="summary-main-row">
-                        <div className="summary-block">
-                            <span className="label">TOTAL NUMBER OF POS:</span>
-                            <span className="value">{stats.totalPOs}</span>
-                        </div>
-                        <div className="v-divider"></div>
-                        <div className="summary-block">
-                            <span className="label">MDS REQUESTED:</span>
-                            <span className="value">{stats.mdsRequested}</span>
-                        </div>
-                        <div className="v-divider"></div>
-                        <div className="summary-block">
-                            <span className="label">MDS RECEIVED:</span>
-                            <span className="value">{stats.mdsReceived}</span>
-                        </div>
-                        <div className="v-divider"></div>
-                        <div className="summary-block">
-                            <span className="label">MDS PENDING:</span>
-                            <span className="value">{stats.mdsPending}</span>
-                        </div>
-                        <div className="v-divider"></div>
-                        <div className="summary-block">
-                            <span className="label hm-red-label">HM RED QTY:</span>
-                            <span className="value hm-red-val">{stats.hmRed}</span>
-                        </div>
+                    <div className="metric-item-v4">
+                        <span className="label-v4">MDS REQUESTED:</span>
+                        <span className="value-v4">328</span>
                     </div>
-
-                    <div className="summary-sub-row">
-                        <div className="summary-block">
-                            <span className="label">HM GREEN QTY:</span>
-                            <span className="value">{stats.hmGreen}</span>
-                        </div>
-                        <div className="v-divider-short"></div>
-                        <div className="summary-block">
-                            <span className="label">PCHM QTY:</span>
-                            <span className="value">{stats.pchm}</span>
-                        </div>
+                    <div className="metric-item-v4">
+                        <span className="label-v4">MDS RECEIVED:</span>
+                        <span className="value-v4">147</span>
                     </div>
-                </div>
-            )}
-
-            {/* Side Drawer Overlay */}
-            {isAddDrawerOpen && <div className="drawer-overlay" onClick={() => setIsAddDrawerOpen(false)} />}
-
-            {/* Side Drawer */}
-            <div className={`add-po-drawer ${isAddDrawerOpen ? 'open' : ''}`}>
-                <div className="drawer-header">
-                    <div className="drawer-title">
-                        <ShoppingCart size={20} />
-                        <span>Add Purchase Order</span>
+                    <div className="metric-item-v4">
+                        <span className="label-v4">MDS PENDING:</span>
+                        <span className="value-v4">181</span>
                     </div>
-                    <button className="close-drawer-btn" onClick={() => setIsAddDrawerOpen(false)}>
-                        <X size={20} />
-                    </button>
-                </div>
-
-                <div className="drawer-content">
-                    <form onSubmit={handleSavePO}>
-                        {/* Section 1: General Information */}
-                        <div className="form-section-expandable">
-                            <div className="section-header" onClick={() => toggleFormSection('general')}>
-                                <div className="section-title">
-                                    <Info size={16} className="title-icon" />
-                                    <span>General Information</span>
-                                </div>
-                                <ChevronDown size={18} className={expandedFormSections.includes('general') ? 'rotate-180' : ''} />
-                            </div>
-
-                            {expandedFormSections.includes('general') && (
-                                <div className="section-fields">
-                                    <div className="form-field">
-                                        <label>PO NUMBER *</label>
-                                        <input type="text" name="poNumber" placeholder="Enter PO Number" value={formData.poNumber} onChange={handleFormChange} required />
-                                    </div>
-                                    <div className="form-field">
-                                        <label>SUPPLIER *</label>
-                                        <div className="custom-select-wrapper" style={{ position: 'relative' }}>
-                                            <div
-                                                className={`select-input-mock ${isSupplierDropdownOpen ? 'active' : ''}`}
-                                                onClick={() => setIsSupplierDropdownOpen(!isSupplierDropdownOpen)}
-                                            >
-                                                {formData.supplier || 'Select Supplier'}
-                                            </div>
-                                            {isSupplierDropdownOpen && (
-                                                <div className="custom-dropdown-menu">
-                                                    <div
-                                                        className={`custom-dropdown-item ${formData.supplier === '' ? 'active' : ''}`}
-                                                        onClick={() => {
-                                                            setFormData(prev => ({ ...prev, supplier: '' }));
-                                                            setIsSupplierDropdownOpen(false);
-                                                        }}
-                                                    >
-                                                        Select Supplier
-                                                    </div>
-                                                    {suppliers.map(s => (
-                                                        <div
-                                                            key={s.id}
-                                                            className={`custom-dropdown-item ${formData.supplier === s.name ? 'active' : ''}`}
-                                                            onClick={() => {
-                                                                setFormData(prev => ({ ...prev, supplier: s.name }));
-                                                                setIsSupplierDropdownOpen(false);
-                                                            }}
-                                                        >
-                                                            {s.name}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-field">
-                                            <label>ORDER DATE *</label>
-                                            <input type="date" name="orderDate" value={formData.orderDate} onChange={handleFormChange} required />
-                                        </div>
-                                        <div className="form-field">
-                                            <label>PART NUMBER</label>
-                                            <input type="text" name="partNumber" placeholder="P/N" value={formData.partNumber} onChange={handleFormChange} />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Section 2: Equipment Details */}
-                        <div className="form-section-expandable">
-                            <div className="section-header" onClick={() => toggleFormSection('equipment')}>
-                                <div className="section-title">
-                                    <Package size={16} className="title-icon" />
-                                    <span>Equipment Details</span>
-                                </div>
-                                <ChevronDown size={18} className={expandedFormSections.includes('equipment') ? 'rotate-180' : ''} />
-                            </div>
-
-                            {expandedFormSections.includes('equipment') && (
-                                <div className="section-fields">
-                                    <div className="form-field">
-                                        <label>ITEM DESCRIPTION *</label>
-                                        <input type="text" name="itemDescription" value={formData.itemDescription} onChange={handleFormChange} required />
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-field">
-                                            <label>IMPA CODE</label>
-                                            <input type="text" name="impaCode" value={formData.impaCode} onChange={handleFormChange} />
-                                        </div>
-                                        <div className="form-field">
-                                            <label>ISSA CODE</label>
-                                            <input type="text" name="issaCode" value={formData.issaCode} onChange={handleFormChange} />
-                                        </div>
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-field">
-                                            <label>EQUIPMENT CODE</label>
-                                            <input type="text" name="equipmentCode" value={formData.equipmentCode} onChange={handleFormChange} />
-                                        </div>
-                                        <div className="form-field">
-                                            <label>EQUIPMENT NAME</label>
-                                            <input type="text" name="equipmentName" value={formData.equipmentName} onChange={handleFormChange} />
-                                        </div>
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-field">
-                                            <label>MAKER</label>
-                                            <input type="text" name="maker" value={formData.maker} onChange={handleFormChange} />
-                                        </div>
-                                        <div className="form-field">
-                                            <label>MODEL</label>
-                                            <input type="text" name="model" value={formData.model} onChange={handleFormChange} />
-                                        </div>
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-field">
-                                            <label>UNIT *</label>
-                                            <input type="text" name="unit" value={formData.unit} onChange={handleFormChange} required />
-                                        </div>
-                                        <div className="form-field">
-                                            <label>QUANTITY *</label>
-                                            <input type="number" name="quantity" value={formData.quantity} onChange={handleFormChange} required />
-                                        </div>
-                                        <div className="form-field">
-                                            <label>ITEMS</label>
-                                            <input type="number" name="items" value={formData.items} onChange={handleFormChange} />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Section 3: Documentation & Compliance */}
-                        <div className="form-section-expandable">
-                            <div className="section-header" onClick={() => toggleFormSection('documentation')}>
-                                <div className="section-title">
-                                    <FileCheck size={16} className="title-icon" />
-                                    <span>Documentation & Compliance</span>
-                                </div>
-                                <ChevronDown size={18} className={expandedFormSections.includes('documentation') ? 'rotate-180' : ''} />
-                            </div>
-
-                            {expandedFormSections.includes('documentation') && (
-                                <div className="section-fields">
-                                    <div className="form-row">
-                                        <div className="form-field">
-                                            <label>MDs SDoCs REQUESTED DATE</label>
-                                            <input type="date" name="mdsRequestedDate" value={formData.mdsRequestedDate} onChange={handleFormChange} />
-                                        </div>
-                                        <div className="form-field">
-                                            <label>MDs SDoCs RECEIVED DATE</label>
-                                            <input type="date" name="mdsReceivedDate" value={formData.mdsReceivedDate} onChange={handleFormChange} />
-                                        </div>
-                                    </div>
-                                    <div className="form-field">
-                                        <label>CHOOSE MDs DOCUMENT FILE</label>
-                                        <input
-                                            type="file"
-                                            ref={mdFileInputRef}
-                                            style={{ display: 'none' }}
-                                            onChange={(e) => handleFileChange(e, 'mds')}
-                                        />
-                                        <div className={`file-upload-box ${formData.mdsFile ? 'has-file' : ''}`} onClick={() => handleFileUpload('mds')}>
-                                            {formData.mdsFile ? <File size={18} color="#00B0FA" /> : <Upload size={18} />}
-                                            <span>{formData.mdsFile ? formData.mdsFile.name : 'Upload MDs file'}</span>
-                                            {formData.mdsFile && <X size={14} className="remove-file" onClick={(e) => { e.stopPropagation(); setFormData(prev => ({ ...prev, mdsFile: null })); }} />}
-                                        </div>
-                                    </div>
-                                    <div className="form-field">
-                                        <label>CHOOSE SDoCs DOCUMENT FILE</label>
-                                        <input
-                                            type="file"
-                                            ref={sdocFileInputRef}
-                                            style={{ display: 'none' }}
-                                            onChange={(e) => handleFileChange(e, 'sdocs')}
-                                        />
-                                        <div className={`file-upload-box ${formData.sdocsFile ? 'has-file' : ''}`} onClick={() => handleFileUpload('sdocs')}>
-                                            {formData.sdocsFile ? <File size={18} color="#00B0FA" /> : <Upload size={18} />}
-                                            <span>{formData.sdocsFile ? formData.sdocsFile.name : 'Upload SDoCs file'}</span>
-                                            {formData.sdocsFile && <X size={14} className="remove-file" onClick={(e) => { e.stopPropagation(); setFormData(prev => ({ ...prev, sdocsFile: null })); }} />}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Section 4: HM Status & Remarks */}
-                        <div className="form-section-expandable">
-                            <div className="section-header" onClick={() => toggleFormSection('hmStatus')}>
-                                <div className="section-title">
-                                    <AlertCircle size={16} className="title-icon" />
-                                    <span>HM Status & Remarks</span>
-                                </div>
-                                <ChevronDown size={18} className={expandedFormSections.includes('hmStatus') ? 'rotate-180' : ''} />
-                            </div>
-
-                            {expandedFormSections.includes('hmStatus') && (
-                                <div className="section-fields">
-                                    <label className="sub-label">HM STATUS SELECTION</label>
-                                    <div className="hm-radio-grid">
-                                        {['CHM', 'Below Threshold', 'Non HM', 'PCHM'].map(status => (
-                                            <label key={status} className={`hm-radio-card ${formData.hmStatus === status ? 'selected' : ''}`}>
-                                                <input type="radio" name="hmStatus" value={status} checked={formData.hmStatus === status} onChange={handleFormChange} />
-                                                <div className="radio-content">
-                                                    <div className="radio-circle" />
-                                                    <span>{status}</span>
-                                                </div>
-                                            </label>
-                                        ))}
-                                    </div>
-                                    <div className="po-checkbox-row">
-                                        <label className="po-checkbox-item">
-                                            <input type="checkbox" name="suspected" checked={formData.suspected} onChange={handleFormChange} />
-                                            <span className="po-checkmark" />
-                                            <span>Suspected</span>
-                                        </label>
-                                        <label className="po-checkbox-item">
-                                            <input type="checkbox" name="multipleHazmat" checked={formData.multipleHazmat} onChange={handleFormChange} />
-                                            <span className="po-checkmark" />
-                                            <span>Multiple Hazmat</span>
-                                        </label>
-                                    </div>
-                                    <div className="form-field">
-                                        <label>VENDOR REMARK</label>
-                                        <textarea name="vendorRemark" placeholder="Type here..." value={formData.vendorRemark} onChange={handleFormChange} />
-                                    </div>
-                                    <div className="form-field">
-                                        <label>REMARK</label>
-                                        <textarea name="remark" value={formData.remark} onChange={handleFormChange} />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="drawer-footer">
-                            <button type="submit" className="save-po-btn">
-                                <Save size={18} />
-                                <span>SAVE PO</span>
-                            </button>
-                            <button type="button" className="cancel-po-btn" onClick={() => setIsAddDrawerOpen(false)}>
-                                <X size={18} />
-                            </button>
-                        </div>
-                    </form>
+                    <div className="metric-item-v4">
+                        <span className="label-v4">HM GREEN:</span>
+                        <span className="value-v4 green">145</span>
+                    </div>
+                    <div className="metric-item-v4">
+                        <span className="label-v4">HM RED:</span>
+                        <span className="value-v4 red">2</span>
+                    </div>
+                    <div className="metric-item-v4">
+                        <span className="label-v4">PCHM QTY:</span>
+                        <span className="value-v4">0</span>
+                    </div>
                 </div>
             </div>
         </div>
