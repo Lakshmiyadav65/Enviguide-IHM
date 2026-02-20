@@ -1,4 +1,4 @@
-import { Search, User, Bell, BellOff, FileText, AlertTriangle, Pin, Check } from 'lucide-react';
+import { Search, User, Bell, BellOff, FileText, AlertTriangle, Pin, Check, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
 import './Header.css';
 
@@ -18,38 +18,61 @@ export default function Header({
     userRole = 'Admin'
 }: HeaderProps) {
     const [showNotifications, setShowNotifications] = useState(false);
-    const [notifications, setNotifications] = useState([
-        {
-            id: 1,
-            type: 'NEW DOCUMENT',
-            title: 'GA Plan Uploaded',
-            description: 'The General Arrangement Plan Rev. 04 has been successfully uploaded and processed.',
-            time: '2 mins ago',
-            icon: <FileText size={18} />,
-            color: '#3B82F6',
-            unread: true
-        },
-        {
-            id: 2,
-            type: 'COMPLIANCE WARNING',
-            title: 'Expiring Certificate',
-            description: 'The IHM Statement of Compliance for MV Ocean Pioneer expires in 15 days.',
-            time: '1 hour ago',
-            icon: <AlertTriangle size={18} />,
-            color: '#F59E0B',
-            unread: true
-        },
-        {
-            id: 3,
-            type: 'MATERIAL UPDATE',
-            title: 'Bridge Proof Deck',
-            description: "New material logs were pinned to the 'Bridge Proof' deck section by John Administra.",
-            time: '3 hours ago',
-            icon: <Pin size={18} />,
-            color: '#8B5CF6',
-            unread: true
+    const getIcon = (type: string) => {
+        switch (type) {
+            case 'PO IMPORT': return <CheckCircle2 size={18} />;
+            case 'NEW DOCUMENT': return <FileText size={18} />;
+            case 'COMPLIANCE WARNING': return <AlertTriangle size={18} />;
+            case 'MATERIAL UPDATE': return <Pin size={18} />;
+            default: return <Bell size={18} />;
         }
-    ]);
+    };
+
+    const [notifications, setNotifications] = useState(() => {
+        const saved = localStorage.getItem('user_notifications');
+        const parsedSaved = saved ? JSON.parse(saved) : [];
+
+        // Add icons to saved notifications
+        const processedSaved = parsedSaved.map((n: any) => ({
+            ...n,
+            icon: getIcon(n.type)
+        }));
+
+        const defaults = [
+            {
+                id: 1,
+                type: 'NEW DOCUMENT',
+                title: 'GA Plan Uploaded',
+                description: 'The General Arrangement Plan Rev. 04 has been successfully uploaded and processed.',
+                time: '2 mins ago',
+                icon: <FileText size={18} />,
+                color: '#3B82F6',
+                unread: true
+            },
+            {
+                id: 2,
+                type: 'COMPLIANCE WARNING',
+                title: 'Expiring Certificate',
+                description: 'The IHM Statement of Compliance for MV Ocean Pioneer expires in 15 days.',
+                time: '1 hour ago',
+                icon: <AlertTriangle size={18} />,
+                color: '#F59E0B',
+                unread: true
+            },
+            {
+                id: 3,
+                type: 'MATERIAL UPDATE',
+                title: 'Bridge Proof Deck',
+                description: "New material logs were pinned to the 'Bridge Proof' deck section by John Administra.",
+                time: '3 hours ago',
+                icon: <Pin size={18} />,
+                color: '#8B5CF6',
+                unread: true
+            }
+        ];
+
+        return [...processedSaved, ...defaults];
+    });
 
     const unreadCount = notifications.filter(n => n.unread).length;
 

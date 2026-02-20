@@ -75,19 +75,24 @@ export default function PendingReviews() {
             localStorage.setItem('sentToReview', JSON.stringify(newSet));
         } else {
             const parsedSent = JSON.parse(storedSent) as ReviewRecord[];
-            // If we have some data but want to ensure we have enough for testing (150)
-            if (parsedSent.length < 150) {
-                const dummies = generateRecords();
-                // Merge carefully: only add dummies if IMO doesn't exist in existing set
-                const existingImos = new Set(parsedSent.map(r => r.imoNumber));
-                const uniqueDummies = dummies.filter(d => !existingImos.has(d.imoNumber));
 
-                const merged = [...parsedSent, ...uniqueDummies].slice(0, Math.max(150, parsedSent.length));
-                setAllRecords(merged);
-                localStorage.setItem('sentToReview', JSON.stringify(merged));
-            } else {
-                setAllRecords(parsedSent);
-            }
+            // Separate real sent items (from PendingAudits) from dummy records
+            // Real records won't be in the dummy IMO range (9800000 + idx * 432)
+            const dummyImos = new Set(
+                Array.from({ length: 150 }).map((_, idx) => (9800000 + idx * 432).toString())
+            );
+            const realSentItems = parsedSent.filter(r => !dummyImos.has(r.imoNumber));
+            const existingDummies = parsedSent.filter(r => dummyImos.has(r.imoNumber));
+
+            // Rebuild: real items first, then dummies padded to 150 total
+            const existingImos = new Set(parsedSent.map(r => r.imoNumber));
+            const newDummies = generateRecords().filter(d => !existingImos.has(d.imoNumber));
+            const allDummies = [...existingDummies, ...newDummies];
+            const needed = Math.max(0, 150 - realSentItems.length);
+            const merged = [...realSentItems, ...allDummies.slice(0, needed)];
+
+            setAllRecords(merged);
+            localStorage.setItem('sentToReview', JSON.stringify(merged));
         }
     }, []);
 
@@ -150,7 +155,7 @@ export default function PendingReviews() {
                         </div>
                         <div className="header-actions">
                             <div className="search-wrapper">
-                                <Search size={18} className="search-icon" />
+                                <Search size={24} className="search-icon" />
                                 <input
                                     type="text"
                                     placeholder="Search Vessel Name or IMO..."

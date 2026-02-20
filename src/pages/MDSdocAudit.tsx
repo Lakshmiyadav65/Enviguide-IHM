@@ -89,7 +89,7 @@ export default function MDSdocAudit() {
                         </div>
                         <div className="md-header-actions">
                             <div className="registry-search-wrapper">
-                                <Search size={18} />
+                                <Search size={22} className="search-icon" />
                                 <input
                                     type="text"
                                     placeholder="Search Vessel Name or IMO..."

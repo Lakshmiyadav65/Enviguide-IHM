@@ -15,8 +15,7 @@
 
 .md-sdoc-content {
     flex: 1;
-    padding: 80px 12px 60px 12px;
-    /* High-fidelity offset to avoid header overlap */
+    padding: 80px 40px 60px 40px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -80,7 +79,7 @@
     align-items: center;
 }
 
-.registry-search-wrapper svg {
+.registry-search-wrapper .search-icon {
     position: absolute;
     left: 12px;
     color: #94A3B8;

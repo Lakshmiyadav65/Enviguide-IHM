@@ -959,13 +959,8 @@ export default function Vessels() {
         }
 
         if (activeTab === 'purchase') {
-            const activeVessel = vesselList.find(v => v.name === activeVesselName);
             return (
-                <PurchaseOrderView
-                    key={activeVesselName}
-                    vesselName={activeVesselName}
-                    imo={activeVessel?.imoNo || ''}
-                />
+                <PurchaseOrderView key={activeVesselName} />
             );
         }
 

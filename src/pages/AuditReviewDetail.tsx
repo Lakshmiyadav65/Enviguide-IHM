@@ -200,10 +200,10 @@ export default function AuditReviewDetail() {
                                 <h2>Categorization Queue</h2>
                                 <div className="filter-group">
                                     <div className="search-box">
-                                        <Search size={16} />
-                                        <input type="text" placeholder="Search PO or Description..." />
+                                        <Search size={22} className="search-icon" />
+                                        <input type="text" placeholder="Search Vessel POs..." />
                                     </div>
-                                    <button className="filter-btn"><Filter size={16} /> Filter</button>
+                                    <button className="filter-btn"><Filter size={18} /> Filters</button>
                                 </div>
                             </div>
 
@@ -274,7 +274,7 @@ export default function AuditReviewDetail() {
                                 <div className="hm-categorization-section">
                                     <label>MATCH HM DATABASE</label>
                                     <div className="hm-search">
-                                        <Search size={16} />
+                                        <Search size={22} className="search-icon" />
                                         <input
                                             type="text"
                                             placeholder="Search hazardous materials..."

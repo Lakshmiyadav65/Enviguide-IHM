@@ -13,7 +13,6 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
     const [step, setStep] = useState(1);
     const [data, setData] = useState<any[][]>([]);
     const [visibleCols, setVisibleCols] = useState<boolean[]>([]);
-    const [showConfirm, setShowConfirm] = useState(false);
 
     // Excel-like Drag selection
     const [dragStart, setDragStart] = useState<{ r: number, c: number } | null>(null);
@@ -206,7 +205,6 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
 
         if (step < 3) {
             setStep(step + 1);
-            setShowConfirm(false);
         }
         else {
             onComplete();
@@ -215,34 +213,49 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
 
     return (
         <div className="review-wizard-overlay" onMouseUp={handleMouseUp} onMouseLeave={() => isDragging.current = false}>
+            {/* Header */}
             <div className="wizard-header">
-                <div className="wizard-steps">
-                    {['Adjust Data or Suppliers', 'Supplier Product Creation', 'Finish'].map((label, i) => (
-                        <div key={i} className={`step-item ${step >= i + 1 ? 'active' : ''}`}>
-                            <div className="step-number">{i + 1}</div> {label}
-                        </div>
-                    ))}
+                <div className={`step-item ${step >= 1 ? 'active' : ''}`} style={{ justifySelf: 'start' }}>
+                    <div className="step-number">1</div>
+                    <span>Adjust Data or Suppliers</span>
+                </div>
+                <div className={`step-item ${step >= 2 ? 'active' : ''}`} style={{ justifySelf: 'center' }}>
+                    <div className="step-number">2</div>
+                    <span>Supplier Product Creation</span>
+                </div>
+                <div className={`step-item ${step >= 3 ? 'active' : ''}`} style={{ justifySelf: 'end' }}>
+                    <div className="step-number">3</div>
+                    <span>Finish</span>
                 </div>
             </div>
 
+            {/* Main Content Area */}
             <div className="wizard-content">
                 {step === 1 && (
                     <>
-                        <div className="wizard-title-row"><h1>Audit Purchase Orders</h1></div>
-                        <div className="col-toggles">
-                            {data[0]?.map((header, i) => (
-                                <label key={i} className="col-toggle">
-                                    <input type="checkbox" checked={visibleCols[i]} onChange={() => {
-                                        const n = [...visibleCols]; n[i] = !n[i]; setVisibleCols(n);
-                                    }} /> {String(header)}
-                                </label>
-                            ))}
-                        </div>
-                        <div className="bulk-actions">
-                            <button className="bulk-btn accept">Bulk Accept</button>
-                            <button className="bulk-btn reject">Bulk Reject</button>
+                        <div className="wizard-title-row">
+                            <h1>Audit Purchase Orders</h1>
                         </div>
 
+                        {/* Toolbar — column toggles on the left, bulk buttons on the right */}
+                        <div className="toolbar-container">
+                            <div className="col-toggles">
+                                {data[0]?.map((header, i) => (
+                                    <label key={i} className="col-toggle">
+                                        <input type="checkbox" checked={visibleCols[i]} onChange={() => {
+                                            const n = [...visibleCols]; n[i] = !n[i]; setVisibleCols(n);
+                                        }} /> {String(header)}
+                                    </label>
+                                ))}
+                            </div>
+                            {/* Bulk action buttons — right side of toolbar */}
+                            <div className="bulk-actions">
+                                <button className="bulk-btn accept">✓ Bulk Accept</button>
+                                <button className="bulk-btn reject">✕ Bulk Reject</button>
+                            </div>
+                        </div>
+
+                        {/* Main layout: scrollable table + fixed sidebar */}
                         <div className="main-layout">
                             <div className="table-section">
                                 <table className="wizard-table">
@@ -251,9 +264,9 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                             {data[0]?.map((header, i) => visibleCols[i] && (
                                                 <th key={i} style={{ width: columnWidths[i], minWidth: columnWidths[i] }}>
                                                     <div className="header-content">
-                                                        {String(header)}
+                                                        <span>{String(header)}</span>
                                                         <button className="filter-trigger" onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === i ? null : i); }}>
-                                                            <ChevronDown size={10} />
+                                                            <ChevronDown size={12} />
                                                         </button>
                                                     </div>
                                                     <div className="resizer" onMouseDown={(e) => handleResizeStart(e, i)} />
@@ -262,11 +275,10 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                                             <div className="menu-item" onClick={() => insertColumn(i, 'left')}>Insert column left</div>
                                                             <div className="menu-item" onClick={() => insertColumn(i, 'right')}>Insert column right</div>
                                                             <div className="menu-item" onClick={() => { const n = [...visibleCols]; n[i] = false; setVisibleCols(n); setActiveMenu(null); }}>Remove column</div>
-                                                            <div className="menu-item">Read only</div>
                                                             <div className="menu-divider" />
                                                             <div className="menu-filter-section">
                                                                 <div className="menu-filter-label">Filter by value:</div>
-                                                                <input className="menu-search-input" placeholder="Search" value={filterSearch} onChange={e => setFilterSearch(e.target.value)} />
+                                                                <input className="menu-search-input" placeholder="Search values..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)} autoFocus />
                                                                 <div className="menu-value-list">
                                                                     {Array.from(new Set(data.slice(1).map(r => String(r[i]))))
                                                                         .filter(v => v.toLowerCase().includes(filterSearch.toLowerCase()))
@@ -281,8 +293,8 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                                                         ))}
                                                                 </div>
                                                                 <div className="menu-footer">
-                                                                    <button className="menu-btn ok" onClick={() => setActiveMenu(null)}>OK</button>
-                                                                    <button className="menu-btn" onClick={() => { setFilters({}); setActiveMenu(null); }}>Clear Filters</button>
+                                                                    <button className="menu-btn ok" onClick={() => setActiveMenu(null)}>Apply</button>
+                                                                    <button className="menu-btn" onClick={() => { setFilters({}); setActiveMenu(null); }}>Clear</button>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -325,34 +337,39 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                         ))}
                                     </tbody>
                                 </table>
-                                {showConfirm && (
-                                    <div className="wizard-confirm-overlay">
-                                        <div className="confirm-box">
-                                            <button className="confirm-btn yes" onClick={nextStep}>Data Reviewed</button>
-                                            <button className="confirm-btn no" onClick={() => setShowConfirm(false)}>Keep Editing</button>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                             <div className="summary-sidebar">
-                                <div className="summary-header">Summary</div>
+                                <div className="summary-header">Review Summary</div>
                                 <div className="summary-body">
-                                    <div className="summary-group"><h4>Inactive Suppliers:</h4><div className="summary-empty">All Suppliers Are Active</div></div>
-                                    <div className="summary-group"><h4>New Suppliers:</h4><div className="summary-empty">No New Suppliers Added</div></div>
-                                    <div className="summary-group"><h4>Active Supplier New Emails:</h4><div className="summary-empty">No Supplier New Emails Added</div></div>
+                                    <div className="summary-group">
+                                        <h4>Inactive Suppliers</h4>
+                                        <div className="summary-empty">All Suppliers Are Active</div>
+                                    </div>
+                                    <div className="summary-group">
+                                        <h4>New Suppliers</h4>
+                                        <div className="summary-empty">No New Suppliers Added</div>
+                                    </div>
+                                    <div className="summary-group">
+                                        <h4>Active Supplier New Emails</h4>
+                                        <div className="summary-empty">No Supplier New Emails Added</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
                     </>
                 )}
+
                 {step === 2 && (
-                    <div className="step-2-container" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                        <div className="wizard-title-row"><h1>Supplier Product Creation</h1></div>
-                        <div className="table-section">
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                        <div className="wizard-title-row">
+                            <h1>Supplier Product Creation</h1>
+                        </div>
+                        <div className="table-section" style={{ border: 'none', borderTop: '1px solid #E2E8F0' }}>
                             <table className="wizard-table">
                                 <thead>
                                     <tr>
-                                        <th style={{ width: 80 }}>Is Active</th>
+                                        <th style={{ width: 100 }}>Is Active</th>
                                         {data[0]?.map((h, i) => (
                                             <th key={i} style={{ width: columnWidths[i] || 150 }}>{String(h)}</th>
                                         ))}
@@ -361,7 +378,9 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                 <tbody>
                                     {data.slice(1).map((row, ri) => (
                                         <tr key={ri}>
-                                            <td><div className="cell-inner">true</div></td>
+                                            <td><div className="cell-inner" style={{ justifyContent: 'center' }}>
+                                                <input type="checkbox" defaultChecked />
+                                            </div></td>
                                             {row.map((cell, ci) => (
                                                 <td key={ci}><div className="cell-inner">{String(cell)}</div></td>
                                             ))}
@@ -369,28 +388,16 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                     ))}
                                 </tbody>
                             </table>
-                            {showConfirm && (
-                                <div className="wizard-confirm-overlay">
-                                    <div className="confirm-box">
-                                        <button className="confirm-btn yes" onClick={nextStep}>Confirm Product Creation</button>
-                                        <button className="confirm-btn no" onClick={() => setShowConfirm(false)}>Cancel</button>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
                 )}
+
                 {step === 3 && (
-                    <div className="finish-step" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                        <div className="wizard-header" style={{ justifyContent: 'flex-start', border: 'none', padding: '12px 0' }}>
-                            <div className="wizard-steps">
-                                <div className="step-item active"><div className="step-number" style={{ background: '#0f172a' }}>1</div> Adjust Data or Suppliers</div>
-                                <div className="step-item active"><div className="step-number" style={{ background: '#0f172a' }}>2</div> Supplier Product Creation</div>
-                                <div className="step-item active"><div className="step-number" style={{ background: '#0f172a' }}>3</div> Finish</div>
-                            </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                        <div className="wizard-title-row">
+                            <h1>Final Review & Confirmation</h1>
                         </div>
-                        <h1>Finish!</h1>
-                        <div className="table-section" style={{ border: 'none', background: '#f5f5f5' }}>
+                        <div className="table-section" style={{ border: 'none', borderTop: '1px solid #E2E8F0', background: '#F8FAFC' }}>
                             <table className="wizard-table" style={{ opacity: 0.8 }}>
                                 <tbody>
                                     {data.slice(1).map((row, ri) => (
@@ -402,28 +409,23 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                     ))}
                                 </tbody>
                             </table>
-                            {showConfirm && (
-                                <div className="wizard-confirm-overlay">
-                                    <div className="confirm-box">
-                                        <button className="confirm-btn yes" onClick={nextStep}>Confirm Finish</button>
-                                        <button className="confirm-btn no" onClick={() => setShowConfirm(false)}>Cancel</button>
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
                 )}
             </div>
 
+            {/* Footer */}
             <div className="wizard-footer">
                 <div className="footer-stats">
-                    <span>Line Items: {data.length - 1}</span>
-                    <span>Audit POs: 17</span>
-                    <span>Records Shown: {filteredRows.length}/{data.length - 1}</span>
+                    <span>Total Line Items: <strong>{data.length - 1}</strong></span>
+                    <span>Audit POs: <strong>17</strong></span>
+                    <span>Verified: <strong>{filteredRows.length}/{data.length - 1}</strong></span>
                 </div>
                 <div className="footer-btns">
-                    <button className="footer-btn discard" onClick={onClose}>Discard</button>
-                    <button className="footer-btn next" onClick={() => setShowConfirm(true)}>{step === 3 ? 'Finish' : 'Next'}</button>
+                    <button className="footer-btn discard" onClick={onClose}>Discard Changes</button>
+                    <button className="footer-btn next" onClick={() => (step === 3 ? onComplete() : nextStep())}>
+                        {step === 3 ? 'FINALIZE REVIEW' : 'NEXT STEP'}
+                    </button>
                 </div>
             </div>
         </div>

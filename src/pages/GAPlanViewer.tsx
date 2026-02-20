@@ -16,7 +16,8 @@ import {
     Ship,
     Save,
     Undo,
-    Redo
+    Redo,
+    XCircle
 } from 'lucide-react';
 
 import './GAPlanViewer.css';
@@ -127,7 +128,12 @@ export default function GAPlanViewer({
     const isPdf = filename.toLowerCase().endsWith('.pdf');
 
     // Toast state
-    const [toast, setToast] = useState<{ title: string; subtitle: string; visible: boolean }>({ title: '', subtitle: '', visible: false });
+    const [toast, setToast] = useState<{ title: string; subtitle: string; visible: boolean; type: 'success' | 'error' }>({
+        title: '',
+        subtitle: '',
+        visible: false,
+        type: 'success'
+    });
 
     // Selection state
     const [currentSelection, setCurrentSelection] = useState<Rect | null>(null);
@@ -234,9 +240,9 @@ export default function GAPlanViewer({
 
     // --- Manual Zoom via Wheel Disabled ---
 
-    const showToast = (title: string, subtitle: string) => {
-        setToast({ title, subtitle, visible: true });
-        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+    const showToast = (title: string, subtitle: string, type: 'success' | 'error' = 'success') => {
+        setToast({ title, subtitle, visible: true, type });
+        setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 4000);
     };
 
     // escape key to cancel
@@ -284,7 +290,7 @@ export default function GAPlanViewer({
 
         // Check for overlap with existing sections
         if (checkOverlap(currentSelection)) {
-            alert("This area is already cropped. You cannot crop the same area twice.");
+            showToast("Cropping Conflict", "This area is already cropped. You cannot crop the same area twice.", "error");
             return;
         }
 
@@ -293,7 +299,7 @@ export default function GAPlanViewer({
         const isDuplicateName = mappedSections.some(section => section.title.trim().toLowerCase() === normalizedTitle);
 
         if (isDuplicateName) {
-            alert(`The name "${newSelectionTitle}" is already in use. Please enter a unique name.`);
+            showToast("Duplicate Name", `The name "${newSelectionTitle}" is already in use. Please enter a unique name.`, "error");
             return;
         }
 
@@ -398,13 +404,17 @@ export default function GAPlanViewer({
 
     return (
         <div className="ga-viewer-overlay">
-            <div className={`ga-toast ${toast.visible ? 'show' : ''}`}>
-                <CheckCircle size={20} />
+            <div className={`ga-toast-v2 ${toast.type} ${toast.visible ? 'show' : ''}`}>
+                <div className="toast-icon-side">
+                    {toast.type === 'success' ? <CheckCircle size={20} /> : <XCircle size={20} />}
+                </div>
                 <div className="ga-toast-content">
                     <div className="ga-toast-title">{toast.title}</div>
                     <div className="ga-toast-subtitle">{toast.subtitle}</div>
                 </div>
-                <div className="ga-toast-action" onClick={undoLastSave}>UNDO</div>
+                {toast.type === 'success' && (
+                    <div className="ga-toast-action" onClick={undoLastSave}>UNDO</div>
+                )}
             </div>
 
             {/* Top Nav Removed */}
@@ -412,8 +422,8 @@ export default function GAPlanViewer({
             <div className="ga-viewer-header">
                 <div className="viewer-header-left">
                     <button className="back-btn" onClick={onClose} style={{ marginRight: '24px' }}>
-                        <ChevronLeft size={18} />
-                        <span style={{ fontSize: '11px', fontWeight: '800', letterSpacing: '0.5px' }}>BACK TO DECKS</span>
+                        <ChevronLeft size={16} strokeWidth={3} />
+                        <span>BACK TO DECKS</span>
                     </button>
                     <div className="logo-icon-box-v2">
                         <Ship size={20} className="sailing-logo" />
@@ -537,7 +547,7 @@ export default function GAPlanViewer({
                                                 autoFocus
                                                 onKeyDown={(e) => e.key === 'Enter' && addSelection()}
                                             />
-                                            <button className="input-save-btn" onClick={addSelection}>
+                                            <button className="input-save-btn" onClick={(e) => { e.stopPropagation(); addSelection(); }} title="Save Deck Selection">
                                                 <Save size={14} />
                                             </button>
                                         </div>

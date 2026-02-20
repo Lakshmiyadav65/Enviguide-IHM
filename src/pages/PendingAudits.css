@@ -15,8 +15,7 @@
 
 .pending-audits-content {
     flex: 1;
-    padding: 80px 32px 32px 32px;
-    /* Standardized offset for platform header visibility */
+    padding: 80px 40px 40px 40px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -100,6 +99,11 @@
     top: 50%;
     transform: translateY(-50%);
     color: #94A3B8;
+    transition: color 0.2s;
+}
+
+.search-box input:focus+.search-icon {
+    color: #00B0FA;
 }
 
 .top-bar-right {
@@ -179,10 +183,8 @@
 .table-scroll-wrapper {
     overflow-x: auto;
     overflow-y: auto;
-    max-height: calc(100vh - 240px);
-    /* Increased to prevent clipping of the 10th row */
-    padding-bottom: 20px;
-    /* Extra breathing room to ensure 10th row is fully visible */
+    max-height: calc(100vh - 320px);
+    padding-bottom: 0;
 }
 
 /* Table Styles */

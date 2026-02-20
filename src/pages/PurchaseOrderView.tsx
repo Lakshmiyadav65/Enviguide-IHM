@@ -1,9 +1,8 @@
 
 import { useState, useMemo, useRef } from 'react';
 import {
-    Plus, ChevronDown, ChevronUp, X, Search, RotateCw,
-    Calendar, Filter, Edit2, Trash2, Info,
-    ArrowUpDown, RefreshCw, FileText, Layout
+    ChevronDown, ChevronUp, Search, RotateCw, Edit2, Trash2,
+    Calendar, Filter, FileText, Layout
 } from 'lucide-react';
 import './PurchaseOrderView.css';
 
@@ -30,11 +29,15 @@ const FILTER_TAGS = [
 
 const initializeData = () => {
     let allItems: PurchaseOrderItem[] = [];
+    const UNITS = ['Piece', 'Kg', 'Litre', 'Set', 'Box', 'Roll', 'Unit', 'Pair', 'Metre'];
     FILTER_TAGS.forEach((tag, tagIdx) => {
         if (tag === 'All') return;
         for (let sIdx = 0; sIdx < 5; sIdx++) {
             const sid = `${tag.replace(/\s+/g, '-').toLowerCase()}-s-${sIdx}`;
             for (let i = 0; i < 5; i++) {
+                const ordered = Math.floor(Math.random() * 50) + 5;
+                const received = tag === 'Received Mds' ? ordered : Math.floor(Math.random() * ordered);
+                const pending = ordered - received;
                 allItems.push({
                     id: `${sid}-item-${i}`,
                     emailStatus: tag === 'Pending Mds' ? 'SENT' : 'NOT SENT',
@@ -44,8 +47,8 @@ const initializeData = () => {
                     mdsRec: tag === 'Received Mds' ? '05/01/2024' : '',
                     itemDescription: `Component ${tag} type ${i}`,
                     orderDate: `2024-01-${10 + i}`,
-                    quantityTotal: `${i} | ${i + 2} | 0`,
-                    unit: 'Piece',
+                    quantityTotal: `${ordered} | ${received} | ${pending}`,
+                    unit: UNITS[(tagIdx + sIdx + i) % UNITS.length],
                     category: tag,
                     selected: false
                 });
@@ -66,14 +69,16 @@ const getSupplierMeta = (filter: string) => {
     ];
 };
 
-export default function PurchaseOrderView({ vesselName, imo }: { vesselName: string; imo: string }) {
+export default function PurchaseOrderView() {
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [activeFilter, setActiveFilter] = useState('All');
     const [openSuppliers, setOpenSuppliers] = useState<string[]>([]);
+    const toggleSupplier = (id: string) => {
+        setOpenSuppliers(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
+    };
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [keyword, setKeyword] = useState('');
-    const [filterSearch, setFilterSearch] = useState('');
     const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData());
 
     const dateFromRef = useRef<HTMLInputElement>(null);
@@ -107,7 +112,6 @@ export default function PurchaseOrderView({ vesselName, imo }: { vesselName: str
     }, [activeFilter, dateFrom, dateTo, keyword, allItems]);
 
     const selectedCount = allItems.filter(i => i.selected).length;
-    const isAnySupplierOpen = openSuppliers.length > 0;
 
     const toggleItemSelection = (id: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
@@ -146,58 +150,64 @@ export default function PurchaseOrderView({ vesselName, imo }: { vesselName: str
                         <div className="po-v4-filters-header-premium" onClick={() => setIsFilterOpen(!isFilterOpen)}>
                             <div className="po-v4-filters-title-main">
                                 <Filter size={18} />
-                                <span>Filters</span>
+                                <span>ORDER STATE & DATE FILTERS</span>
                             </div>
-                            <div className="po-v4-filters-search-styled">
-                                {/* No icon here as per instruction */}
-                                <input
-                                    type="text"
-                                    placeholder="Search based on filters"
-                                    value={filterSearch}
-                                    onChange={(e) => setFilterSearch(e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                />
+                            <div className="po-v4-header-chevron">
+                                {isFilterOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                             </div>
-                            {isFilterOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                         </div>
 
                         {isFilterOpen && (
                             <div className="po-v4-filters-content-premium">
                                 <div className="po-v4-filters-row-premium">
                                     <div className="po-v4-date-inputs-group">
-                                        <div className="po-v4-date-field-styled" onClick={() => dateFromRef.current?.showPicker()}>
-                                            <label>Order From Date</label>
-                                            <div className="po-v4-date-input-wrapper">
+                                        <div className="filter-date-field" onClick={() => dateFromRef.current?.showPicker()}>
+                                            <label>Order Start Date</label>
+                                            <div className="date-input-with-icon">
                                                 <input
                                                     ref={dateFromRef}
                                                     type="date"
                                                     value={dateFrom}
                                                     onChange={(e) => setDateFrom(e.target.value)}
                                                     onClick={(e) => e.stopPropagation()}
-                                                    className="po-v4-date-native-input"
                                                 />
-                                                <Calendar size={16} className="po-v4-calendar-icon-styled" />
+                                                <Calendar size={18} className="calendar-icon-overlay" />
                                             </div>
                                         </div>
-                                        <div className="po-v4-date-field-styled" onClick={() => dateToRef.current?.showPicker()}>
-                                            <label>Order To Date</label>
-                                            <div className="po-v4-date-input-wrapper">
+                                        <div className="filter-date-field" onClick={() => dateToRef.current?.showPicker()}>
+                                            <label>Order End Date</label>
+                                            <div className="date-input-with-icon">
                                                 <input
                                                     ref={dateToRef}
                                                     type="date"
                                                     value={dateTo}
                                                     onChange={(e) => setDateTo(e.target.value)}
                                                     onClick={(e) => e.stopPropagation()}
-                                                    className="po-v4-date-native-input"
                                                 />
-                                                <Calendar size={16} className="po-v4-calendar-icon-styled" />
+                                                <Calendar size={18} className="calendar-icon-overlay" />
                                             </div>
                                         </div>
                                     </div>
-                                    {/* HORIZONTAL Filter Actions as per latest request */}
-                                    <div className="po-v4-filter-actions-horizontal-group">
-                                        <button type="button" className="po-v4-btn-circle-action-styled search" title="Search"><Search size={18} /></button>
-                                        <button type="button" className="po-v4-btn-circle-action-styled reset" title="Reset" onClick={(e) => { e.stopPropagation(); setDateFrom(''); setDateTo(''); setActiveFilter('All'); setKeyword(''); }}><RefreshCw size={18} /></button>
+                                    <div className="po-v4-action-group-buttons">
+                                        <button
+                                            type="button"
+                                            className="po-v4-btn-rect-action-styled search"
+                                        >
+                                            Apply Filters
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="po-v4-btn-rect-action-styled reset"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setDateFrom('');
+                                                setDateTo('');
+                                                setActiveFilter('All');
+                                                setKeyword('');
+                                            }}
+                                        >
+                                            Reset Filters
+                                        </button>
                                     </div>
                                 </div>
 
@@ -213,7 +223,6 @@ export default function PurchaseOrderView({ vesselName, imo }: { vesselName: str
                                         </button>
                                     ))}
                                 </div>
-
                                 <div className="po-v4-keyword-search-premium" onClick={(e) => e.stopPropagation()}>
                                     <div className="po-v4-keyword-label-row">
                                         <label>Keywords</label>
@@ -227,7 +236,6 @@ export default function PurchaseOrderView({ vesselName, imo }: { vesselName: str
                                                 onChange={(e) => setKeyword(e.target.value)}
                                             />
                                         </div>
-                                        <ChevronDown size={14} />
                                     </div>
                                 </div>
                             </div>
@@ -250,7 +258,7 @@ export default function PurchaseOrderView({ vesselName, imo }: { vesselName: str
                         <div className="po-v4-suppliers-list-structured">
                             {currentSuppliers.map(supplier => (
                                 <div key={supplier.id} className={`po-v4-supplier-item-v4 ${openSuppliers.includes(supplier.id) ? 'is-open' : ''}`}>
-                                    <div className="po-v4-supplier-header-v4" onClick={(e) => setOpenSuppliers(prev => prev.includes(supplier.id) ? prev.filter(id => id !== supplier.id) : [...prev, supplier.id])}>
+                                    <div className="po-v4-supplier-header-v4" onClick={() => toggleSupplier(supplier.id)}>
                                         <div className="po-v4-sup-info-v4">
                                             <div className="po-v4-sup-ref-tag">{supplier.ref}</div>
                                             <div className="po-v4-sup-name-title">{supplier.name}</div>
@@ -279,20 +287,20 @@ export default function PurchaseOrderView({ vesselName, imo }: { vesselName: str
                                                 <div className="po-v4-action-icons-localized">
                                                     {selectedCount > 0 && (
                                                         <div className="po-v4-action-item-local tooltip-p" onClick={handleRequestMDs}>
-                                                            <div className="po-v4-circle-btn-v4 active">
+                                                            <div className="po-v4-circle-btn-v4 req-mds">
                                                                 <FileText size={18} />
                                                             </div>
                                                             <span className="po-v4-tooltip-text">Complete request MDs & SDoCs</span>
                                                         </div>
                                                     )}
                                                     <div className="po-v4-action-item-local tooltip-p">
-                                                        <div className="po-v4-circle-btn-v4 active">
+                                                        <div className="po-v4-circle-btn-v4 refresh">
                                                             <RotateCw size={18} />
                                                         </div>
                                                         <span className="po-v4-tooltip-text">Refresh Data</span>
                                                     </div>
                                                     <div className="po-v4-action-item-local tooltip-p">
-                                                        <div className="po-v4-circle-btn-v4 active">
+                                                        <div className="po-v4-circle-btn-v4 layout">
                                                             <Layout size={18} />
                                                         </div>
                                                         <span className="po-v4-tooltip-text">Layout Settings</span>
@@ -315,7 +323,7 @@ export default function PurchaseOrderView({ vesselName, imo }: { vesselName: str
                                                             <th className="mdc-col">MDs SDoCs Rec</th>
                                                             <th className="it-col">Item Description</th>
                                                             <th className="da-col">Order Date</th>
-                                                            <th className="qt-col">Quantity</th>
+                                                            <th className="qt-col"><div style={{display:'flex',flexDirection:'column',gap:'2px'}}><span>Quantity</span><span style={{fontSize:'9px',fontWeight:500,color:'#94A3B8',whiteSpace:'nowrap'}}><span style={{color:'#EF4444'}}>Ord</span>{' | '}<span style={{color:'#10B981'}}>Rec</span>{' | '}<span style={{color:'#3B82F6'}}>Pend</span></span></div></th>
                                                             <th className="un-col">Unit</th>
                                                         </tr>
                                                     </thead>
