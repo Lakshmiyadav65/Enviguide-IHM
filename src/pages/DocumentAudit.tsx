@@ -47,6 +47,9 @@ export default function DocumentAudit() {
     const [clarificationItem, setClarificationItem] = useState<AuditItem | null>(null);
     const [showToast, setShowToast] = useState(false);
     const [toastData, setToastData] = useState({ title: '', message: '' });
+    const [mailTo, setMailTo] = useState('compliance@globalmaritime.com');
+    const [mailSubject, setMailSubject] = useState('');
+    const [mailBody, setMailBody] = useState('');
 
     const initialAuditItems: AuditItem[] = [
         { id: 'PO-2023-8842', supplier: 'Global Maritime Supplies Ltd', docType: 'MD', fileLink: 'MD_PV_8842.pdf', dateReceived: '24 Oct 2023', clarificationStatus: 'AWAITING CLARIFICATION' },
@@ -105,6 +108,8 @@ export default function DocumentAudit() {
     const handleOpenClarification = (item: AuditItem | null) => {
         if (!item) return;
         setClarificationItem(item);
+        setMailSubject(`Clarification Required: ${item.fileLink.replace('.pdf', '')} for ${item.id}`);
+        setMailBody(`Dear ${item.supplier.split(' ')[0]} Team,\n\nWe have reviewed the Material Declaration for ${item.id} and require further clarification on Table A: PCBs.\n\nThe submitted documentation does not clearly specify the concentration of polychlorinated biphenyls for the electrical components listed in Annex II. Specifically, we noted that the threshold levels reported for the 'Main Control Unit' (GMS-MCU-102) seem inconsistent with international regulatory requirements for this class of maritime hardware.\n\nPlease provide additional supporting documentation from the component manufacturer or re-verify the threshold levels against current IHM guidelines. Failure to provide this clarification may delay the certification process for the vessel 'Pacific Venture'.`);
         setIsClarificationOpen(true);
         if (selectedDoc) setSelectedDoc(null);
     };
@@ -480,16 +485,24 @@ export default function DocumentAudit() {
                             <div className="clarification-body">
                                 <div className="mail-field">
                                     <span className="field-label">TO</span>
-                                    <div className="field-value-pill">
-                                        <strong>{clarificationItem.supplier}</strong>
-                                        <span className="email-addr">(compliance@globalmaritime.com)</span>
+                                    <div className="field-value-pill editable">
+                                        <input
+                                            type="text"
+                                            value={mailTo}
+                                            onChange={(e) => setMailTo(e.target.value)}
+                                            className="mail-input-premium"
+                                        />
+                                        <span className="supplier-ref-label">{clarificationItem.supplier}</span>
                                     </div>
                                 </div>
                                 <div className="mail-field">
                                     <span className="field-label">SUBJECT</span>
-                                    <div className="field-value-text">
-                                        Clarification Required: {clarificationItem.fileLink.replace('.pdf', '')} for {clarificationItem.id}
-                                    </div>
+                                    <input
+                                        type="text"
+                                        value={mailSubject}
+                                        onChange={(e) => setMailSubject(e.target.value)}
+                                        className="mail-input-premium subject"
+                                    />
                                 </div>
 
                                 <div className="mail-toolbar">
@@ -514,12 +527,17 @@ export default function DocumentAudit() {
                                 </div>
 
                                 <div className="mail-editor-area">
-                                    <p>Dear {clarificationItem.supplier.split(' ')[0]} Team,</p>
-                                    <p>We have reviewed the Material Declaration for {clarificationItem.id} and require further clarification on Table A: PCBs.</p>
-                                    <p>The submitted documentation does not clearly specify the concentration of polychlorinated biphenyls for the electrical components listed in Annex II. Specifically, we noted that the threshold levels reported for the 'Main Control Unit' (GMS-MCU-102) seem inconsistent with international regulatory requirements for this class of maritime hardware.</p>
-                                    <p>Please provide additional supporting documentation from the component manufacturer or re-verify the threshold levels against current IHM guidelines. Failure to provide this clarification may delay the certification process for the vessel 'Pacific Venture'.</p>
+                                    <textarea
+                                        value={mailBody}
+                                        onChange={(e) => setMailBody(e.target.value)}
+                                        className="mail-textarea-premium"
+                                        placeholder="Type your clarification request here..."
+                                    />
 
-                                    <div className="upload-docs-center-btn">
+                                    <div
+                                        className="upload-docs-center-btn"
+                                        onClick={() => window.open('/administration/upload-docs', '_blank')}
+                                    >
                                         UPLOAD DOCUMENTS
                                     </div>
 

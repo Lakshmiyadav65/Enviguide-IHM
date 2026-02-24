@@ -10,6 +10,7 @@ import PendingReviews from './pages/PendingReviews';
 import MDSdocAudit from './pages/MDSdocAudit';
 import DocumentAudit from './pages/DocumentAudit';
 import AuditReviewDetail from './pages/AuditReviewDetail';
+import DocTab from './pages/DocTab';
 import './index.css';
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
         <Route path="/administration/review-detail/:imo" element={<AuditReviewDetail />} />
         <Route path="/administration/md-sdoc-audit" element={<MDSdocAudit />} />
         <Route path="/administration/document-audit/:imo" element={<DocumentAudit />} />
+        <Route path="/administration/upload-docs" element={<DocTab />} />
         <Route path="/security" element={<Dashboard />} />
         <Route path="/master-data" element={<Dashboard />} />
         <Route path="/inventory" element={<Dashboard />} />

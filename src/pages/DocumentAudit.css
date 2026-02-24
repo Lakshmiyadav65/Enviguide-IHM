@@ -947,10 +947,11 @@
     align-items: center;
     padding: 12px 0;
     border-bottom: 1px solid #F1F5F9;
+    gap: 16px;
 }
 
 .field-label {
-    width: 100px;
+    width: 80px;
     font-size: 11px;
     font-weight: 800;
     color: #94A3B8;
@@ -958,32 +959,31 @@
     letter-spacing: 1px;
 }
 
-.field-value-pill {
+.field-value-pill.editable {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 16px;
+    gap: 8px;
+    padding: 6px 12px;
     background: #F8FAFC;
     border: 1px solid #E2E8F0;
     border-radius: 8px;
     flex: 1;
 }
 
-.field-value-pill strong {
+.mail-input-premium {
+    flex: 1;
+    background: transparent;
+    border: none;
     font-size: 13px;
-    color: #1E293B;
-}
-
-.field-value-pill .email-addr {
-    font-size: 12px;
-    color: #64748B;
-}
-
-.field-value-text {
-    font-size: 14px;
     font-weight: 600;
     color: #1E293B;
-    flex: 1;
+    outline: none;
+    padding: 4px 0;
+}
+
+.mail-input-premium.subject {
+    font-size: 14px;
+    font-weight: 700;
 }
 
 .mail-toolbar {
@@ -1045,10 +1045,55 @@
     margin-bottom: 20px;
 }
 
+.mail-input-premium {
+    flex: 1;
+    background: transparent;
+    border: none;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1E293B;
+    outline: none;
+    padding: 0;
+}
+
+.mail-input-premium.subject {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.field-value-pill.editable {
+    padding: 6px 16px;
+}
+
+.supplier-ref-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #94A3B8;
+    background: #F1F5F9;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.mail-textarea-premium {
+    width: 100%;
+    min-height: 300px;
+    background: transparent;
+    border: none;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #475569;
+    outline: none;
+    resize: none;
+    font-family: inherit;
+    margin-bottom: 20px;
+    display: block;
+}
+
 .upload-docs-center-btn {
     display: block;
     width: fit-content;
-    margin: 40px 0;
+    margin: 40px auto;
     padding: 12px 32px;
     background: linear-gradient(135deg, #00A3FF 0%, #0088CC 100%);
     color: white;
