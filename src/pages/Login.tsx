@@ -1,22 +1,34 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ship, Mail, Lock, Eye, EyeOff, ChevronRight, HelpCircle } from 'lucide-react';
+import { Ship, Mail, Lock, Eye, EyeOff, Info } from 'lucide-react';
 import './Login.css';
+
+// Import moody slide images
+import slide1 from '../assets/login-slide-1.png';
+import slide2 from '../assets/login-slide-2.png';
+import slide3 from '../assets/login-slide-3.png';
 
 export default function Login() {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [rememberMe, setRememberMe] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [showDemo, setShowDemo] = useState(false);
+    const [currentSlide, setCurrentSlide] = useState(0);
+
+    const slides = [slide1, slide2, slide3];
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentSlide((prev) => (prev + 1) % slides.length);
+        }, 6000);
+        return () => clearInterval(timer);
+    }, [slides.length]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
 
-        // Realistic simulation of authentication
         setTimeout(() => {
             setIsLoading(false);
             navigate('/dashboard');
@@ -24,121 +36,112 @@ export default function Login() {
     };
 
     return (
-        <div className="login-container">
-            {/* Maritime Background Slideshow - Explicitly Ships */}
-            <div className="slideshow">
-                <div className="slide"></div>
-                <div className="slide"></div>
-                <div className="slide"></div>
-                <div className="overlay"></div>
+        <div className="login-viewport">
+            {/* Left Panel: Moody Slideshow */}
+            <div className="visual-side">
+                {slides.map((slide, index) => (
+                    <div
+                        key={index}
+                        className={`slide-v2 ${index === currentSlide ? 'active' : ''}`}
+                        style={{ backgroundImage: `url(${slide})` }}
+                    ></div>
+                ))}
+                <div className="visual-overlay"></div>
+                <div className="visual-caption">
+                    <span className="tiny-label">IHM Management</span>
+                </div>
             </div>
 
-            {/* Auth Interface Wrapper */}
-            <div className="auth-wrapper">
-                <div className="auth-card">
-                    <div className="auth-header">
-                        <div className="brand-icon-rounded">
-                            <Ship size={36} />
+            {/* Right Panel: Clean Auth Portal */}
+            <div className="form-side">
+                <div className="auth-content">
+                    <div className="auth-header-v2">
+                        <div className="brand-pill">
+                            <Ship size={20} />
+                            <span>EnviGuide IHM</span>
                         </div>
-                        <h1>EnviGuide IHM</h1>
-                        <p>Maritime Compliance Solutions</p>
+                        <h2>Welcome Back</h2>
+                        <p>Access your secure maritime dashboard</p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="auth-form">
-                        <div className="form-field">
-                            <label htmlFor="email">Work Email</label>
-                            <div className="input-container">
-                                <Mail size={18} className="field-icon" />
+                    <form onSubmit={handleSubmit} className="premium-form">
+                        <div className="form-group-v2">
+                            <label>Portal Email</label>
+                            <div className="input-row-v2">
+                                <Mail size={16} className="icon-v2" />
                                 <input
                                     type="email"
-                                    id="email"
-                                    placeholder="name@maritime.com"
+                                    placeholder="admin@maritime.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
-                                    autoComplete="email"
                                 />
                             </div>
                         </div>
 
-                        <div className="form-field">
-                            <label htmlFor="password">Security Password</label>
-                            <div className="input-container">
-                                <Lock size={18} className="field-icon" />
+                        <div className="form-group-v2">
+                            <label>Access Key</label>
+                            <div className="input-row-v2">
+                                <Lock size={16} className="icon-v2" />
                                 <input
                                     type={showPassword ? 'text' : 'password'}
-                                    id="password"
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
-                                    autoComplete="current-password"
                                 />
                                 <button
                                     type="button"
-                                    className="password-toggle"
+                                    className="eye-btn"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    aria-label={showPassword ? "Hide password" : "Show password"}
                                 >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                             </div>
                         </div>
 
-                        <div className="auth-utils">
-                            <label className="remember-label">
-                                <input
-                                    type="checkbox"
-                                    checked={rememberMe}
-                                    onChange={(e) => setRememberMe(e.target.checked)}
-                                />
-                                <span>Trust this device</span>
+                        <div className="form-utils-v2">
+                            <label className="remember-v2">
+                                <input type="checkbox" />
+                                <span className="mark"></span>
+                                <span>Remember me</span>
                             </label>
-                            <a href="#" className="forgot-link">Forgot Key?</a>
+                            <a href="#" className="forgot-v2">Forgot Key?</a>
                         </div>
 
                         <button
                             type="submit"
-                            className="btn-primary-auth"
+                            className="btn-blocker"
                             disabled={isLoading}
                         >
-                            {isLoading ? 'Decrypting...' : 'Secure Entry'}
-                            {!isLoading && <ChevronRight size={20} />}
+                            {isLoading ? <div className="dot-loading"></div> : "Sign In"}
                         </button>
 
-                        <div className="demo-section">
-                            <button
-                                type="button"
-                                className="demo-trigger"
-                                onClick={() => setShowDemo(!showDemo)}
-                            >
-                                <HelpCircle size={14} />
-                                <span>First time visiting? Get Demo credentials</span>
-                            </button>
-                            {showDemo && (
-                                <div className="demo-details">
-                                    Email: <strong>admin@maritime.com</strong><br />
-                                    Password: <strong>demo123</strong>
-                                </div>
-                            )}
-                        </div>
+                        <button type="button" className="btn-google-v2">
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="16" height="16" />
+                            <span>Sign In with Enterprise ID</span>
+                        </button>
                     </form>
 
-                    <div className="auth-footer">
-                        <p>No access? <a href="#">Request Client Portal</a></p>
+                    {/* Prominent Demo Access */}
+                    <div className="demo-access-banner">
+                        <div className="banner-top">
+                            <Info size={12} />
+                            <span>Demo Access Credentials</span>
+                        </div>
+                        <div className="banner-details">
+                            <div className="item"><span>Email:</span> <strong>admin@maritime.com</strong></div>
+                            <div className="item"><span>Pass:</span> <strong>demo123</strong></div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Bottom Global Footer */}
-            <div className="global-legal-footer">
-                <p>&copy; 2026 EnviGuide IHM • System Identity Management • ISO 27001 Certified</p>
-                <div className="legal-links">
-                    <a href="#">Privacy Protocol</a>
-                    <a href="#">Network Terms</a>
-                    <a href="#">Audit Logs</a>
-                </div>
+                <footer className="auth-footer-v2">
+                    <p>© 2026 EnviGuide IHM • ISO 27001 Certified</p>
+                </footer>
             </div>
         </div>
     );
 }
+
+

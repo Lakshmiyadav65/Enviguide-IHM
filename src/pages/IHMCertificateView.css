@@ -1599,3 +1599,107 @@
     grid-template-columns: 1fr 1fr;
     gap: 12px;
 }
+
+
+/* Generation View (Dual Card Design from Image) */
+.ihm-certificate-container.generation-view {
+    padding: 24px;
+    background-color: #f1f5f9;
+    /* Slate 100 as base background */
+    height: 100%;
+    overflow-y: auto;
+}
+
+.cert-generation-layout {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Card Commonalities */
+.cert-generation-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    width: 450px;
+    /* Specific width for centered look */
+}
+
+.card-header-clean {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.card-header-clean h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+/* Generation Form Specifics */
+.generation-form-body {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.gen-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gen-input-group label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.gen-select,
+.gen-date-input {
+    width: 100%;
+    padding: 10px 0;
+    border: none;
+    border-bottom: 2px solid #e2e8f0;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1e293b;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.gen-select:focus,
+.gen-date-input:focus {
+    border-bottom-color: #3b82f6;
+}
+
+.generation-footer {
+    margin-top: 12px;
+}
+
+.generate-cert-btn {
+    width: 100%;
+    padding: 12px;
+    background-color: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.generate-cert-btn:hover {
+    background-color: #1d4ed8;
+}
