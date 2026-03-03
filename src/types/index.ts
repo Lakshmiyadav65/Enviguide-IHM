@@ -80,6 +80,9 @@ export interface Material {
     compartment?: string;
     equipment?: string;
     mdStatus?: 'pending' | 'received' | 'approved';
+    poNo?: string;
+    component?: string;
+    materialName?: string;
 }
 
 export interface Deck {

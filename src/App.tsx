@@ -4,6 +4,13 @@ import Dashboard from './pages/Dashboard';
 import Vessels from './pages/Vessels';
 import FullPlanViewer from './pages/FullPlanViewer';
 import HazardousMaterialMapping from './pages/HazardousMaterialMapping';
+import UploadPurchaseOrder from './pages/UploadPurchaseOrder';
+import PendingAudits from './pages/PendingAudits';
+import PendingReviews from './pages/PendingReviews';
+import MDSdocAudit from './pages/MDSdocAudit';
+import DocumentAudit from './pages/DocumentAudit';
+import AuditReviewDetail from './pages/AuditReviewDetail';
+import DocTab from './pages/DocTab';
 import './index.css';
 
 function App() {
@@ -20,6 +27,13 @@ function App() {
         <Route path="/materials" element={<Dashboard />} />
         <Route path="/purchase-orders" element={<Dashboard />} />
         <Route path="/administration" element={<Dashboard />} />
+        <Route path="/administration/upload-po" element={<UploadPurchaseOrder />} />
+        <Route path="/administration/pending-audits" element={<PendingAudits />} />
+        <Route path="/administration/pending-reviews" element={<PendingReviews />} />
+        <Route path="/administration/review-detail/:imo" element={<AuditReviewDetail />} />
+        <Route path="/administration/md-sdoc-audit" element={<MDSdocAudit />} />
+        <Route path="/administration/document-audit/:imo" element={<DocumentAudit />} />
+        <Route path="/administration/upload-docs" element={<DocTab />} />
         <Route path="/security" element={<Dashboard />} />
         <Route path="/master-data" element={<Dashboard />} />
         <Route path="/inventory" element={<Dashboard />} />

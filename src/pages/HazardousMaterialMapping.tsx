@@ -4,7 +4,6 @@ import {
     LayoutGrid,
     Plus,
     Search,
-    Bell,
     Filter,
     Flame,
     MapPin,
@@ -16,7 +15,9 @@ import {
     ZoomOut,
     FileText,
     Eye,
-    Ship
+    Ship,
+    Calendar,
+    ChevronLeft
 } from 'lucide-react';
 import './HazardousMaterialMapping.css';
 
@@ -42,7 +43,15 @@ interface MaterialEntry {
     description?: string;
     manufacturer?: string;
     ihmPartNumber?: string;
+    equipmentClass?: string;
+    noOfPieces?: string;
+    totalQuantity?: string;
+    createdDate?: string;
+    updatedDate?: string;
+    remarks?: string;
 }
+
+import type { Material } from '../types/index';
 
 import { PLAN_GENERIC } from '../assets/ship_plans';
 
@@ -71,7 +80,7 @@ export default function HazardousMaterialMapping() {
     const vesselName = query.get('vessel') || 'Unknown Vessel';
     const [inventory, setInventory] = useState<MaterialEntry[]>([]);
     const lastLoadedKeyRef = useRef("");
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery] = useState('');
     const [tempPin, setTempPin] = useState<{ x: number, y: number } | null>(null);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const [isPanning, setIsPanning] = useState(false);
@@ -148,6 +157,12 @@ export default function HazardousMaterialMapping() {
         material: '',
         quantity: '',
         unit: 'kg',
+        noOfPieces: '1',
+        totalQuantity: '0.01',
+        createdDate: new Date().toISOString().split('T')[0],
+        updatedDate: new Date().toISOString().split('T')[0],
+        remarks: '',
+        equipmentClass: '',
         hmStatus: 'CHM',
         files: [] as string[]
     });
@@ -203,7 +218,7 @@ export default function HazardousMaterialMapping() {
             clearTimeout(timer);
             window.removeEventListener('resize', updatePosition);
         };
-    }, [rect.w, rect.h]);
+    }, [rect.w, rect.h, query, vesselName, sectionName]);
 
     // Save to localStorage whenever inventory changes
     useEffect(() => {
@@ -275,11 +290,7 @@ export default function HazardousMaterialMapping() {
         }
     };
 
-    const handleFileUpload = () => {
-        // Simulate file upload
-        const newFile = `doc_ref_${formData.files.length + 1}.pdf`;
-        setFormData(prev => ({ ...prev, files: [...prev.files, newFile] }));
-    };
+
 
     const handleAddMaterial = () => {
         if (!tempPin) {
@@ -298,7 +309,29 @@ export default function HazardousMaterialMapping() {
             pin: tempPin
         };
 
-        setInventory([...inventory, newEntry]);
+        const updatedInventory = [...inventory, newEntry];
+        setInventory(updatedInventory);
+
+        // Sync with vessel-wide inventory for the Records page
+        const recordMaterial: Material = {
+            id: `MAPPED-${newEntry.id}`,
+            name: newEntry.name,
+            ihmPart: newEntry.ihmPart,
+            category: newEntry.hmStatus === 'CHM' ? 'hazard' : 'warning',
+            status: 'Verified',
+            completion: 100,
+            zone: sectionName,
+            poNo: newEntry.shipPO,
+            component: newEntry.component,
+            materialName: newEntry.material,
+            hazardType: newEntry.hazMaterials[0] || '',
+            equipment: newEntry.equipment
+        };
+
+        const vesselInventoryKey = `vessel_inventory_${vesselName}`;
+        const existingVesselInv: Material[] = JSON.parse(localStorage.getItem(vesselInventoryKey) || '[]');
+        localStorage.setItem(vesselInventoryKey, JSON.stringify([...existingVesselInv, recordMaterial]));
+
         setTempPin(null);
         setFormData({
             avoidUpdation: false,
@@ -315,8 +348,14 @@ export default function HazardousMaterialMapping() {
             material: '',
             quantity: '',
             unit: 'kg',
+            noOfPieces: '1',
+            totalQuantity: '0.01',
+            createdDate: new Date().toISOString().split('T')[0],
+            updatedDate: new Date().toISOString().split('T')[0],
+            remarks: '',
+            equipmentClass: '',
             hmStatus: 'CHM',
-            files: []
+            files: [] as string[]
         });
         setViewMode('list');
         setActiveTool('none');
@@ -340,10 +379,34 @@ export default function HazardousMaterialMapping() {
         return groups;
     }, [filteredInventory]);
 
+    const [hoveredMaterialId, setHoveredMaterialId] = useState<string | null>(null);
+
+    const [highlightedMaterialId, setHighlightedMaterialId] = useState<string | null>(null);
+
+    const handlePinClick = (id: string) => {
+        setHighlightedMaterialId(id);
+
+        // Find element and scroll
+        setTimeout(() => {
+            const el = document.getElementById(`material-card-${id}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 100);
+
+        // Remove highlight after animation
+        setTimeout(() => {
+            setHighlightedMaterialId(null);
+        }, 1500);
+    };
+
     return (
         <div className="hazmat-mapping-page">
             <header className="mapping-header-v5">
                 <div className="h-left-v5">
+                    <button className="back-btn-v5" onClick={() => navigate(-1)}>
+                        <ChevronLeft size={20} />
+                    </button>
                     <div className="logo-group-v5">
                         <Ship size={22} className="logo-icon-v5 sailing-logo" />
                         <strong>IHM</strong>
@@ -351,32 +414,6 @@ export default function HazardousMaterialMapping() {
                     </div>
                 </div>
 
-
-                <div className="h-center-v5">
-                    <div className="search-pill-v5">
-                        <Search size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search inventory..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                </div>
-
-                <div className="h-right-v5">
-                    <div className="notif-badge-v5">
-                        <Bell size={20} />
-                        <span className="notif-red">3</span>
-                    </div>
-                    <div className="profile-capsule-v5">
-                        <div className="p-info">
-                            <strong>John Administrator</strong>
-                            <span className="p-role">ADMIN</span>
-                        </div>
-                        <div className="p-avatar-v5">JA</div>
-                    </div>
-                </div>
             </header>
 
             <div className="mapping-main-v5">
@@ -433,16 +470,24 @@ export default function HazardousMaterialMapping() {
                                 {inventory.map(item => {
                                     // If we are viewing a specific material detail, only show its pin
                                     const shouldShowPin = viewingMaterial ? item.id === viewingMaterial.id : true;
+                                    const isHovered = hoveredMaterialId === item.id;
 
                                     return item.pin && shouldShowPin && (
                                         <div key={item.id} className="pin-marker-v5"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handlePinClick(item.id);
+                                            }}
                                             style={{
                                                 left: item.pin.x - rect.x,
                                                 top: item.pin.y - rect.y,
-                                                transform: `translate(-50%, -50%) scale(${100 / zoom})`
+                                                transform: `translate(-50%, -50%) scale(${100 / zoom})`,
+                                                color: isHovered ? '#EF4444' : '#00B0FA', // Change directly via inline style or class
+                                                zIndex: isHovered ? 100 : 10,
+                                                cursor: 'pointer'
                                             }}>
-                                            <div className="pin-icon-box">
-                                                <Flame size={20} fill="currentColor" />
+                                            <div className="pin-icon-box" style={{ filter: isHovered ? 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.6))' : undefined }}>
+                                                <Flame size={isHovered ? 26 : 20} fill="currentColor" />
                                             </div>
                                         </div>
                                     );
@@ -504,7 +549,14 @@ export default function HazardousMaterialMapping() {
                                         </div>
                                         <div className="v5-cat-items">
                                             {items.map(item => (
-                                                <div key={item.id} className="v5-item-card" onClick={() => { setViewingMaterial(item); setViewMode('detail'); }}>
+                                                <div
+                                                    key={item.id}
+                                                    id={`material-card-${item.id}`}
+                                                    className={`v5-item-card ${highlightedMaterialId === item.id ? 'pin-highlight' : ''}`}
+                                                    onClick={() => { setViewingMaterial(item); setViewMode('detail'); }}
+                                                    onMouseEnter={() => setHoveredMaterialId(item.id)}
+                                                    onMouseLeave={() => setHoveredMaterialId(null)}
+                                                >
                                                     <div className="v5-card-inner">
                                                         <div className="v5-selection-rail">
                                                             <div className={`v5-check-circle ${viewingMaterial?.id === item.id ? 'checked' : ''}`}>
@@ -540,6 +592,15 @@ export default function HazardousMaterialMapping() {
                             )
                         ) : viewMode === 'detail' && viewingMaterial ? (
                             <div className="material-detail-panel-v5" style={{ padding: '0', background: '#F8FAFC' }}>
+                                <div style={{ padding: '16px 16px 0 16px' }}>
+                                    <button
+                                        onClick={() => { setViewingMaterial(null); setViewMode('list'); }}
+                                        className="back-btn-v5"
+                                        style={{ width: 'auto', padding: '6px 12px', fontSize: '12px', height: '32px' }}
+                                    >
+                                        <ChevronLeft size={16} /> BACK
+                                    </button>
+                                </div>
                                 <div className="detail-card-premium">
                                     <div className="detail-header-row">
                                         <div className="dh-left">
@@ -548,10 +609,10 @@ export default function HazardousMaterialMapping() {
                                             </div>
                                             <div className="dh-titles">
                                                 <h3>{viewingMaterial.name}</h3>
-                                                <span className="dh-ref">REF: HAZ-CMP-2024-001</span>
+                                                <span className="dh-ref">EG NO: {viewingMaterial.shipPO ? (viewingMaterial.shipPO.startsWith('EG') ? viewingMaterial.shipPO : `EG${viewingMaterial.shipPO}`) : 'EG3456'}</span>
                                             </div>
                                         </div>
-                                        <span className="status-badge-premium mapped">MAPPED</span>
+                                        <span className="status-badge-premium mapped" style={{ marginLeft: 'auto' }}>MAPPED</span>
                                     </div>
 
                                     <div className="detail-form-grid">
@@ -715,7 +776,7 @@ export default function HazardousMaterialMapping() {
                                             <ChevronDown size={14} />
                                             {openDropdown === 'movement' && (
                                                 <div className="dropdown-v4">
-                                                    {['Installation', 'Maintenance', 'Removal', 'Internal Movement', 'Disposal'].map(type => (
+                                                    {['MTS - Move to Store', 'MTS - Move from Store', 'Relocate Deck', 'Relocate Location', 'Landed Ashore'].map(type => (
                                                         <div key={type} className="drop-item" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, movementType: type }); setOpenDropdown(null); }}>{type}</div>
                                                     ))}
                                                 </div>
@@ -730,9 +791,43 @@ export default function HazardousMaterialMapping() {
                                             <ChevronDown size={14} />
                                             {openDropdown === 'ihm' && (
                                                 <div className="dropdown-v4">
-                                                    {['Part I - Materials contained in ship structure', 'Part II - Operationally generated wastes', 'Part III - Stores'].map(part => (
-                                                        <div key={part} className="drop-item" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, ihmPart: part }); setOpenDropdown(null); }}>{part}</div>
+                                                    {['Part I - Materials contained in ship structure or equipment', 'Part II - Operationally generated wastes', 'Part III - Stores'].map(part => (
+                                                        <div key={part} className="drop-item" onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setFormData({ ...formData, ihmPart: part, equipmentClass: '' });
+                                                            setOpenDropdown('eq_class'); // Trigger open equipment class
+                                                        }}>{part}</div>
                                                     ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Equipment Class Logic - Always Visible */}
+                                    <div className="form-group-technical">
+                                        <label>EQUIPMENT CLASS</label>
+
+                                        <div className={`custom-select-v2 ${!formData.ihmPart ? 'disabled-selection' : ''}`}
+                                            onClick={() => {
+                                                if (formData.ihmPart) {
+                                                    setOpenDropdown(openDropdown === 'eq_class' ? null : 'eq_class');
+                                                }
+                                            }}>
+                                            <span>{formData.equipmentClass || 'Select Equipment Class'}</span>
+                                            <ChevronDown size={14} />
+                                            {openDropdown === 'eq_class' && (
+                                                <div className="dropdown-v4">
+                                                    {formData.ihmPart?.includes('Part I') ? (
+                                                        ['1-1 Paints and Coatings systems', '1-2 Equipment and Machinery', '1-3 Structure and Hull'].map((opt, i) => (
+                                                            <div key={`${opt}-${i}`} className="drop-item" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, equipmentClass: opt }); setOpenDropdown(null); }}>{opt}</div>
+                                                        ))
+                                                    ) : formData.ihmPart ? (
+                                                        ['Part 2', 'Part 2', 'Part 2'].map((opt, i) => (
+                                                            <div key={`${opt}-${i}`} className="drop-item" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, equipmentClass: opt }); setOpenDropdown(null); }}>{opt}</div>
+                                                        ))
+                                                    ) : (
+                                                        <div className="drop-item disabled">Please select IHM Part first</div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -740,19 +835,16 @@ export default function HazardousMaterialMapping() {
 
                                     <div className="form-group-technical">
                                         <label>SUSPECTED HAZARDOUS MATERIALS <span className="req">*</span></label>
-                                        <div className="multi-select-list">
-                                            {['Asbestos', 'PCB', 'Ozone Depleting Substances', 'Organotin Compounds', 'Lead-based Paint'].map(mat => (
-                                                <div key={mat}
-                                                    className={`list-item ${formData.hazMaterials.includes(mat) ? 'selected' : ''}`}
-                                                    onClick={() => {
-                                                        const updated = formData.hazMaterials.includes(mat)
-                                                            ? formData.hazMaterials.filter(m => m !== mat)
-                                                            : [...formData.hazMaterials, mat];
-                                                        setFormData({ ...formData, hazMaterials: updated });
-                                                    }}>
-                                                    {mat}
+                                        <div className="custom-select-v2" onClick={() => setOpenDropdown(openDropdown === 'suspected_hm' ? null : 'suspected_hm')}>
+                                            <span>{formData.hazMaterials[0] || 'Select suspected material'}</span>
+                                            <ChevronDown size={14} />
+                                            {openDropdown === 'suspected_hm' && (
+                                                <div className="dropdown-v4">
+                                                    {['Asbestos', 'Ozone Depleting Substances', 'Organotin Compounds', 'Cuibutryne', 'Radioactive materials', 'Polychloronaphthalenes', 'Certain Shortchain Chlorinated Paraffins', 'Perfluorooctane Sulfonate (PFOS)', 'Hexabromocyclododecane (HBCDD)'].map(mat => (
+                                                        <div key={mat} className="drop-item" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, hazMaterials: [mat] }); setOpenDropdown(null); }}>{mat}</div>
+                                                    ))}
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
                                     </div>
 
@@ -763,7 +855,7 @@ export default function HazardousMaterialMapping() {
                                         </div>
                                         <div className="form-group-technical flex-1">
                                             <label>SHIP PO</label>
-                                            <input type="text" placeholder="PO-123456" value={formData.shipPO} onChange={e => setFormData({ ...formData, shipPO: e.target.value })} />
+                                            <input type="text" placeholder="e.g. PO-123456" value={formData.shipPO} onChange={e => setFormData({ ...formData, shipPO: e.target.value })} />
                                         </div>
                                     </div>
 
@@ -799,13 +891,14 @@ export default function HazardousMaterialMapping() {
                                         <input type="text" placeholder="e.g. Rubber" value={formData.material} onChange={e => setFormData({ ...formData, material: e.target.value })} />
                                     </div>
 
-                                    <div className="form-row-balanced">
-                                        <div className="form-group-technical flex-2">
-                                            <label>QUANTITY OF HM</label>
-                                            <input type="text" placeholder="12.5" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: e.target.value })} />
+                                    {/* Fields from Screenshot - Added eg: labels */}
+                                    <div className="form-row-quad" style={{ display: 'flex', gap: '15px', marginTop: '10px' }}>
+                                        <div className="form-group-technical flex-1">
+                                            <label>Quantity of HM</label>
+                                            <input type="text" placeholder="eg: 0.02" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: e.target.value })} />
                                         </div>
                                         <div className="form-group-technical flex-1">
-                                            <label>UNIT</label>
+                                            <label>Unit</label>
                                             <div className="custom-select-v2" onClick={() => setOpenDropdown(openDropdown === 'unit' ? null : 'unit')}>
                                                 <span>{formData.unit}</span>
                                                 <ChevronDown size={14} />
@@ -818,37 +911,121 @@ export default function HazardousMaterialMapping() {
                                                 )}
                                             </div>
                                         </div>
+                                        <div className="form-group-technical flex-1">
+                                            <label>No. of Pieces</label>
+                                            <input type="text" placeholder="eg: 8" value={formData.noOfPieces} onChange={e => setFormData({ ...formData, noOfPieces: e.target.value })} />
+                                        </div>
                                     </div>
 
+                                    <div className="total-quantity-status" style={{ padding: '8px 0', borderBottom: '1px solid #E2E8F0', marginBottom: '15px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <div style={{ width: '16px', height: '16px', border: '1px solid #94A3B8', borderRadius: '2px' }} />
+                                            <div style={{ color: '#00B0FA', fontWeight: 'bold' }}>
+                                                Total Quantity of HM: <span style={{ color: '#1E293B', marginLeft: '5px' }}>{formData.noOfPieces} PCS | {formData.quantity || '0.00'} {formData.unit}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* New File Upload Design */}
                                     <div className="form-group-technical">
-                                        <label>DOCUMENT ATTACHMENTS</label>
-                                        {formData.files.length <= 2 ? (
-                                            <div className="upload-dropzone-v4" onClick={handleFileUpload}>
-                                                <div className="up-icon"><Upload size={20} /></div>
-                                                <p>{formData.files.length === 0 ? 'Choose document file(s)' : `${formData.files.length} File(s) Selected`}</p>
-                                                <div className="file-preview-list-mini">
-                                                    {formData.files.map((f, i) => <span key={i} className="f-mini-tag">{f}</span>)}
+                                        <label>Documents Attachment</label>
+                                        <div className="upload-box-v5" style={{ position: 'relative' }}>
+                                            <Upload size={20} color="#00B0FA" />
+                                            <p>Choose File or Drag-and-Drop</p>
+                                            <span className="file-hint">**PDF, PNG and JPEG allowed up to 10MB.</span>
+                                            <input
+                                                type="file"
+                                                multiple
+                                                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+                                                onChange={(e) => {
+                                                    if (e.target.files) {
+                                                        const newFiles = Array.from(e.target.files).map(f => f.name);
+                                                        setFormData({ ...formData, files: [...formData.files, ...newFiles] });
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+
+                                        {/* File List Logic */}
+                                        <div className="file-status-rail" style={{ marginTop: '10px' }}>
+                                            {formData.files.length === 1 ? (
+                                                <div className="neat-file-row">
+                                                    <FileText size={16} color="#00B0FA" />
+                                                    <span>{formData.files[0]}</span>
+                                                    <X size={18} className="remove-f" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, files: [] }); }} />
                                                 </div>
-                                            </div>
-                                        ) : (
-                                            <div className="custom-select-v2 doc-dropbox" onClick={() => setOpenDropdown(openDropdown === 'files' ? null : 'files')}>
-                                                <span>{formData.files.length} Documents Attached</span>
-                                                <ChevronDown size={14} />
-                                                {openDropdown === 'files' && (
-                                                    <div className="dropdown-v4 dropdown-files">
-                                                        {formData.files.map((f, i) => (
-                                                            <div key={i} className="drop-item file-item">
-                                                                <span>{f}</span>
-                                                                <X size={12} onClick={(e) => { e.stopPropagation(); setFormData(p => ({ ...p, files: p.files.filter((_, idx) => idx !== i) })); }} />
-                                                            </div>
-                                                        ))}
-                                                        <div className="drop-item add-more" onClick={(e) => { e.stopPropagation(); handleFileUpload(); }}>
-                                                            + Add More Documents
-                                                        </div>
+                                            ) : formData.files.length > 1 ? (
+                                                <div className="multi-file-dropdown-hover"
+                                                    onMouseEnter={() => setOpenDropdown('files_hover')}
+                                                    onMouseLeave={() => setOpenDropdown(null)}>
+                                                    <div className="hover-trigger-box">
+                                                        <FileText size={16} color="#00B0FA" />
+                                                        <span>{formData.files.length} Documents Selected</span>
+                                                        <ChevronDown size={14} />
                                                     </div>
-                                                )}
+
+                                                    {openDropdown === 'files_hover' && (
+                                                        <div className="hover-dropdown-list">
+                                                            <div className="hover-list-content">
+                                                                {formData.files.map((f, i) => (
+                                                                    <div key={i} className="hover-file-item">
+                                                                        <div className="file-name-group">
+                                                                            <FileText size={16} color="#64748B" />
+                                                                            <span>{f}</span>
+                                                                        </div>
+                                                                        <X size={18} className="remove-f-mini" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, files: formData.files.filter((_, idx) => idx !== i) }); }} />
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    </div>
+
+                                    {/* HM Status - Changed Gold to Blue */}
+                                    <div className="hm-status-section" style={{ marginTop: '15px' }}>
+                                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#1E293B', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>HM Status</label>
+                                        <div style={{ display: 'flex', gap: '40px' }}>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                                                <input type="radio" name="hmStatus" checked={formData.hmStatus === 'CHM'} onChange={() => setFormData({ ...formData, hmStatus: 'CHM' })} />
+                                                <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#00B0FA' }}>CHM</span>
+                                            </label>
+                                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+                                                <input type="radio" name="hmStatus" checked={formData.hmStatus === 'PCHM'} onChange={() => setFormData({ ...formData, hmStatus: 'PCHM' })} />
+                                                <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#64748B' }}>PCHM</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div className="form-row-balanced" style={{ marginTop: '20px' }}>
+                                        <div className="form-group-technical flex-1">
+                                            <label>Created Date *</label>
+                                            <div className="premium-date-wrapper">
+                                                <input type="date" value={formData.createdDate} onChange={e => setFormData({ ...formData, createdDate: e.target.value })} />
+                                                <Calendar size={16} className="date-icon-abs" />
                                             </div>
-                                        )}
+                                            <span style={{ fontSize: '9px', color: '#94A3B8' }}>DD/MM/YYYY</span>
+                                        </div>
+                                        <div className="form-group-technical flex-1">
+                                            <label>Updated Date For Report *</label>
+                                            <div className="premium-date-wrapper">
+                                                <input type="date" value={formData.updatedDate} onChange={e => setFormData({ ...formData, updatedDate: e.target.value })} />
+                                                <Calendar size={16} className="date-icon-abs" />
+                                            </div>
+                                            <span style={{ fontSize: '9px', color: '#94A3B8' }}>DD/MM/YYYY</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="form-group-technical" style={{ marginTop: '15px' }}>
+                                        <label>Remarks</label>
+                                        <textarea
+                                            placeholder="NO. : 4090200)"
+                                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '13px', minHeight: '60px' }}
+                                            value={formData.remarks}
+                                            onChange={e => setFormData({ ...formData, remarks: e.target.value })}
+                                        />
                                     </div>
                                 </div>
 
@@ -868,17 +1045,6 @@ export default function HazardousMaterialMapping() {
                         )}
                     </div>
                 </aside>
-                {/* Assuming viewer-viewport-v5 is a sibling to aside, and we want the panel inside it */}
-                {/* The provided content does not show the viewer-viewport-v5 closing tag, so I'll place it after the aside,
-                    assuming the structure is <div class="main-container"><aside>...</aside><div class="viewer-viewport-v5">...</div></div> */}
-                {/* However, the instruction implies it should be within the viewer-viewport-v5.
-                    Given the provided snippet, the closing `</div>` tags after `sidebar-fab-v5` suggest closing the main layout container.
-                    I will place it as a sibling to the `aside` element, and then close the main container.
-                    This means the `materials-bottom-panel` will be at the same level as the `aside` (sidebar).
-                    If the `viewer-viewport-v5` is also at this level, then this panel will be a sibling to both.
-                    The instruction's snippet for the change shows it after the `sidebar-fab-v5` and then two `</div>` tags,
-                    which would place it outside the `aside` element.
-                    I will follow the provided snippet's placement. */}
             </div >
 
 
@@ -892,9 +1058,7 @@ export default function HazardousMaterialMapping() {
                     <div className="f-divider" />
                     <div className="f-h-item">LAST SYNC: JUST NOW</div>
                 </div>
-                <div className="f-version">
-                    IHM MAPPING INTERFACE V4.2.0
-                </div>
+
             </footer>
         </div >
     );

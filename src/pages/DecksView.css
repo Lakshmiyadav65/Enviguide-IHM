@@ -582,38 +582,41 @@
 .divider-circle-v3 {
     width: 16px;
     height: 16px;
-    border: 2px solid #CBD5E1;
+    border: 1.5px solid #CBD5E1;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     background: white;
     position: relative;
+    box-shadow: none;
 }
 
 .divider-legs-v3 {
     display: flex;
+    justify-content: center;
     gap: 8px;
-    margin-top: 4px;
-    /* Added space between circle and legs */
+    /* Bigger gap to ensure they stay apart at the top */
+    margin-top: 10px;
 }
 
 .leg-v3 {
-    width: 2px;
+    width: 2.5px;
     height: 36px;
     background: #CBD5E1;
     border-radius: 1px;
 }
 
 .leg-v3.left {
-    transform: rotate(18deg);
+    transform: rotate(30deg);
     transform-origin: top center;
 }
 
 .leg-v3.right {
-    transform: rotate(-18deg);
+    transform: rotate(-30deg);
     transform-origin: top center;
 }
+
 
 @keyframes dividerProfessionalDrift {
 

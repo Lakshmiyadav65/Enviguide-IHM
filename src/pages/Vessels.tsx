@@ -1,17 +1,17 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import {
-    Search, Plus, Filter, Layers, FileText, ShoppingCart,
-    BarChart2, FileCheck, ShieldCheck, Check, Edit2, X,
-    FolderOpen, Ship as ShipIcon, Pin, Upload, Eye, Trash2, Calendar, ChevronDown, ChevronUp,
-    Download, AlertTriangle, ExternalLink, ChevronLeft, ChevronRight, RefreshCw
+    Search, Plus, Check, ShieldCheck, BarChart2, ShoppingCart, Layers,
+    FolderOpen, Ship as ShipIcon, GripVertical, Book, Paperclip,
+    ExternalLink, Download, X, AlertTriangle, Monitor, FileText,
+    ChevronDown, Trash2, Edit2, Calendar, ChevronLeft, ChevronRight, Pin, Upload, Eye, EyeOff, RotateCw, ZoomIn, ZoomOut, Maximize2
 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
 import './Vessels.css';
-import MaterialsRecord from './MaterialsRecord';
-import PurchaseOrderView from './PurchaseOrderView';
 import DecksView from './DecksView';
+import PurchaseOrderView from './PurchaseOrderView';
+import MaterialsRecord from './MaterialsRecord';
 import IHMCertificateView from './IHMCertificateView';
 import vesselDefault from '../assets/images/vessel_default.jpg';
 
@@ -220,10 +220,38 @@ export default function Vessels() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [isFilterExpanded, setIsFilterExpanded] = useState(false);
-    const [openReportId, setOpenReportId] = useState<string | null>('adhoc');
 
-    // Custom Dropdown States
+    // Document & Form States
+    const [docSearch, setDocSearch] = useState('');
+    const [docCategory, setDocCategory] = useState('All');
+    const [docStatus, setDocStatus] = useState('All');
+    const [docPage, setDocPage] = useState(1);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [newDocType, setNewDocType] = useState('Select Document Type');
+    const docsPerPage = 10;
+
+    const [isDraggingFile, setIsDraggingFile] = useState(false);
+    const [formData, setFormData] = useState<VesselData>(INITIAL_VESSELS[0]);
+    const [showModal, setShowModal] = useState(false);
+    const [modalMessage, setModalMessage] = useState('');
+
+    const [selectedDoc, setSelectedDoc] = useState<any>(null);
+    const [docToDelete, setDocToDelete] = useState<any>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    // Reports Flow States
+    const [reportStep, setReportStep] = useState(0); // 0: Selection, 1: Configuration, 2: Editor
+    const [selectedReportType, setSelectedReportType] = useState<string | null>(null);
+    const [selectedReportCategory, setSelectedReportCategory] = useState<string | null>(null);
+    const [selectedSections, setSelectedSections] = useState<string[]>([]);
+    const [hiddenSections, setHiddenSections] = useState<string[]>([]);
+    const [reorderedSections, setReorderedSections] = useState<any[]>([]);
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const docInputRef = useRef<HTMLInputElement>(null);
+
+    // Custom Dropdown States & Refs
     const [isDocTypeDropdownOpen, setIsDocTypeDropdownOpen] = useState(false);
     const [isDocCategoryDropdownOpen, setIsDocCategoryDropdownOpen] = useState(false);
     const [isDocStatusDropdownOpen, setIsDocStatusDropdownOpen] = useState(false);
@@ -249,10 +277,72 @@ export default function Vessels() {
         };
     }, []);
 
-    // Purchase Order Filters Lifted State
-    const [poFilterDateFrom, setPoFilterDateFrom] = useState('');
-    const [poFilterDateTo, setPoFilterDateTo] = useState('');
-    const [poFilterCompliance, setPoFilterCompliance] = useState('All');
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    // Scroll effect for report blurred cards (Accordion cards in Step 0)
+    useEffect(() => {
+        const handleScroll = () => {
+            const container = scrollContainerRef.current;
+            if (!container) return;
+
+            const cards = container.querySelectorAll('.report-accordion-group');
+            const containerRect = container.getBoundingClientRect();
+            const containerBottom = containerRect.bottom;
+            const scrollHeight = container.scrollHeight;
+            const scrollTop = container.scrollTop;
+            const clientHeight = container.clientHeight;
+
+            const isAtBottom = scrollHeight - (scrollTop + clientHeight) < 10;
+
+            cards.forEach((card) => {
+                const rect = (card as HTMLElement).getBoundingClientRect();
+                const cardBottom = rect.bottom;
+                const distanceToBottom = containerBottom - cardBottom;
+
+                // If we are at the very bottom, remove all blur
+                if (isAtBottom) {
+                    (card as HTMLElement).style.filter = 'none';
+                    (card as HTMLElement).style.opacity = '1';
+                    (card as HTMLElement).style.transform = 'scale(1)';
+                    return;
+                }
+
+                // Identify the "last few" cards based on proximity to container bottom
+                // We want the last 2 visible cards to be blurry
+                if (distanceToBottom < 100 && distanceToBottom > -50) {
+                    const blurAmount = Math.max(0, (100 - distanceToBottom) / 20);
+                    const opacityAmount = Math.max(0.6, distanceToBottom / 100);
+                    (card as HTMLElement).style.filter = `blur(${blurAmount}px)`;
+                    (card as HTMLElement).style.opacity = `${opacityAmount}`;
+                    (card as HTMLElement).style.transform = `scale(${0.98 + (distanceToBottom / 5000)})`;
+                } else if (distanceToBottom <= -50) {
+                    // Elements below the viewport bottom
+                    (card as HTMLElement).style.filter = 'blur(8px)';
+                    (card as HTMLElement).style.opacity = '0';
+                } else {
+                    (card as HTMLElement).style.filter = 'none';
+                    (card as HTMLElement).style.opacity = '1';
+                    (card as HTMLElement).style.transform = 'scale(1)';
+                }
+            });
+        };
+
+        const container = scrollContainerRef.current;
+        if (activeTab === 'reports' && reportStep === 0 && container) {
+            container.addEventListener('scroll', handleScroll);
+            // Trigger once to set initial state
+            handleScroll();
+        } else if (container) {
+            // Reset all cards if we leave reports or move to config step
+            const cards = container.querySelectorAll('.report-accordion-group');
+            cards.forEach((card) => {
+                (card as HTMLElement).style.filter = 'none';
+                (card as HTMLElement).style.opacity = '1';
+                (card as HTMLElement).style.transform = 'scale(1)';
+            });
+        }
+        return () => container?.removeEventListener('scroll', handleScroll);
+    }, [activeTab, reportStep]);
 
     const [vesselDocuments, setVesselDocuments] = useState<{ [key: string]: any[] }>({
         'MV Ocean Pioneer': Array.from({ length: 45 }, (_, i) => ({
@@ -359,25 +449,7 @@ export default function Vessels() {
         }))
     });
 
-    const [docSearch, setDocSearch] = useState('');
-    const [docCategory, setDocCategory] = useState('All');
-    const [docStatus, setDocStatus] = useState('All');
-
-    const [formData, setFormData] = useState<VesselData>(INITIAL_VESSELS[0]);
-    const [showModal, setShowModal] = useState(false);
-    const [modalMessage, setModalMessage] = useState('');
-    const [isDraggingFile, setIsDraggingFile] = useState(false);
-
-    const [selectedDoc, setSelectedDoc] = useState<any>(null);
-    const [docToDelete, setDocToDelete] = useState<any>(null);
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-    const [newDocType, setNewDocType] = useState('Select Document Type');
-    const [docPage, setDocPage] = useState(1);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const docsPerPage = 7;
-
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const docInputRef = useRef<HTMLInputElement>(null);
+    // State management handles consolidated above
 
 
     const activeVesselData = useMemo(() => {
@@ -529,16 +601,17 @@ export default function Vessels() {
     };
 
     const tabs = [
-        { id: 'project', label: 'Project', icon: FileCheck },
+        { id: 'project', label: 'Project', icon: FolderOpen },
         { id: 'decks', label: 'Decks', icon: Layers },
-        { id: 'documents', label: 'Documents', icon: FolderOpen },
-        { id: 'materials', label: 'Materials Record', icon: FileText },
+        { id: 'documents', label: 'Documents', icon: FileText },
+        { id: 'materials', label: 'Materials Record', icon: Layers },
         { id: 'purchase', label: 'Purchase Orders', icon: ShoppingCart },
         { id: 'reports', label: 'Reports', icon: BarChart2 },
         { id: 'certificate', label: 'IHM Certificate', icon: ShieldCheck },
     ];
 
     const renderContent = () => {
+
         if (id !== 'ship') {
             return (
                 <div className="vessels-placeholder">
@@ -687,7 +760,11 @@ export default function Vessels() {
                             <Calendar size={18} />
                             <span>Select Date Range (From - To)</span>
                         </div>
-                        <button className="clear-filters-link" onClick={() => { setDocSearch(''); setDocCategory('All'); setDocStatus('All'); }}>Clear Filters</button>
+                        {(docSearch || docCategory !== 'All' || docStatus !== 'All') && (
+                            <button className="clear-filters-link" onClick={() => { setDocSearch(''); setDocCategory('All'); setDocStatus('All'); }}>
+                                Clear Filters
+                            </button>
+                        )}
                     </div>
 
                     <div className="doc-table-wrapper">
@@ -881,16 +958,8 @@ export default function Vessels() {
         }
 
         if (activeTab === 'purchase') {
-            const activeVessel = vesselList.find(v => v.name === activeVesselName);
             return (
-                <PurchaseOrderView
-                    key={activeVesselName}
-                    vesselName={activeVesselName}
-                    imo={activeVessel?.imoNo || ''}
-                    filterDateFrom={poFilterDateFrom}
-                    filterDateTo={poFilterDateTo}
-                    filterCompliance={poFilterCompliance}
-                />
+                <PurchaseOrderView key={activeVesselName} />
             );
         }
 
@@ -899,98 +968,426 @@ export default function Vessels() {
         }
 
         if (activeTab === 'reports') {
-            interface ReportGroup {
-                id: string;
-                label: string;
-                icon: any;
-                disabled: boolean;
-                isDullRed?: boolean;
-                ticks?: number;
-            }
+            const vesselDisplayName = activeVesselName.includes(' ') ? activeVesselName.split(' ')[1].toUpperCase() : activeVesselName.toUpperCase();
 
-            const reportGroups: ReportGroup[] = [
-                { id: 'adhoc', label: 'Ad Hoc Report', icon: FileText, disabled: false },
-                { id: 'kf2-web', label: 'KF2 Webtechmembers', icon: ShieldCheck, disabled: false },
-                { id: 'q4-25', label: 'Q4 (01/10/2025 - 31/12/2025)', icon: Calendar, disabled: false },
-                { id: 'q3-25', label: 'Q3 (01/07/2025 - 30/09/2025)', icon: Calendar, disabled: false },
-                { id: 'q2-25', label: 'Q2 (01/04/2025 - 30/06/2025)', icon: Calendar, disabled: false },
-                { id: 'q1-25', label: 'Q1 (01/01/2025 - 31/03/2025)', icon: Calendar, disabled: false },
-                { id: 'q4-24', label: 'Q4 (01/10/2024 - 31/12/2024)', icon: Calendar, disabled: false },
-                { id: 'q3-24', label: 'Q3 (01/07/2024 - 30/09/2024)', icon: Calendar, disabled: false },
-                { id: 'q2-24', label: 'Q2 (01/04/2024 - 30/06/2024)', icon: Calendar, disabled: false },
-                { id: 'q1-24', label: 'Q1 (01/01/2024 - 31/03/2024)', icon: Calendar, disabled: false },
-                { id: 'q4-23', label: 'Q4 (01/10/2023 - 31/12/2023)', icon: Calendar, disabled: false },
+            const reportCategories = [
+                {
+                    id: 'adhoc',
+                    title: 'AD HOC REPORT',
+                    items: [
+                        { id: 'summary', name: 'Compliance Summary Report', date: 'Last updated: Oct 24, 2023' },
+                        { id: 'inventory', name: 'Detailed Materials Inventory Report', date: 'Last updated: Oct 12, 2023' },
+                        { id: 'hazmat', name: 'Global Hazmat Overview Report', date: 'Last updated: Nov 05, 2023' },
+                    ]
+                },
+                { id: 'q1_2026', title: 'Q1 (01/01/2026 - 31/03/2026)', items: [{ id: 'q1_26_1', name: 'Quarterly Compliance Report', date: 'Last updated: Feb 01, 2026' }] },
+                { id: 'q4_2025', title: 'Q4 (01/10/2025 - 31/12/2025)', items: [{ id: 'q4_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 05, 2026' }] },
+                { id: 'q3_2025', title: 'Q3 (01/07/2025 - 30/09/2025)', items: [{ id: 'q3_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 10, 2025' }] },
+                { id: 'q2_2025', title: 'Q2 (01/04/2025 - 30/06/2025)', items: [{ id: 'q2_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 15, 2025' }] },
+                { id: 'q1_2025', title: 'Q1 (01/01/2025 - 31/03/2025)', items: [{ id: 'q1_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 10, 2025' }] },
+                { id: 'q4_2024', title: 'Q4 (01/10/2024 - 31/12/2024)', items: [{ id: 'q4_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 12, 2025' }] },
+                { id: 'q3_2024', title: 'Q3 (01/07/2024 - 30/09/2024)', items: [{ id: 'q3_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 15, 2024' }] },
+                { id: 'q2_2024', title: 'Q2 (01/04/2024 - 30/06/2024)', items: [{ id: 'q2_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 20, 2024' }] },
+                { id: 'q1_2024', title: 'Q1 (01/01/2024 - 31/03/2024)', items: [{ id: 'q1_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 18, 2024' }] },
+                { id: 'q4_2023', title: 'Q4 (01/10/2023 - 31/12/2023)', items: [{ id: 'q4_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 22, 2024' }] },
+                { id: 'q3_2023', title: 'Q3 (01/07/2023 - 30/09/2023)', items: [{ id: 'q3_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 25, 2023' }] },
+                { id: 'q2_2023', title: 'Q2 (01/04/2023 - 30/06/2023)', items: [{ id: 'q2_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 28, 2023' }] },
+                { id: 'q1_2023', title: 'Q1 (01/01/2023 - 31/03/2023)', items: [{ id: 'q1_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 30, 2023' }] },
+                { id: 'q4_2022', title: 'Q4 (01/10/2022 - 31/12/2022)', items: [{ id: 'q4_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 15, 2023' }] },
+                { id: 'q3_2022', title: 'Q3 (01/07/2022 - 30/09/2022)', items: [{ id: 'q3_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 20, 2022' }] },
+                { id: 'q2_2022', title: 'Q2 (01/04/2022 - 30/06/2022)', items: [{ id: 'q2_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 25, 2022' }] },
+                { id: 'q1_2022', title: 'Q1 (01/01/2022 - 31/03/2022)', items: [{ id: 'q1_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 28, 2022' }] },
+                { id: 'q4_2021', title: 'Q4 (01/10/2021 - 31/12/2021)', items: [{ id: 'q4_21_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 18, 2022' }] },
+                { id: 'q3_2021', title: 'Q3 (01/07/2021 - 30/09/2021)', items: [{ id: 'q3_21_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 22, 2021' }] },
+                { id: 'q2_2021', title: 'Q2 (01/04/2021 - 30/06/2021)', items: [{ id: 'q2_21_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 25, 2021' }] },
             ];
 
-            return (
-                <div className="reports-container">
-                    <div className="reports-stack">
-                        {reportGroups.map((group) => (
-                            <div
-                                key={group.id}
-                                className={`report-accordion-card ${group.isDullRed ? 'dull-red' : ''} ${openReportId === group.id ? 'active' : ''}`}
-                                onClick={() => !group.disabled && setOpenReportId(openReportId === group.id ? null : group.id)}
-                            >
-                                <div className="report-accordion-header">
-                                    <div className="report-header-left">
-                                        <group.icon size={20} className="report-group-icon" />
-                                        <h3>{group.label} {group.ticks && <span className="tick-count">[{group.ticks} Ticks]</span>}</h3>
-                                    </div>
-                                    <ChevronDown
-                                        size={18}
-                                        className="report-chevron"
-                                        style={{
-                                            transform: openReportId === group.id ? 'rotate(180deg)' : 'none',
-                                            transition: 'transform 0.2s'
+            const SECTIONS_LIST = [
+                { id: 'intro', title: 'Introduction', hasView: true },
+                { id: 'specs', title: 'Vessel Specifications', hasView: true },
+                { id: 'index', title: 'Index', hasView: true },
+                { id: 'mov', title: 'IHM Movement', hasView: true },
+                { id: 'haz', title: 'Ship Hazmat Overview', hasView: true },
+                { id: 'details', title: 'IHM Details', hasView: true },
+                { id: 'decks', title: 'HM Marked Decks', hasView: true },
+                { id: 'doc', title: 'IHM Document', hasView: true },
+                { id: 'f1', title: '9371543_CLODOMIRA_IHM Attestation Letter', hasView: true },
+                { id: 'f2', title: 'CLODOMIRA-IHM-002699', hasView: true },
+                { id: 'f3', title: '2020-12-01-ihm-report-compressed', hasView: true },
+                { id: 'f4', title: 'ACOSTA-IHM-004122_FULL TERM', hasView: true },
+                { id: 'f5', title: 'Anti-fouling Certificate', hasView: true },
+                { id: 'f6', title: '_ACOSTA-IHM-FULL TERM NEW ISSUED', hasView: true },
+                { id: 'other', title: 'Other', hasView: true }
+            ];
+
+            const toggleSection = (id: string) => {
+                if (selectedSections.includes(id)) {
+                    setSelectedSections(selectedSections.filter(s => s !== id));
+                } else {
+                    setSelectedSections([...selectedSections, id]);
+                }
+            };
+
+            if (reportStep === 0 || reportStep === 1) {
+                return (
+                    <div className="reports-accordion-wrapper" ref={scrollContainerRef}>
+                        {reportCategories.map((cat) => {
+                            const isCategoryConfiguring = reportStep === 1 && selectedReportCategory === cat.id;
+                            // Only expand if it's the selected category. ADHOC is no longer forced open.
+                            const isExpanded = selectedReportCategory === cat.id;
+
+                            return (
+                                <div key={cat.id} className={`report-accordion-group ${isExpanded ? 'expanded' : ''}`}>
+                                    <div
+                                        className="report-accordion-header"
+                                        onClick={() => {
+                                            if (reportStep === 1 && selectedReportCategory === cat.id) {
+                                                setReportStep(0);
+                                                setSelectedReportCategory(null);
+                                            } else {
+                                                setSelectedReportCategory(isExpanded ? null : cat.id);
+                                            }
                                         }}
-                                    />
-                                </div>
-
-                                {openReportId === group.id && (
-                                    <div className="report-accordion-content">
-                                        <div className="report-item-row">
-                                            <div className="report-info">
-                                                <div className="report-icon-bg">
-                                                    <FileText size={22} />
-                                                </div>
-                                                <div className="report-text">
-                                                    <h4>Compliance Summary</h4>
-                                                    <p>LAST UPDATE: 24 OCT 2023</p>
-                                                </div>
-                                            </div>
-                                            <div className="report-actions">
-                                                <button className="generate-btn-primary">
-                                                    <RefreshCw size={14} /> GENERATE
-                                                </button>
-                                                <button className="download-icon-btn">
-                                                    <Download size={22} />
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div className="report-item-row">
-                                            <div className="report-info">
-                                                <div className="report-icon-bg">
-                                                    <BarChart2 size={22} />
-                                                </div>
-                                                <div className="report-text">
-                                                    <h4>{group.id === 'adhoc' ? 'Ad Hoc Report - Standard Audit' : 'Detailed Materials Inventory Report'}</h4>
-                                                    <p>LAST UPDATE: 12 OCT 2023</p>
-                                                </div>
-                                            </div>
-                                            <div className="report-actions">
-                                                <button className="generate-btn-primary">
-                                                    <RefreshCw size={14} /> GENERATE
-                                                </button>
-                                                <button className="download-icon-btn">
-                                                    <Download size={22} />
-                                                </button>
-                                            </div>
-                                        </div>
+                                    >
+                                        <Monitor size={18} color="#00B0FA" />
+                                        <h3>{cat.title}</h3>
+                                        <ChevronDown size={14} className="accordion-arrow" />
                                     </div>
+                                    {isExpanded && (
+                                        <div className="report-accordion-content">
+                                            {isCategoryConfiguring ? (
+                                                <div className="designer-report-config-form">
+                                                    <div className="config-form-top-row">
+                                                        <div className="designer-field-group">
+                                                            <label>From Date *</label>
+                                                            <div className="designer-input-box">
+                                                                <input type="date" defaultValue="2021-05-15" />
+                                                            </div>
+                                                            <span className="field-helper">MM/DD/YYYY</span>
+                                                        </div>
+                                                        <div className="designer-field-group">
+                                                            <label>To Date *</label>
+                                                            <div className="designer-input-box">
+                                                                <input type="date" defaultValue="2026-02-04" />
+                                                            </div>
+                                                            <span className="field-helper">MM/DD/YYYY</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="designer-file-row">
+                                                        <label>Choose file</label>
+                                                        <div className="file-selection-bar" onClick={() => docInputRef.current?.click()}>
+                                                            <div className="file-display-area">
+                                                                <Paperclip size={18} color="#94A3B8" />
+                                                                <span style={{ fontSize: '13px', color: '#64748B', marginLeft: '8px' }}>
+                                                                    {selectedFile ? selectedFile.name : 'No file selected'}
+                                                                </span>
+                                                            </div>
+                                                            <button className="designer-upload-btn" type="button">
+                                                                <Upload size={18} />
+                                                            </button>
+                                                        </div>
+                                                        <input
+                                                            type="file"
+                                                            ref={docInputRef}
+                                                            style={{ display: 'none' }}
+                                                            onChange={handleDocFileChange}
+                                                        />
+                                                    </div>
+
+                                                    <div className="designer-sections-table">
+                                                        <div className="sections-table-header">
+                                                            <span className="col-sections">Sections</span>
+                                                            <span className="col-include">INCLUDE</span>
+                                                        </div>
+                                                        <div className="sections-table-body">
+                                                            {SECTIONS_LIST.map(sec => (
+                                                                <div key={sec.id} className="section-table-row">
+                                                                    <div className="section-name-cell">
+                                                                        <span>{sec.title}</span>
+                                                                        {sec.hasView && (
+                                                                            <button
+                                                                                type="button"
+                                                                                className="action-icn-btn minimal"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    if (hiddenSections.includes(sec.id)) {
+                                                                                        setHiddenSections(hiddenSections.filter(h => h !== sec.id));
+                                                                                    } else {
+                                                                                        setHiddenSections([...hiddenSections, sec.id]);
+                                                                                    }
+                                                                                }}
+                                                                                title="Toggle visibility"
+                                                                            >
+                                                                                {hiddenSections.includes(sec.id) ? <EyeOff size={14} color="#EF4444" /> : <Eye size={14} className="view-icon-dim" />}
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="section-checkbox-cell">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={selectedSections.includes(sec.id)}
+                                                                            onChange={() => toggleSection(sec.id)}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="designer-form-footer">
+                                                        <button
+                                                            className="preview-btn-designer"
+                                                            onClick={() => {
+                                                                const currentSections = SECTIONS_LIST.filter(sec =>
+                                                                    selectedSections.includes(sec.id) && !hiddenSections.includes(sec.id)
+                                                                );
+                                                                setReorderedSections(currentSections);
+                                                                setReportStep(2);
+                                                            }}
+                                                        >
+                                                            <Eye size={18} />
+                                                            PREVIEW REPORT
+                                                        </button>
+                                                        <button
+                                                            className="generate-btn-designer"
+                                                            onClick={() => {
+                                                                const currentSections = SECTIONS_LIST.filter(sec =>
+                                                                    selectedSections.includes(sec.id) && !hiddenSections.includes(sec.id)
+                                                                );
+                                                                setReorderedSections(currentSections);
+                                                                setReportStep(2);
+                                                            }}
+                                                        >
+                                                            <RotateCw size={18} />
+                                                            GENERATE REPORT
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="report-items-list">
+                                                    {cat.items.length > 0 ? (
+                                                        cat.items.map((item) => (
+                                                            <div key={item.id} className="report-item-card-premium">
+                                                                <div className="report-item-icon-box">
+                                                                    <FileText size={24} color="#94A3B8" />
+                                                                </div>
+                                                                <div className="report-item-info">
+                                                                    <div className="report-item-name">{item.name}</div>
+                                                                    <div className="report-item-meta">{item.date}</div>
+                                                                </div>
+                                                                <div className="report-action-btns">
+                                                                    <button
+                                                                        className="generate-btn-final"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setSelectedReportType(item.name);
+                                                                            setSelectedReportCategory(cat.id);
+                                                                            setReportStep(1);
+                                                                        }}
+                                                                    >
+                                                                        <RotateCw size={16} />
+                                                                        GENERATE
+                                                                    </button>
+                                                                    <button className="download-btn-final" onClick={(e) => e.stopPropagation()}>
+                                                                        <Download size={16} />
+                                                                        DOWNLOAD
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <div className="empty-category-msg">No reports found for this criteria.</div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+            }
+
+            // STEP 2: REPORT PREVIEW (As per user request, reorder structure is hidden for now)
+            return (
+                <div className="reports-final-output-wrapper">
+                    {/* Sub-header with Title - Meta and Edit Config removed as per user request */}
+                    <div className="report-sub-header-premium">
+                        <div className="sub-title-main">
+                            <Book size={24} className="editor-icon" />
+                            <h2>Report Structure Editor</h2>
+                        </div>
+                    </div>
+
+                    <div className="report-editor-layout">
+                        {/* Left Sidebar: Draggable Structure */}
+                        <div className="report-structure-sidebar">
+                            <div className="sidebar-header-row">
+                                <h3>DRAG TO REORDER SECTIONS</h3>
+                                <button className="add-sec-btn-text">ADD SECTION</button>
+                            </div>
+
+                            <div className="draggable-sections-list">
+                                {reorderedSections.length > 0 ? (
+                                    reorderedSections.map((sec, idx) => (
+                                        <div
+                                            key={sec.id}
+                                            className={`draggable-section-card ${draggedIndex === idx ? 'dragging' : ''}`}
+                                            draggable
+                                            onDragStart={(e) => {
+                                                setDraggedIndex(idx);
+                                                e.dataTransfer.effectAllowed = 'move';
+                                            }}
+                                            onDragOver={(e) => {
+                                                e.preventDefault();
+                                                if (draggedIndex === null || draggedIndex === idx) return;
+                                                const newSections = [...reorderedSections];
+                                                const itemToMove = newSections[draggedIndex];
+                                                newSections.splice(draggedIndex, 1);
+                                                newSections.splice(idx, 0, itemToMove);
+                                                setDraggedIndex(idx);
+                                                setReorderedSections(newSections);
+                                            }}
+                                            onDragEnd={() => setDraggedIndex(null)}
+                                        >
+                                            <div className="card-grab-handle">
+                                                <GripVertical size={16} color="#94A3B8" />
+                                            </div>
+                                            <div className="card-title-txt">{sec.title}</div>
+                                            <div
+                                                className="card-visibility-icn"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const newReordered = reorderedSections.filter(s => s.id !== sec.id);
+                                                    setReorderedSections(newReordered);
+                                                    setHiddenSections([...hiddenSections, sec.id]);
+                                                }}
+                                                style={{ cursor: 'pointer' }}
+                                                title="Hide section"
+                                            >
+                                                <Eye size={16} color="#94A3B8" />
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="empty-selection-msg">No sections selected for preview.</div>
                                 )}
                             </div>
-                        ))}
+
+                            <div className="sidebar-footer-actions">
+                                <button className="reset-order-btn" onClick={() => {
+                                    const original = SECTIONS_LIST.filter(sec =>
+                                        selectedSections.includes(sec.id) && !hiddenSections.includes(sec.id)
+                                    );
+                                    setReorderedSections(original);
+                                }}>RESET ORDER</button>
+                            </div>
+                        </div>
+
+                        {/* Right: Preview Pane */}
+                        <div className="report-main-preview-area">
+                            {/* Centered Mock Paper Document */}
+                            <div className="preview-pane-standalone">
+                                <div className="pane-header-actions">
+                                    <div className="preview-tag">
+                                        <FileText size={18} className="preview-icon-small" />
+                                        <h3>Live Preview: {selectedReportType || 'Report Overview'}</h3>
+                                    </div>
+                                    <div className="preview-controls-overlay">
+                                        <span className="page-indicator">Page 1 of 12</span>
+                                        <div className="zoom-btns">
+                                            <button className="zoom-btn"><ZoomOut size={16} /></button>
+                                            <button className="zoom-btn"><ZoomIn size={16} /></button>
+                                            <button className="zoom-btn"><Maximize2 size={16} /></button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="paper-viewer-container">
+                                    <div className="mock-paper-document">
+                                        <div className="paper-header">
+                                            <div className="paper-logo-icon">
+                                                <ShipIcon size={32} />
+                                            </div>
+                                            <div className="confidential-mark">
+                                                <span>STRICTLY CONFIDENTIAL</span>
+                                                <small>Ref: VS-{vesselDisplayName}-2024-001</small>
+                                            </div>
+                                        </div>
+
+                                        <h1 className="paper-title">{selectedReportType || 'Ship Hazmat Overview'}</h1>
+
+                                        <p className="paper-intro-text">
+                                            The following overview outlines the distribution and concentration of
+                                            hazardous materials identified during the most recent IHM survey for the
+                                            vessel <strong>{activeVesselName} (IMO: {activeVesselData?.imoNo || '9371543'})</strong>.
+                                        </p>
+
+                                        <div className="summary-boxes-row">
+                                            <div className="summary-box">
+                                                <span className="box-label">TOTAL ITEMS LOGGED</span>
+                                                <span className="box-value">124 Samples</span>
+                                            </div>
+                                            <div className="summary-box accent">
+                                                <span className="box-label">ACTIVE HAZARDS</span>
+                                                <span className="box-value">12 Locations</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="hazmat-table-mock">
+                                            <div className="table-header">
+                                                <span>HAZMAT CODE</span>
+                                                <span>LOCATION</span>
+                                                <span>STATUS</span>
+                                            </div>
+                                            <div className="table-row">
+                                                <span>Asbestos (Table A)</span>
+                                                <span>Engine Room - Gasket</span>
+                                                <span className="status-pos">Positive</span>
+                                            </div>
+                                            <div className="table-row">
+                                                <span>PCBs (Table A)</span>
+                                                <span>Main Deck - Paint</span>
+                                                <span className="status-neg">Negative</span>
+                                            </div>
+                                            <div className="table-row">
+                                                <span>Ozone Depleting</span>
+                                                <span>A/C Plant 2</span>
+                                                <span className="status-trace">Trace</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="paper-footer-note">
+                                            Note: All findings are subject to regular quarterly inspections and should be cross-referenced with the Movement Log on page 7.
+                                        </div>
+
+                                        <div className="paper-bottom-meta">
+                                            <span>Varuna Sentinels | IHM Compliance Report</span>
+                                            <span>Page 1 of 12</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pane-footer-actions">
+                                    <button className="save-draft-btn-plain">SAVE DRAFT</button>
+                                    <button className="finalize-export-btn">
+                                        <Layers size={18} /> FINALIZE & EXPORT
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="vessel-status-bar">
+                        <div className="status-left">
+                            <div className="status-dot dot-online"></div>
+                            <span>System Online</span>
+                        </div>
+                        <div className="status-right">
+                            <span>© 2024 Varuna Sentinels. All rights reserved.</span>
+                        </div>
                     </div>
                 </div>
             );
@@ -1067,8 +1464,13 @@ export default function Vessels() {
                                             </>
                                         ) : (
                                             <div className="drag-drop-placeholder">
-                                                <div className="upload-icon-circle">
-                                                    <Upload size={32} />
+                                                <div className="custom-upload-animation">
+                                                    <div className="animated-circle">
+                                                        <div className="inverted-v-divider">
+                                                            <div className="v-line left"></div>
+                                                            <div className="v-line right"></div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div className="upload-text">
                                                     <p className="main-text">Drag and drop file</p>
@@ -1137,7 +1539,7 @@ export default function Vessels() {
         <div className="vessels-page-container">
             <Sidebar />
             <main className="vessel-page-main">
-                <Header title="SHIPS AT PROJECT" notificationCount={notifCount} />
+                <Header notificationCount={notifCount} />
 
                 <div className="vessels-layout-wrapper">
                     <div className="vessels-top-nav">
@@ -1158,182 +1560,53 @@ export default function Vessels() {
                     </div>
 
                     <div className="vessels-content-layout">
-                        {/* Secondary Sidebar - Hidden on Decks, Documents, Materials & Certificate tabs */}
-                        {activeTab !== 'decks' && activeTab !== 'documents' && activeTab !== 'materials' && activeTab !== 'certificate' && activeTab !== 'reports' && (
+                        {/* Secondary Sidebar - Always visible for context */}
+                        {true && (
                             <aside className="secondary-sidebar">
-                                {activeTab === 'purchase' ? (
-                                    <>
-                                        <div className="sidebar-filters-wrapper">
-                                            <div className="sticky-filter-section">
-                                                <div className="vessel-sidebar-filter card-style" onClick={() => setIsFilterExpanded(!isFilterExpanded)}>
-                                                    <Filter size={14} />
-                                                    <span>FILTER</span>
-                                                    {isFilterExpanded ? <ChevronUp size={14} style={{ marginLeft: 'auto', color: '#64748b' }} /> : <ChevronDown size={14} style={{ marginLeft: 'auto', color: '#64748b' }} />}
-                                                </div>
+                                <div className="sidebar-section-header">
+                                    <span>VESSEL SELECTION</span>
+                                </div>
+                                <div className="vessel-search-container light-mode">
+                                    <div className="vessel-search-box light">
+                                        <Search size={16} color="#94A3B8" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search vessels..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
 
-                                                {isFilterExpanded && (
-                                                    <div className="sidebar-filter-content-direct">
-                                                        <div className="filter-section">
-                                                            <div className="filter-section-title">DATE RANGE</div>
-                                                            <div className="filter-date-inputs">
-                                                                <div className="filter-date-field">
-                                                                    <label>FROM</label>
-                                                                    <div className="date-input-with-icon">
-                                                                        <input
-                                                                            type="date"
-                                                                            value={poFilterDateFrom}
-                                                                            onChange={(e) => setPoFilterDateFrom(e.target.value)}
-                                                                        />
-                                                                        <Calendar size={14} className="calendar-icon-overlay" />
-                                                                    </div>
-                                                                </div>
-                                                                <div className="filter-date-field">
-                                                                    <label>TO</label>
-                                                                    <div className="date-input-with-icon">
-                                                                        <input
-                                                                            type="date"
-                                                                            value={poFilterDateTo}
-                                                                            onChange={(e) => setPoFilterDateTo(e.target.value)}
-                                                                        />
-                                                                        <Calendar size={14} className="calendar-icon-overlay" />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="filter-section">
-                                                            <div className="filter-section-title">COMPLIANCE STATUS</div>
-                                                            <div className="filter-radio-group">
-                                                                <label className="filter-radio-item">
-                                                                    <input
-                                                                        type="radio"
-                                                                        name="compliance"
-                                                                        checked={poFilterCompliance === 'All'}
-                                                                        onChange={() => setPoFilterCompliance('All')}
-                                                                    />
-                                                                    <span>All Statuses</span>
-                                                                </label>
-                                                                <label className="filter-radio-item">
-                                                                    <input
-                                                                        type="radio"
-                                                                        name="compliance"
-                                                                        checked={poFilterCompliance === 'Verified'}
-                                                                        onChange={() => setPoFilterCompliance('Verified')}
-                                                                    />
-                                                                    <span>Verified</span>
-                                                                </label>
-                                                                <label className="filter-radio-item">
-                                                                    <input
-                                                                        type="radio"
-                                                                        name="compliance"
-                                                                        checked={poFilterCompliance === 'Not Verified'}
-                                                                        onChange={() => setPoFilterCompliance('Not Verified')}
-                                                                    />
-                                                                    <span>Not Verified</span>
-                                                                </label>
-                                                                <label className="filter-radio-item">
-                                                                    <input
-                                                                        type="radio"
-                                                                        name="compliance"
-                                                                        checked={poFilterCompliance === 'MD Pending'}
-                                                                        onChange={() => setPoFilterCompliance('MD Pending')}
-                                                                    />
-                                                                    <span>MD Pending</span>
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
+                                <div className="vessel-list light-mode" style={{ flex: 1, overflowY: 'auto' }}>
+                                    {vesselList.filter(v =>
+                                        v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        v.imoNo.includes(searchTerm)
+                                    ).map((vessel) => (
+                                        <div
+                                            key={`${vessel.name}-${vessel.imoNo}`}
+                                            className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
+                                            onClick={() => handleVesselSelect(vessel)}
+                                        >
+                                            <div className="vessel-status-dot v-active"></div>
+                                            <div className="vessel-info-block">
+                                                <h4>{vessel.name}</h4>
+                                                <p>IMO {vessel.imoNo}</p>
                                             </div>
                                         </div>
-
-                                        <div className="sidebar-dark-content-area">
-                                            <div className="vessel-search-container dark-mode">
-                                                <div className="vessel-search-box light">
-                                                    <Search size={16} color="#94A3B8" />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search vessels..."
-                                                        value={searchTerm}
-                                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="vessel-list dark-mode" style={{ flex: 1, overflowY: 'auto' }}>
-                                                {vesselList.filter(v =>
-                                                    v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                    v.imoNo.includes(searchTerm)
-                                                ).map((vessel) => (
-                                                    <div
-                                                        key={`${vessel.name}-${vessel.imoNo}`}
-                                                        className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
-                                                        onClick={() => handleVesselSelect(vessel)}
-                                                    >
-                                                        <div className="vessel-status-dot v-active"></div>
-                                                        <div className="vessel-info-block">
-                                                            <h4>{vessel.name}</h4>
-                                                            <p>IMO {vessel.imoNo}</p>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="sidebar-list-footer">
-                                                <button className="add-vessel-btn-refined" onClick={handleAddClick}>
-                                                    <Plus size={18} />
-                                                    Add Vessel
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="sidebar-dark-content-area">
-                                            <div className="vessel-search-container light-mode">
-                                                <div className="vessel-search-box light">
-                                                    <Search size={16} color="#94A3B8" />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search vessels..."
-                                                        value={searchTerm}
-                                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="vessel-list light-mode" style={{ flex: 1, overflowY: 'auto' }}>
-                                                {vesselList.filter(v =>
-                                                    v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                    v.imoNo.includes(searchTerm)
-                                                ).map((vessel) => (
-                                                    <div
-                                                        key={`${vessel.name}-${vessel.imoNo}`}
-                                                        className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
-                                                        onClick={() => handleVesselSelect(vessel)}
-                                                    >
-                                                        <div className="vessel-status-dot v-active"></div>
-                                                        <div className="vessel-info-block">
-                                                            <h4>{vessel.name}</h4>
-                                                            <p>IMO {vessel.imoNo}</p>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="sidebar-list-footer">
-                                                <button className="add-vessel-btn-refined" onClick={handleAddClick}>
-                                                    <Plus size={18} />
-                                                    Add Vessel
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
+                                    ))}
+                                </div>
+                                <div className="sidebar-list-footer">
+                                    <button className="add-vessel-btn-refined" onClick={handleAddClick}>
+                                        <Plus size={18} />
+                                        Add Vessel
+                                    </button>
+                                </div>
                             </aside>
                         )}
 
-                        {/* Main Section */}
                         <div className="vessels-main">
-                            <div className={`vessel-tab-content ${activeTab === 'purchase' ? 'no-scroll' : ''}`}>
+                            <div className={`vessel-tab-content ${(activeTab === 'reports' && reportStep === 2) ? 'no-scroll no-padding' : ''}`}>
                                 {renderContent()}
                             </div>
                         </div>
@@ -1353,74 +1626,324 @@ export default function Vessels() {
 }
 
 // Helper Components
-const FormGroup = ({ label, name, value, onChange, required, readOnly }: { label: string, name: string, value: string, onChange: (e: any) => void, required?: boolean, readOnly?: boolean }) => (
-    <div className="form-group-modern">
-        <label>{label} {required && <span className="required">*</span>}</label>
-        <input
-            type="text"
-            name={name}
-            className={`form-control-modern ${readOnly ? 'read-only' : ''}`}
-            value={value}
-            onChange={onChange}
-            readOnly={readOnly}
-            placeholder={`Enter ${label.toLowerCase()}`}
-        />
-    </div>
-);
-
-const DateGroup = ({ label, name, value, onChange, readOnly }: { label: string, name: string, value: string, onChange: (e: any) => void, readOnly?: boolean }) => (
-    <div className="form-group-modern">
-        <label>{label}</label>
-        <div className="date-input-wrapper-modern">
+function FormGroup({ label, name, value, onChange, required, readOnly }: { label: string, name: string, value: string, onChange: (e: any) => void, required?: boolean, readOnly?: boolean }) {
+    return (
+        <div className="form-group-modern">
+            <label>{label} {required && <span className="required">*</span>}</label>
             <input
-                type="date"
+                type="text"
                 name={name}
                 className={`form-control-modern ${readOnly ? 'read-only' : ''}`}
                 value={value}
                 onChange={onChange}
-                onKeyDown={(e) => e.preventDefault()}
-                onClick={(e) => !readOnly && (e.target as HTMLInputElement).showPicker?.()}
-                style={{ cursor: readOnly ? 'default' : 'pointer' }}
                 readOnly={readOnly}
+                placeholder={`Enter ${label.toLowerCase()}`}
             />
-            <Calendar className="date-icon-modern" size={16} />
         </div>
-    </div>
-);
+    );
+}
 
-const RadioGroup = ({ label, name, options, value, onChange, readOnly }: { label: string, name: string, options: string[], value: string, onChange: (e: any) => void, readOnly?: boolean }) => (
-    <div className="form-group-modern">
-        <label>{label}</label>
-        <div className="radio-group-container">
-            {options.map(opt => (
-                <label key={opt} className={`radio-option ${readOnly ? 'disabled' : ''}`}>
-                    <input
-                        type="radio"
-                        name={name}
-                        value={opt}
-                        checked={value === opt}
-                        onChange={onChange}
-                        disabled={readOnly}
-                    />
-                    <span className="radio-custom"></span>
-                    <span className="radio-text">{opt}</span>
-                </label>
-            ))}
-        </div>
-    </div>
-);
+function DateGroup({ label, name, value, onChange, readOnly }: { label: string, name: string, value: string, onChange: (e: any) => void, readOnly?: boolean }) {
+    const [showCalendar, setShowCalendar] = useState(false);
+    const [showYearPicker, setShowYearPicker] = useState(false);
+    const [showMonthPicker, setShowMonthPicker] = useState(false);
 
-const SuccessModal = ({ message, onClose }: { message: string, onClose: () => void }) => (
-    <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content success-card-modal">
-            <div className="modal-success-icon">
-                <Check size={40} />
+    // Check if browser supports :has(), otherwise we might need global class handling, but inline style works for z-index
+
+    const parseDate = (val: string | null) => {
+        if (!val) return null;
+        const d = new Date(val);
+        return !isNaN(d.getTime()) ? d : null;
+    };
+
+    const initialDate = parseDate(value);
+    const [viewDate, setViewDate] = useState(initialDate || new Date());
+    const [selectedDate, setSelectedDate] = useState<Date | null>(initialDate);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const yearsContainerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const parsed = parseDate(value);
+        setSelectedDate(parsed);
+        if (parsed) {
+            setViewDate(parsed);
+        }
+    }, [value]);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setShowCalendar(false);
+                setShowYearPicker(false);
+                setShowMonthPicker(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // Auto-scroll year picker
+    useEffect(() => {
+        if (showYearPicker && yearsContainerRef.current) {
+            const currentYearEl = yearsContainerRef.current.querySelector('.year-cell.current');
+            if (currentYearEl) {
+                currentYearEl.scrollIntoView({ block: 'center', behavior: 'auto' });
+            }
+        }
+    }, [showYearPicker]);
+
+    const handleToggle = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!readOnly) {
+            setShowCalendar(prev => !prev);
+            setShowYearPicker(false);
+            setShowMonthPicker(false);
+        }
+    };
+
+    const daysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
+    const startDayOfMonth = (month: number, year: number) => new Date(year, month, 1).getDay();
+
+    const handlePrevMonth = () => {
+        setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
+    };
+
+    const handleNextMonth = () => {
+        setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
+    };
+
+    const handleYearChange = (year: number) => {
+        setViewDate(new Date(year, viewDate.getMonth(), 1));
+        setShowYearPicker(false);
+        // Optional: switch to month picker after year? keeping to day view for efficiency unless requested
+        // User asked "Ask user about the month then ask them about the day" - maybe go to Month picker?
+        // Let's go to Month picker for better flow
+        setShowMonthPicker(true);
+    };
+
+    const handleMonthChange = (monthIndex: number) => {
+        setViewDate(new Date(viewDate.getFullYear(), monthIndex, 1));
+        setShowMonthPicker(false);
+    };
+
+    const handleSelectDate = (day: number) => {
+        const newDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+        setSelectedDate(newDate);
+        setShowCalendar(false);
+
+        const yyyy = newDate.getFullYear();
+        const mm = String(newDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(newDate.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+
+        // Simulate full event to prevent crashes in parent handlers
+        const syntheticEvent = {
+            target: { name, value: dateStr },
+            preventDefault: () => { },
+            stopPropagation: () => { },
+            persist: () => { }
+        };
+
+        onChange(syntheticEvent);
+    };
+
+    const formatDateDisplay = (date: Date | null) => {
+        if (!date) return "";
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yyyy = date.getFullYear();
+        return `${dd} - ${mm} - ${yyyy}`;
+    };
+
+    const renderYearPicker = () => {
+        const currentYear = viewDate.getFullYear();
+        // Generate years 1900 to 2100
+        const years = Array.from({ length: 201 }, (_, i) => 1900 + i);
+
+        return (
+            <div className="year-picker-grid">
+                <div className="year-picker-header">Select Year</div>
+                <div className="years-container" ref={yearsContainerRef}>
+                    {years.map(y => (
+                        <div
+                            key={y}
+                            className={`year-cell ${y === currentYear ? 'current' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); handleYearChange(y); }}
+                        >
+                            {y}
+                        </div>
+                    ))}
+                </div>
             </div>
-            <h2 className="modal-title">Success!</h2>
-            <p className="modal-message">{message}</p>
-            <button className="modal-action-btn" onClick={onClose}>
-                DONE
-            </button>
+        );
+    };
+
+    const renderMonthPicker = () => {
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const currentMonth = viewDate.getMonth();
+
+        return (
+            <div className="month-picker-grid">
+                <div className="year-picker-header">Select Month</div>
+                <div className="months-container">
+                    {monthNames.map((m, idx) => (
+                        <div
+                            key={m}
+                            className={`month-cell ${idx === currentMonth ? 'current' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); handleMonthChange(idx); }}
+                        >
+                            {m}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    const renderCalendar = () => {
+        const month = viewDate.getMonth();
+        const year = viewDate.getFullYear();
+        const days = [];
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+        const offset = startDayOfMonth(month, year);
+        for (let i = 0; i < offset; i++) {
+            days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
+        }
+
+        const totalDays = daysInMonth(month, year);
+        for (let d = 1; d <= totalDays; d++) {
+            const isToday = new Date().toDateString() === new Date(year, month, d).toDateString();
+            const isSelected = selectedDate?.toDateString() === new Date(year, month, d).toDateString();
+            days.push(
+                <div
+                    key={d}
+                    className={`calendar-day ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); handleSelectDate(d); }}
+                >
+                    {d}
+                </div>
+            );
+        }
+
+        return (
+            <div className="innovative-calendar-popup" onClick={(e) => e.stopPropagation()}>
+                {showYearPicker ? renderYearPicker() : showMonthPicker ? renderMonthPicker() : (
+                    <>
+                        <div className="calendar-header-premium">
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handlePrevMonth(); }} className="nav-btn-cal"><ChevronLeft size={16} /></button>
+                            <div className="month-year-display">
+                                <span
+                                    className="cal-month clickable"
+                                    onClick={(e) => { e.stopPropagation(); setShowMonthPicker(true); }}
+                                    title="Click to change month"
+                                >
+                                    {monthNames[month]}
+                                </span>
+                                <div
+                                    className="cal-year-badge clickable"
+                                    onClick={(e) => { e.stopPropagation(); setShowYearPicker(true); }}
+                                    title="Click to change year"
+                                >
+                                    {year}
+                                </div>
+                            </div>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handleNextMonth(); }} className="nav-btn-cal"><ChevronRight size={16} /></button>
+                        </div>
+                        <div className="calendar-weekdays">
+                            {['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'].map(wd => <span key={wd}>{wd}</span>)}
+                        </div>
+                        <div className="calendar-grid-premium">
+                            {days}
+                        </div>
+                        <div className="calendar-footer-cal">
+                            <button
+                                type="button"
+                                className="today-btn-cal"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const now = new Date();
+                                    setViewDate(now);
+                                    handleSelectDate(now.getDate());
+                                }}
+                            >
+                                Go to Today
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    };
+
+    return (
+        <div
+            className="form-group-modern"
+            ref={containerRef}
+            style={{ zIndex: showCalendar ? 100 : 'auto', position: 'relative' }} /* Fix overlap */
+        >
+            <label>{label}</label>
+            <div className="date-input-wrapper-modern">
+                <div
+                    className={`custom-date-field ${readOnly ? 'read-only' : ''} ${showCalendar ? 'active' : ''}`}
+                    onClick={handleToggle}
+                >
+                    <span className={`date-value-text ${!selectedDate ? 'placeholder' : ''}`}>
+                        {selectedDate ? formatDateDisplay(selectedDate) : `Select ${label.toLowerCase()}`}
+                    </span>
+                    <div
+                        className="orbital-cal-indicator"
+                        onClick={handleToggle}
+                    >
+                        <Calendar size={16} />
+                    </div>
+                </div>
+                {!readOnly && showCalendar && renderCalendar()}
+            </div>
         </div>
-    </div>
-);
+    );
+}
+
+function RadioGroup({ label, name, options, value, onChange, readOnly }: { label: string, name: string, options: string[], value: string, onChange: (e: any) => void, readOnly?: boolean }) {
+    return (
+        <div className="form-group-modern">
+            <label>{label}</label>
+            <div className="radio-group-container">
+                {options.map(opt => (
+                    <label key={opt} className={`radio-option ${readOnly ? 'disabled' : ''}`}>
+                        <input
+                            type="radio"
+                            name={name}
+                            value={opt}
+                            checked={value === opt}
+                            onChange={onChange}
+                            disabled={readOnly}
+                        />
+                        <span className="radio-custom"></span>
+                        <span className="radio-text">{opt}</span>
+                    </label>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function SuccessModal({ message, onClose }: { message: string, onClose: () => void }) {
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content success-card-modal">
+                <div className="modal-success-icon">
+                    <Check size={40} />
+                </div>
+                <h2 className="modal-title">Success!</h2>
+                <p className="modal-message">{message}</p>
+                <button className="modal-action-btn" onClick={onClose}>
+                    DONE
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// Local SuccessModal restored.
