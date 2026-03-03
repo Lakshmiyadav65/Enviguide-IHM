@@ -156,37 +156,42 @@
 
 /* Column Widths */
 .registry-table th:nth-child(1) {
-    width: 15%;
-}
-
-/* IMO Number */
-.registry-table th:nth-child(2) {
-    width: 25%;
+    width: 12%;
 }
 
 /* Vessel Name */
+.registry-table th:nth-child(2) {
+    width: 18%;
+}
+
+/* Name */
 .registry-table th:nth-child(3) {
-    width: 10%;
+    width: 12%;
 }
 
 /* Total PO */
 .registry-table th:nth-child(4) {
-    width: 12%;
+    width: 10%;
 }
 
 /* Total Items */
 .registry-table th:nth-child(5) {
-    width: 15%;
+    width: 12%;
 }
 
 /* Review Status */
 .registry-table th:nth-child(6) {
-    width: 18%;
+    width: 12%;
 }
 
 /* Review Assigned To */
 .registry-table th:nth-child(7) {
-    width: 15%;
+    width: 14%;
+}
+
+/* Action */
+.registry-table th:nth-child(8) {
+    width: 10%;
     text-align: center;
 }
 

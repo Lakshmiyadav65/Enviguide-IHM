@@ -8,6 +8,7 @@ import ReviewWizard from './ReviewWizard';
 interface ReviewRecord {
     imoNumber: string;
     vesselName: string;
+    name: string;
     totalPO: number;
     totalItems: number;
     reviewStatus: 'In Review' | 'Pending';
@@ -58,6 +59,7 @@ export default function PendingReviews() {
             return Array.from({ length: 150 }).map((_, idx) => ({
                 imoNumber: (9800000 + idx * 432).toString(),
                 vesselName: vesselPool[idx % vesselPool.length],
+                name: vesselPool[idx % vesselPool.length],
                 totalPO: Math.floor(Math.random() * 95) + 5,
                 totalItems: Math.floor(Math.random() * 4500) + 120,
                 reviewStatus: idx % 4 === 0 ? 'Pending' : 'In Review',
@@ -178,6 +180,7 @@ export default function PendingReviews() {
                                     <tr>
                                         <th>IMO NUMBER</th>
                                         <th>VESSEL NAME</th>
+                                        <th>NAME</th>
                                         <th>TOTAL PO</th>
                                         <th>TOTAL ITEMS</th>
                                         <th>REVIEW STATUS</th>
@@ -195,6 +198,7 @@ export default function PendingReviews() {
                                                 </div>
                                                 <span className="vessel-name">{record.vesselName}</span>
                                             </td>
+                                            <td>{record.name || record.vesselName}</td>
                                             <td>{record.totalPO}</td>
                                             <td>{record.totalItems.toLocaleString()}</td>
                                             <td>

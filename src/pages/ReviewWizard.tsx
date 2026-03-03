@@ -33,31 +33,46 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
 
     const [, setHistory] = useState<any[][][]>([]);
 
+    // State removed: suspectedCol unused
+
     useEffect(() => {
         const rows = localStorage.getItem(`audit_rows_${imo}`);
         if (rows) {
             const parsed = JSON.parse(rows);
             setData(parsed);
+
+            // Assume the first column is vesselName, second is poNumber from our new map
+            // Adjust lengths
             setVisibleCols(new Array(parsed[0]?.length || 0).fill(true));
             setColumnWidths(new Array(parsed[0]?.length || 0).fill(150));
         } else {
-            const sampleHeaders = ['PO Number', 'Item Description', 'MD Requested Date', 'Sent Date', 'IMPA Code', 'ISSA Code', 'Issue', 'Equipment Code', 'Equipment Name', 'Maker', 'Model', 'Part Number', 'Unit', 'Quantity', 'Vendor Remark', 'Vendor Email', 'Vendor Name'];
+            // Default sample headers matching our new mandated structure
+            const sampleHeaders = [
+                'Name', 'Vessel Name', 'PO Number', 'IMO Number',
+                'PO Sent Date', 'MD Requested Date', 'Item Description', 'Is Suspected',
+                'IMPA Code', 'ISSA Code', 'Equipment Code', 'Equipment Name',
+                'Maker', 'Model', 'Part Number', 'Unit', 'Quantity', 'Vendor Remark',
+                'Vendor Email', 'Vendor Name'
+            ];
             const sampleRows = Array.from({ length: 25 }).map((_, i) => [
-                `PO - 123${456 + i}`,
-                'Battery',
-                '2026-02-19',
+                vesselName, // Name (Project)
+                vesselName, // Vessel Name
+                `PO-123${456 + i}`,
+                imo,
+                '2026-02-20', // PO Sent Date
+                '2026-02-19', // MD Requested Date
+                'Main Battery Pack', // Item Description
+                'No', // Is Suspected
                 '46072',
-                'AM1234',
                 '564362',
-                'yes',
                 'EQ-001',
-                'Main Battery',
+                'Battery',
                 'Exide',
-                'XP - 200',
-                'PN - 99',
+                'XP-200',
+                'PN-99',
                 'PCS',
                 '2',
-                'Urgent',
+                'Urgent delivery required',
                 'supplier@example.com',
                 'Global Marine Parts'
             ]);
@@ -234,7 +249,10 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                 {step === 1 && (
                     <>
                         <div className="wizard-title-row">
-                            <h1>Audit Purchase Orders</h1>
+                            <div className="wizard-title-left">
+                                <h1>Review & Audit Purchase Orders</h1>
+                                <p>{vesselName} • {imo}</p>
+                            </div>
                         </div>
 
                         {/* Toolbar — column toggles on the left, bulk buttons on the right */}
@@ -261,46 +279,48 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                 <table className="wizard-table">
                                     <thead>
                                         <tr>
-                                            {data[0]?.map((header, i) => visibleCols[i] && (
-                                                <th key={i} style={{ width: columnWidths[i], minWidth: columnWidths[i] }}>
-                                                    <div className="header-content">
-                                                        <span>{String(header)}</span>
-                                                        <button className="filter-trigger" onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === i ? null : i); }}>
-                                                            <ChevronDown size={12} />
-                                                        </button>
-                                                    </div>
-                                                    <div className="resizer" onMouseDown={(e) => handleResizeStart(e, i)} />
-                                                    {activeMenu === i && (
-                                                        <div className="column-menu" onClick={e => e.stopPropagation()}>
-                                                            <div className="menu-item" onClick={() => insertColumn(i, 'left')}>Insert column left</div>
-                                                            <div className="menu-item" onClick={() => insertColumn(i, 'right')}>Insert column right</div>
-                                                            <div className="menu-item" onClick={() => { const n = [...visibleCols]; n[i] = false; setVisibleCols(n); setActiveMenu(null); }}>Remove column</div>
-                                                            <div className="menu-divider" />
-                                                            <div className="menu-filter-section">
-                                                                <div className="menu-filter-label">Filter by value:</div>
-                                                                <input className="menu-search-input" placeholder="Search values..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)} autoFocus />
-                                                                <div className="menu-value-list">
-                                                                    {Array.from(new Set(data.slice(1).map(r => String(r[i]))))
-                                                                        .filter(v => v.toLowerCase().includes(filterSearch.toLowerCase()))
-                                                                        .map(val => (
-                                                                            <label key={val} className="menu-value-item">
-                                                                                <input type="checkbox" checked={(filters[i] || []).includes(val)} onChange={() => {
-                                                                                    const cur = filters[i] || [];
-                                                                                    const next = cur.includes(val) ? cur.filter(v => v !== val) : [...cur, val];
-                                                                                    setFilters({ ...filters, [i]: next });
-                                                                                }} /> {val}
-                                                                            </label>
-                                                                        ))}
-                                                                </div>
-                                                                <div className="menu-footer">
-                                                                    <button className="menu-btn ok" onClick={() => setActiveMenu(null)}>Apply</button>
-                                                                    <button className="menu-btn" onClick={() => { setFilters({}); setActiveMenu(null); }}>Clear</button>
+                                            {data[0]?.map((header, i) => {
+                                                return visibleCols[i] && (
+                                                    <th key={`h_${i}`} style={{ width: columnWidths[i], minWidth: columnWidths[i] }}>
+                                                        <div className="header-content">
+                                                            <span>{String(header)}</span>
+                                                            <button className="filter-trigger" onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === i ? null : i); }}>
+                                                                <ChevronDown size={12} />
+                                                            </button>
+                                                        </div>
+                                                        <div className="resizer" onMouseDown={(e) => handleResizeStart(e, i)} />
+                                                        {activeMenu === i && (
+                                                            <div className="column-menu" onClick={e => e.stopPropagation()}>
+                                                                <div className="menu-item" onClick={() => insertColumn(i, 'left')}>Insert column left</div>
+                                                                <div className="menu-item" onClick={() => insertColumn(i, 'right')}>Insert column right</div>
+                                                                <div className="menu-item" onClick={() => { const n = [...visibleCols]; n[i] = false; setVisibleCols(n); setActiveMenu(null); }}>Remove column</div>
+                                                                <div className="menu-divider" />
+                                                                <div className="menu-filter-section">
+                                                                    <div className="menu-filter-label">Filter by value:</div>
+                                                                    <input className="menu-search-input" placeholder="Search values..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)} autoFocus />
+                                                                    <div className="menu-value-list">
+                                                                        {Array.from(new Set(data.slice(1).map(r => String(r[i]))))
+                                                                            .filter(v => v.toLowerCase().includes(filterSearch.toLowerCase()))
+                                                                            .map(val => (
+                                                                                <label key={val} className="menu-value-item">
+                                                                                    <input type="checkbox" checked={(filters[i] || []).includes(val)} onChange={() => {
+                                                                                        const cur = filters[i] || [];
+                                                                                        const next = cur.includes(val) ? cur.filter(v => v !== val) : [...cur, val];
+                                                                                        setFilters({ ...filters, [i]: next });
+                                                                                    }} /> {val}
+                                                                                </label>
+                                                                            ))}
+                                                                    </div>
+                                                                    <div className="menu-footer">
+                                                                        <button className="menu-btn ok" onClick={() => setActiveMenu(null)}>Apply</button>
+                                                                        <button className="menu-btn" onClick={() => { setFilters({}); setActiveMenu(null); }}>Clear</button>
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
-                                                    )}
-                                                </th>
-                                            ))}
+                                                        )}
+                                                    </th>
+                                                );
+                                            })}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -313,7 +333,23 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                                         onDoubleClick={() => handleCellDoubleClick(originalIdx, ci)}
                                                     >
                                                         <div className={`cell-inner ${getSelectionClass(originalIdx, ci)}`}>
-                                                            {editingCell?.r === originalIdx && editingCell.c === ci ? (
+                                                            {String(data[0][ci]) === 'Is Suspected' ? (
+                                                                <select
+                                                                    className="suspicious-select"
+                                                                    value={String(cell)}
+                                                                    onChange={(e) => {
+                                                                        pushToHistory();
+                                                                        setData(prev => {
+                                                                            const nd = JSON.parse(JSON.stringify(prev));
+                                                                            nd[originalIdx][ci] = e.target.value;
+                                                                            return nd;
+                                                                        });
+                                                                    }}
+                                                                >
+                                                                    <option value="No">No</option>
+                                                                    <option value="Yes">Yes</option>
+                                                                </select>
+                                                            ) : editingCell?.r === originalIdx && editingCell.c === ci ? (
                                                                 <input
                                                                     autoFocus
                                                                     className="cell-input"

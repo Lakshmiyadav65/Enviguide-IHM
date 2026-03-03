@@ -8,6 +8,7 @@ import { Search, ChevronDown, Download, Edit2, Send, Trash2, X, CheckCircle2, XC
 interface AuditRecord {
     imoNumber: string;
     vesselName: string;
+    name: string;
     totalPO: number;
     totalItems: number;
     duplicatePO: number;
@@ -28,6 +29,9 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
     const [data, setData] = useState<any[][]>([]);
     const [visibleColumns, setVisibleColumns] = useState<boolean[]>([]);
     const [poColIdx, setPoColIdx] = useState<number | null>(null);
+    const [itemDescColIdx, setItemDescColIdx] = useState<number | null>(null);
+    const [qtyColIdx, setQtyColIdx] = useState<number | null>(null);
+    const [supplierColIdx, setSupplierColIdx] = useState<number | null>(null);
     const [rowActions, setRowActions] = useState<Record<number, string>>({});
     const [currentDupGroupIdx, setCurrentDupGroupIdx] = useState(0);
     const [, setHistory] = useState<{ data: any[][]; actions: Record<number, string> }[]>([]);
@@ -41,6 +45,9 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
             if (mapping) {
                 const parsedMapping = JSON.parse(mapping);
                 if (parsedMapping.poNumber) setPoColIdx(parseInt(parsedMapping.poNumber));
+                if (parsedMapping.itemDescription) setItemDescColIdx(parseInt(parsedMapping.itemDescription));
+                if (parsedMapping.quantity) setQtyColIdx(parseInt(parsedMapping.quantity));
+                if (parsedMapping.supplierName) setSupplierColIdx(parseInt(parsedMapping.supplierName));
             }
 
             const savedVisibility = localStorage.getItem(`audit_visible_cols_${imo}`);
@@ -106,8 +113,15 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
 
             const po = String(row[poColIdx!] || '').trim();
             if (!po) return;
-            if (!counts[po]) counts[po] = [];
-            counts[po].push(originalIdx);
+
+            const itemDesc = itemDescColIdx !== null ? String(row[itemDescColIdx] || '').trim().toLowerCase() : '';
+            const qty = qtyColIdx !== null ? String(row[qtyColIdx] || '').trim().toLowerCase() : '';
+            const supplier = supplierColIdx !== null ? String(row[supplierColIdx] || '').trim().toLowerCase() : '';
+
+            const key = `${po}|${itemDesc}|${qty}|${supplier}`;
+
+            if (!counts[key]) counts[key] = [];
+            counts[key].push(originalIdx);
         });
 
         return Object.values(counts)
@@ -238,8 +252,19 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
         if (poColIdx !== null && filteredData.length > 1) {
             const pos = filteredData.slice(1).map(r => String(r[poColIdx] || '').trim()).filter(p => p !== '');
             totalPO = new Set(pos).size;
+
             const counts: Record<string, number> = {};
-            pos.forEach(p => counts[p] = (counts[p] || 0) + 1);
+            filteredData.slice(1).forEach(r => {
+                const po = String(r[poColIdx] || '').trim();
+                const itemDesc = itemDescColIdx !== null ? String(r[itemDescColIdx] || '').trim().toLowerCase() : '';
+                const qty = qtyColIdx !== null ? String(r[qtyColIdx] || '').trim().toLowerCase() : '';
+                const supplier = supplierColIdx !== null ? String(r[supplierColIdx] || '').trim().toLowerCase() : '';
+
+                if (po) {
+                    const key = `${po}|${itemDesc}|${qty}|${supplier}`;
+                    counts[key] = (counts[key] || 0) + 1;
+                }
+            });
             poD = Object.values(counts).filter(c => c > 1).length;
         }
 
@@ -293,20 +318,24 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
                     <div className="v3-dup-columns">
                         <label>Visible Columns</label>
                         <div className="v3-dup-checkboxes">
-                            {data[0]?.map((col, i) => (
-                                <label key={i}>
-                                    <input
-                                        type="checkbox"
-                                        checked={visibleColumns[i]}
-                                        onChange={() => {
-                                            const next = [...visibleColumns];
-                                            next[i] = !next[i];
-                                            setVisibleColumns(next);
-                                        }}
-                                    />
-                                    {String(col || `Field ${i + 1}`)}
-                                </label>
-                            ))}
+                            {data[0]?.map((col, i) => {
+                                // Skip internal columns in the editor view (first 8 columns)
+                                if (i < 8) return null;
+                                return (
+                                    <label key={i}>
+                                        <input
+                                            type="checkbox"
+                                            checked={visibleColumns[i]}
+                                            onChange={() => {
+                                                const next = [...visibleColumns];
+                                                next[i] = !next[i];
+                                                setVisibleColumns(next);
+                                            }}
+                                        />
+                                        {String(col || `Field ${i + 1}`)}
+                                    </label>
+                                );
+                            })}
                         </div>
                     </div>
 
@@ -342,9 +371,12 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
                         <thead>
                             <tr>
                                 <th style={{ minWidth: '280px' }}>Resolution Action</th>
-                                {data[0].map((col, i) => visibleColumns[i] && (
-                                    <th key={i}>{String(col)}</th>
-                                ))}
+                                {data[0].map((col, i) => {
+                                    if (i < 8) return null;
+                                    return visibleColumns[i] && (
+                                        <th key={`header_${i}`}>{String(col)}</th>
+                                    );
+                                })}
                             </tr>
                         </thead>
                         <tbody>
@@ -371,24 +403,39 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
                                             ))}
                                         </div>
                                     </td>
-                                    {row.map((cell: any, ci: number) => visibleColumns[ci] && (
-                                        <td key={ci}>
-                                            <input
-                                                type="text"
-                                                className={`v3-dup-table-input ${isDragging && dragStartCi === ci ? 'is-dragging-cell' : ''}`}
-                                                value={String(cell || '')}
-                                                onChange={(e) => handleUpdateCell(originalIdx, ci, e.target.value)}
-                                                onKeyDown={(e) => handleKeyDown(e, ri, ci)}
-                                                onMouseDown={() => handleCellMouseDown(String(cell || ''), ci)}
-                                                onMouseEnter={() => handleCellMouseEnter(originalIdx, ci)}
-                                                onFocus={() => pushToHistory()}
-                                                onClick={(e) => (e.target as HTMLInputElement).select()}
-                                                data-ri={ri}
-                                                data-ci={ci}
-                                                title={String(cell || '')}
-                                            />
-                                        </td>
-                                    ))}
+                                    {row.map((cell: any, ci: number) => {
+                                        if (ci < 8) return null;
+                                        return visibleColumns[ci] && (
+                                            <td key={ci}>
+                                                {String(data[0][ci]) === 'Is Suspected' ? (
+                                                    <select
+                                                        className="suspicious-select"
+                                                        value={String(cell || 'No')}
+                                                        onChange={(e) => handleUpdateCell(originalIdx, ci, e.target.value)}
+                                                        onFocus={() => pushToHistory()}
+                                                    >
+                                                        <option value="No">No</option>
+                                                        <option value="Yes">Yes</option>
+                                                    </select>
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        className={`v3-dup-table-input ${isDragging && dragStartCi === ci ? 'is-dragging-cell' : ''}`}
+                                                        value={String(cell || '')}
+                                                        onChange={(e) => handleUpdateCell(originalIdx, ci, e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, ri, ci)}
+                                                        onMouseDown={() => handleCellMouseDown(String(cell || ''), ci)}
+                                                        onMouseEnter={() => handleCellMouseEnter(originalIdx, ci)}
+                                                        onFocus={() => pushToHistory()}
+                                                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                                                        data-ri={ri}
+                                                        data-ci={ci}
+                                                        title={String(cell || '')}
+                                                    />
+                                                )}
+                                            </td>
+                                        );
+                                    })}
                                 </tr>
                             ))}
                         </tbody>
@@ -427,6 +474,7 @@ export default function PendingAudits() {
         const initialRecords: AuditRecord[] = Array.from({ length: 39 }).map((_, idx) => ({
             imoNumber: (9571648 + idx).toString(),
             vesselName: vesselNames[idx % vesselNames.length],
+            name: vesselNames[idx % vesselNames.length],
             totalPO: Math.floor(Math.random() * 100) + 10,
             totalItems: Math.floor(Math.random() * 5000) + 500,
             duplicatePO: idx % 5 === 0 ? Math.floor(Math.random() * 30) : 0,
@@ -624,7 +672,6 @@ export default function PendingAudits() {
                             <table className="audits-table">
                                 <thead>
                                     <tr>
-                                        <th>IMO NUMBER</th>
                                         <th>VESSEL NAME</th>
                                         <th>TOTAL PO</th>
                                         <th>TOTAL ITEMS</th>
@@ -638,7 +685,6 @@ export default function PendingAudits() {
                                 <tbody>
                                     {currentRecords.map((record, index) => (
                                         <tr key={record.imoNumber + index}>
-                                            <td className="imo-number">{record.imoNumber}</td>
                                             <td className="vessel-name">{record.vesselName}</td>
                                             <td>{record.totalPO}</td>
                                             <td>{record.totalItems.toLocaleString()}</td>

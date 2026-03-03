@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import {
-    Search, Plus, Filter, Layers, FileText, ShoppingCart,
-    BarChart2, FileCheck, ShieldCheck, Check, Edit2, X,
-    FolderOpen, Ship as ShipIcon, Pin, Upload, Eye, Trash2, Calendar, ChevronDown, ChevronUp,
-    Download, AlertTriangle, ExternalLink, ChevronLeft, ChevronRight, Book, RotateCw, Monitor, Paperclip, GripVertical, EyeOff, ZoomIn, ZoomOut, Maximize2
+    Search, Plus, Check, ShieldCheck, BarChart2, ShoppingCart, Layers,
+    FolderOpen, Ship as ShipIcon, GripVertical, Book, Paperclip,
+    ExternalLink, Download, X, AlertTriangle, Monitor, FileText,
+    ChevronDown, Trash2, Edit2, Calendar, ChevronLeft, ChevronRight, Pin, Upload, Eye, EyeOff, RotateCw, ZoomIn, ZoomOut, Maximize2
 } from 'lucide-react';
-import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
+import Sidebar from '../components/Sidebar';
 import './Vessels.css';
-import MaterialsRecord from './MaterialsRecord';
-import PurchaseOrderView from './PurchaseOrderView';
 import DecksView from './DecksView';
+import PurchaseOrderView from './PurchaseOrderView';
+import MaterialsRecord from './MaterialsRecord';
 import IHMCertificateView from './IHMCertificateView';
 import vesselDefault from '../assets/images/vessel_default.jpg';
 
@@ -220,7 +220,6 @@ export default function Vessels() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [isFilterExpanded, setIsFilterExpanded] = useState(false);
 
     // Document & Form States
     const [docSearch, setDocSearch] = useState('');
@@ -277,11 +276,6 @@ export default function Vessels() {
             document.body.style.overflow = '';
         };
     }, []);
-
-    // Purchase Order Filters Lifted State
-    const [poFilterDateFrom, setPoFilterDateFrom] = useState('');
-    const [poFilterDateTo, setPoFilterDateTo] = useState('');
-    const [poFilterCompliance, setPoFilterCompliance] = useState('All');
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -607,16 +601,17 @@ export default function Vessels() {
     };
 
     const tabs = [
-        { id: 'project', label: 'Project', icon: FileCheck },
+        { id: 'project', label: 'Project', icon: FolderOpen },
         { id: 'decks', label: 'Decks', icon: Layers },
-        { id: 'documents', label: 'Documents', icon: FolderOpen },
-        { id: 'materials', label: 'Materials Record', icon: FileText },
+        { id: 'documents', label: 'Documents', icon: FileText },
+        { id: 'materials', label: 'Materials Record', icon: Layers },
         { id: 'purchase', label: 'Purchase Orders', icon: ShoppingCart },
         { id: 'reports', label: 'Reports', icon: BarChart2 },
         { id: 'certificate', label: 'IHM Certificate', icon: ShieldCheck },
     ];
 
     const renderContent = () => {
+
         if (id !== 'ship') {
             return (
                 <div className="vessels-placeholder">
@@ -765,7 +760,11 @@ export default function Vessels() {
                             <Calendar size={18} />
                             <span>Select Date Range (From - To)</span>
                         </div>
-                        <button className="clear-filters-link" onClick={() => { setDocSearch(''); setDocCategory('All'); setDocStatus('All'); }}>Clear Filters</button>
+                        {(docSearch || docCategory !== 'All' || docStatus !== 'All') && (
+                            <button className="clear-filters-link" onClick={() => { setDocSearch(''); setDocCategory('All'); setDocStatus('All'); }}>
+                                Clear Filters
+                            </button>
+                        )}
                     </div>
 
                     <div className="doc-table-wrapper">
@@ -1561,178 +1560,48 @@ export default function Vessels() {
                     </div>
 
                     <div className="vessels-content-layout">
-                        {/* Secondary Sidebar - Hidden on Purchase, Decks, Documents, Materials, Certificate & Reports tabs */}
-                        {activeTab !== 'decks' && activeTab !== 'documents' && activeTab !== 'materials' && activeTab !== 'certificate' && activeTab !== 'reports' && activeTab !== 'purchase' && (
+                        {/* Secondary Sidebar - Always visible for context */}
+                        {true && (
                             <aside className="secondary-sidebar">
-                                {activeTab === 'purchase' ? (
-                                    <>
-                                        <div className="sidebar-filters-wrapper">
-                                            <div className="sticky-filter-section">
-                                                <div className="vessel-sidebar-filter card-style" onClick={() => setIsFilterExpanded(!isFilterExpanded)}>
-                                                    <Filter size={14} />
-                                                    <span>FILTER</span>
-                                                    {isFilterExpanded ? <ChevronUp size={14} style={{ marginLeft: 'auto', color: '#64748b' }} /> : <ChevronDown size={14} style={{ marginLeft: 'auto', color: '#64748b' }} />}
-                                                </div>
+                                <div className="sidebar-section-header">
+                                    <span>VESSEL SELECTION</span>
+                                </div>
+                                <div className="vessel-search-container light-mode">
+                                    <div className="vessel-search-box light">
+                                        <Search size={16} color="#94A3B8" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search vessels..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
 
-                                                {isFilterExpanded && (
-                                                    <div className="sidebar-filter-content-direct">
-                                                        <div className="filter-section">
-                                                            <div className="filter-section-title">DATE RANGE</div>
-                                                            <div className="filter-date-inputs">
-                                                                <div className="filter-date-field">
-                                                                    <label>FROM</label>
-                                                                    <div className="date-input-with-icon">
-                                                                        <input
-                                                                            type="date"
-                                                                            value={poFilterDateFrom}
-                                                                            onChange={(e) => setPoFilterDateFrom(e.target.value)}
-                                                                        />
-                                                                        <Calendar size={14} className="calendar-icon-overlay" />
-                                                                    </div>
-                                                                </div>
-                                                                <div className="filter-date-field">
-                                                                    <label>TO</label>
-                                                                    <div className="date-input-with-icon">
-                                                                        <input
-                                                                            type="date"
-                                                                            value={poFilterDateTo}
-                                                                            onChange={(e) => setPoFilterDateTo(e.target.value)}
-                                                                        />
-                                                                        <Calendar size={14} className="calendar-icon-overlay" />
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="filter-section">
-                                                            <div className="filter-section-title">COMPLIANCE STATUS</div>
-                                                            <div className="filter-radio-group">
-                                                                <label className="filter-radio-item">
-                                                                    <input
-                                                                        type="radio"
-                                                                        name="compliance"
-                                                                        checked={poFilterCompliance === 'All'}
-                                                                        onChange={() => setPoFilterCompliance('All')}
-                                                                    />
-                                                                    <span>All Statuses</span>
-                                                                </label>
-                                                                <label className="filter-radio-item">
-                                                                    <input
-                                                                        type="radio"
-                                                                        name="compliance"
-                                                                        checked={poFilterCompliance === 'Verified'}
-                                                                        onChange={() => setPoFilterCompliance('Verified')}
-                                                                    />
-                                                                    <span>Verified</span>
-                                                                </label>
-                                                                <label className="filter-radio-item">
-                                                                    <input
-                                                                        type="radio"
-                                                                        name="compliance"
-                                                                        checked={poFilterCompliance === 'Not Verified'}
-                                                                        onChange={() => setPoFilterCompliance('Not Verified')}
-                                                                    />
-                                                                    <span>Not Verified</span>
-                                                                </label>
-                                                                <label className="filter-radio-item">
-                                                                    <input
-                                                                        type="radio"
-                                                                        name="compliance"
-                                                                        checked={poFilterCompliance === 'MD Pending'}
-                                                                        onChange={() => setPoFilterCompliance('MD Pending')}
-                                                                    />
-                                                                    <span>MD Pending</span>
-                                                                </label>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
+                                <div className="vessel-list light-mode" style={{ flex: 1, overflowY: 'auto' }}>
+                                    {vesselList.filter(v =>
+                                        v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        v.imoNo.includes(searchTerm)
+                                    ).map((vessel) => (
+                                        <div
+                                            key={`${vessel.name}-${vessel.imoNo}`}
+                                            className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
+                                            onClick={() => handleVesselSelect(vessel)}
+                                        >
+                                            <div className="vessel-status-dot v-active"></div>
+                                            <div className="vessel-info-block">
+                                                <h4>{vessel.name}</h4>
+                                                <p>IMO {vessel.imoNo}</p>
                                             </div>
                                         </div>
-
-                                        <div className="sidebar-dark-content-area">
-                                            <div className="vessel-search-container dark-mode">
-                                                <div className="vessel-search-box light">
-                                                    <Search size={16} color="#94A3B8" />
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Search vessels..."
-                                                        value={searchTerm}
-                                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="vessel-list dark-mode" style={{ flex: 1, overflowY: 'auto' }}>
-                                                {vesselList.filter(v =>
-                                                    v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                    v.imoNo.includes(searchTerm)
-                                                ).map((vessel) => (
-                                                    <div
-                                                        key={`${vessel.name}-${vessel.imoNo}`}
-                                                        className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
-                                                        onClick={() => handleVesselSelect(vessel)}
-                                                    >
-                                                        <div className="vessel-status-dot v-active"></div>
-                                                        <div className="vessel-info-block">
-                                                            <h4>{vessel.name}</h4>
-                                                            <p>IMO {vessel.imoNo}</p>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="sidebar-list-footer">
-                                                <button className="add-vessel-btn-refined" onClick={handleAddClick}>
-                                                    <Plus size={18} />
-                                                    Add Vessel
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="sidebar-section-header">
-                                            <span>VESSEL SELECTION</span>
-                                            <Search size={14} style={{ cursor: 'pointer', color: '#64748B' }} />
-                                        </div>
-                                        <div className="vessel-search-container light-mode">
-                                            <div className="vessel-search-box light">
-                                                <Search size={16} color="#94A3B8" />
-                                                <input
-                                                    type="text"
-                                                    placeholder="Search vessels..."
-                                                    value={searchTerm}
-                                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="vessel-list light-mode" style={{ flex: 1, overflowY: 'auto' }}>
-                                            {vesselList.filter(v =>
-                                                v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                v.imoNo.includes(searchTerm)
-                                            ).map((vessel) => (
-                                                <div
-                                                    key={`${vessel.name}-${vessel.imoNo}`}
-                                                    className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
-                                                    onClick={() => handleVesselSelect(vessel)}
-                                                >
-                                                    <div className="vessel-status-dot v-active"></div>
-                                                    <div className="vessel-info-block">
-                                                        <h4>{vessel.name}</h4>
-                                                        <p>IMO {vessel.imoNo}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="sidebar-list-footer">
-                                            <button className="add-vessel-btn-refined" onClick={handleAddClick}>
-                                                <Plus size={18} />
-                                                Add Vessel
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
+                                    ))}
+                                </div>
+                                <div className="sidebar-list-footer">
+                                    <button className="add-vessel-btn-refined" onClick={handleAddClick}>
+                                        <Plus size={18} />
+                                        Add Vessel
+                                    </button>
+                                </div>
                             </aside>
                         )}
 
@@ -2076,3 +1945,5 @@ function SuccessModal({ message, onClose }: { message: string, onClose: () => vo
         </div>
     );
 }
+
+// Local SuccessModal restored.

@@ -309,17 +309,83 @@
 }
 
 .cell-inner {
-    width: 100%;
+    padding: 10px 16px;
     height: 100%;
-    padding: 0 12px;
+    min-height: 48px;
     display: flex;
     align-items: center;
     font-size: 13px;
-    color: #334155;
-    cursor: cell;
-    overflow: hidden;
+    color: #475569;
+    font-weight: 500;
+    transition: all 0.2s;
+    user-select: none;
+    position: relative;
     white-space: nowrap;
+    overflow: hidden;
+}
+
+.cell-inner.static-text {
+    font-weight: 700;
+    color: var(--text);
     text-overflow: ellipsis;
+}
+
+/* Suspected Toggle Button copied and adjusted for wizard table */
+.suspected-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.suspected-toggle:hover {
+    background: #F1F5F9;
+}
+
+.suspected-toggle span {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--slate);
+    width: 30px;
+}
+
+.suspected-toggle.is-suspected span {
+    color: var(--danger);
+}
+
+.toggle-track {
+    width: 44px;
+    height: 24px;
+    border-radius: 100px;
+    background: var(--border);
+    position: relative;
+    transition: all 0.3s ease;
+    border: 1px solid #CBD5E1;
+}
+
+.toggle-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: white;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.suspected-toggle.is-suspected .toggle-track {
+    background: var(--danger);
+    border-color: var(--danger);
+}
+
+.suspected-toggle.is-suspected .toggle-thumb {
+    left: calc(100% - 20px);
 }
 
 /* Selection */
@@ -680,3 +746,4 @@
     transform: translateY(-1px);
     box-shadow: 0 8px 20px rgba(0, 176, 250, 0.4);
 }
+.suspicious-select { width: 100%; border: 1px solid #CBD5E1; color: #1E293B; border-radius: 4px; padding: 4px; outline: none; transition: border-color 0.2s; font-size: 13px; font-weight: 500; font-family: inherit; } .suspicious-select:focus { border-color: #00B0FA; } .suspicious-select option[value="Yes"] { color: #DC2626 !important; font-weight: 700; }

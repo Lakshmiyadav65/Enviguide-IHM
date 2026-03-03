@@ -26,23 +26,23 @@ const SHIP_MANAGERS_DATA = [
 ];
 
 const ALL_MAPPING_FIELDS = [
+    { id: 'vesselName', label: 'VESSEL NAME', req: true },
     { id: 'poNumber', label: 'PO NUMBER', req: true },
-    { id: 'itemDescription', label: 'ITEM DESCRIPTION', req: false },
-    { id: 'poDate', label: 'MD REQUESTED DATE', req: true },
-    { id: 'deliveryDate', label: 'SENT DATE', req: false },
-    { id: 'impaCode', label: 'IMPA CODE', req: false },
-    { id: 'issaCode', label: 'ISSA CODE', req: false },
-    { id: 'issue', label: 'ISSUE', req: false },
-    { id: 'productCode', label: 'EQUIPMENT CODE', req: false },
-    { id: 'productName', label: 'EQUIPMENT NAME', req: true },
-    { id: 'maker', label: 'MAKER', req: false },
-    { id: 'model', label: 'MODEL', req: false },
-    { id: 'partNumber', label: 'PART NUMBER', req: false },
-    { id: 'unit', label: 'UNIT', req: false },
-    { id: 'quantity', label: 'QUANTITY', req: false },
-    { id: 'remarks', label: 'VENDOR REMARK', req: false },
-    { id: 'vendorEmail', label: 'VENDOR EMAIL', req: false },
-    { id: 'supplierName', label: 'VENDOR NAME', req: true },
+    { id: 'itemDescription', label: 'ITEM DESCRIPTION', req: true },
+    { id: 'poSentDate', label: 'PO SENT DATE', req: true },
+    { id: 'impaCode', label: 'IMPA CODE', req: true },
+    { id: 'issaCode', label: 'ISSA CODE', req: true },
+    { id: 'equipmentCode', label: 'EQUIPMENT CODE', req: true },
+    { id: 'equipmentName', label: 'EQUIPMENT NAME', req: true },
+    { id: 'maker', label: 'MAKER', req: true },
+    { id: 'model', label: 'MODEL', req: true },
+    { id: 'partNumber', label: 'PART NUMBER', req: true },
+    { id: 'unit', label: 'UNIT', req: true },
+    { id: 'quantity', label: 'QUANTITY', req: true },
+    { id: 'vendorRemark', label: 'VENDOR REMARK', req: true },
+    { id: 'vendorEmail', label: 'VENDOR EMAIL', req: true },
+    { id: 'vendorName', label: 'VENDOR NAME', req: true },
+    { id: 'mdRequestedDate', label: 'MD REQUESTED DATE', req: true },
 ];
 
 export default function UploadPurchaseOrder() {
@@ -59,6 +59,7 @@ export default function UploadPurchaseOrder() {
         visible: false,
         type: 'success'
     });
+    const [showFinalizeBanner, setShowFinalizeBanner] = useState(false);
 
     const [showManagerDropdown, setShowManagerDropdown] = useState(false);
     const [showVesselDropdown, setShowVesselDropdown] = useState(false);
@@ -112,24 +113,25 @@ export default function UploadPurchaseOrder() {
 
     // Keyword map: for each field ID, list all lowercase keywords that indicate a match
     const FIELD_KEYWORDS: Record<string, string[]> = {
+        vesselName: ['vessel name', 'vessel', 'ship', 'ship name', 'shipname', 'vesselname'],
         poNumber: ['po number', 'po no', 'po#', 'purchase order', 'order number', 'orderno', 'ponumber'],
         itemDescription: ['item description', 'description', 'details', 'desc', 'particulars', 'item desc'],
-        poDate: ['md requested date', 'requested date', 'md request date', 'mds requested', 'po date', 'order date', 'podate'],
-        deliveryDate: ['sent date', 'date sent', 'delivery date', 'ship date', 'shipment date', 'deliverydate', 'sentdate'],
-        impaCode: ['impa code', 'impa', 'impa no', 'impa number', 'impacode'],
-        issaCode: ['issa code', 'issa', 'issa no', 'issa number', 'issacode'],
-        issue: ['issue', 'issue no', 'issue number', 'issue date', 'issueno'],
-        productCode: ['equipment code', 'equip code', 'product code', 'item code', 'sku', 'productcode', 'equipmentcode'],
-        productName: ['equipment name', 'equip name', 'product name', 'item name', 'material name', 'equipmentname', 'productname'],
-        maker: ['maker', 'make', 'manufacturer', 'manufactured by', 'mfr'],
-        model: ['model', 'model no', 'model number', 'modelno'],
-        partNumber: ['part number', 'part no', 'part#', 'partno', 'partnumber'],
-        unit: ['unit', 'uom', 'unit of measure', 'unit of measurement'],
-        quantity: ['quantity', 'qty', 'units ordered', 'quan'],
-        remarks: ['vendor remark', 'vendor remarks', 'remarks', 'notes', 'comments', 'remark', 'note'],
-        vendorEmail: ['vendor email', 'email', 'supplier email', 'contact email', 'vendoremail', 'email address'],
-        supplierName: ['vendor name', 'supplier name', 'vendor', 'supplier', 'vendorname', 'suppliername'],
+        poSentDate: ['po sent date', 'sent date', 'date sent', 'delivery date', 'ship date', 'shipment date', 'deliverydate', 'sentdate'],
+        impaCode: ['impa code', 'impa', 'impa no', 'impacode'],
+        issaCode: ['issa code', 'issa', 'issa no', 'issacode'],
+        equipmentCode: ['equipment code', 'equipment no', 'equip code', 'equipmentcode'],
+        equipmentName: ['equipment name', 'equipment', 'equip name', 'equipmentname'],
+        maker: ['maker', 'manufacturer', 'brand'],
+        model: ['model', 'model no', 'model name'],
+        partNumber: ['part number', 'part no', 'part#', 'partnumber'],
+        unit: ['unit', 'uom', 'measure'],
+        quantity: ['quantity', 'qty', 'amount'],
+        vendorRemark: ['vendor remark', 'vendor note', 'remarks', 'vendorremark'],
+        vendorEmail: ['vendor email', 'email', 'vendoremail'],
+        vendorName: ['vendor name', 'vendor', 'supplier', 'vendorname'],
+        mdRequestedDate: ['md requested date', 'requested date', 'md request date', 'mds requested', 'po date', 'order date', 'podate'],
     };
+
 
     const autoMapHeaders = (headers: any[], existingMappings: Record<string, string> = {}) => {
         const newMappings: Record<string, string> = { ...existingMappings };
@@ -140,7 +142,8 @@ export default function UploadPurchaseOrder() {
             const keywords = FIELD_KEYWORDS[field.id] || [];
             const idx = headers.findIndex((h, i) => {
                 if (usedCols.has(i.toString())) return false; // skip already-mapped cols
-                const header = String(h || '').toLowerCase().trim();
+                // Replace underscores with spaces to support both e.g. "MD_REQUESTED_DATE" and "MD REQUESTED DATE"
+                const header = String(h || '').toLowerCase().replace(/_/g, ' ').trim();
                 return keywords.some(kw => header === kw || header.includes(kw) || kw.includes(header));
             });
             if (idx !== -1) {
@@ -177,6 +180,15 @@ export default function UploadPurchaseOrder() {
     const mappedRequired = requiredFields.filter(f => !!fieldMappings[f.id]);
     const allRequiredMapped = mappedRequired.length === requiredFields.length;
 
+    const handleConfirmMapping = () => {
+        const unmappedRequired = ALL_MAPPING_FIELDS.filter(f => f.req && !fieldMappings[f.id]);
+        if (unmappedRequired.length > 0) {
+            setShowMappingErrors(true);
+            return;
+        }
+        setShowFinalizeBanner(true);
+    };
+
     const finalizeImport = () => {
         const unmappedRequired = ALL_MAPPING_FIELDS.filter(f => f.req && !fieldMappings[f.id]);
         if (unmappedRequired.length > 0) {
@@ -195,25 +207,111 @@ export default function UploadPurchaseOrder() {
         // 1. Mark recently added vessel
         localStorage.setItem('recentlyAddedAudit', JSON.stringify({ imo, timestamp: Date.now() }));
 
-        // 2. Save mapping & raw data
-        localStorage.setItem(`audit_mapping_${imo}`, JSON.stringify(fieldMappings));
-        localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(excelData));
+        // 2. Transform raw data to enforce exact column order requested
+        const mappedIndices = new Set(Object.values(fieldMappings).map(Number));
+        const transformedData = excelData.map((row, rIdx) => {
+            if (rIdx === 0) {
+                const newHeader = [
+                    'Name', 'Vessel Name', 'PO Number', 'IMO Number',
+                    'PO Sent Date', 'MD Requested Date', 'Item Description', 'Is Suspected',
+                    'IMPA Code', 'ISSA Code', 'Equipment Code', 'Equipment Name',
+                    'Maker', 'Model', 'Part Number', 'Unit', 'Quantity',
+                    'Vendor Remark', 'Vendor Email', 'Vendor Name'
+                ];
+                // Append all remaining columns that were not mapped
+                row.forEach((colStr, cIdx) => {
+                    if (!mappedIndices.has(cIdx)) newHeader.push(String(colStr || `Column ${cIdx}`));
+                });
+                return newHeader;
+            } else {
+                const newRow = [
+                    shipName, // Name (default to vessel name)
+                    fieldMappings.vesselName ? String(row[Number(fieldMappings.vesselName)] || '') : shipName,
+                    fieldMappings.poNumber ? String(row[Number(fieldMappings.poNumber)] || '') : '',
+                    imo, // IMO Number (from selected vessel)
+                    fieldMappings.poSentDate ? String(row[Number(fieldMappings.poSentDate)] || '') : '',
+                    fieldMappings.mdRequestedDate ? String(row[Number(fieldMappings.mdRequestedDate)] || '') : '',
+                    fieldMappings.itemDescription ? String(row[Number(fieldMappings.itemDescription)] || '') : '',
+                    'No', // Is Suspected default
+                    fieldMappings.impaCode ? String(row[Number(fieldMappings.impaCode)] || '') : '',
+                    fieldMappings.issaCode ? String(row[Number(fieldMappings.issaCode)] || '') : '',
+                    fieldMappings.equipmentCode ? String(row[Number(fieldMappings.equipmentCode)] || '') : '',
+                    fieldMappings.equipmentName ? String(row[Number(fieldMappings.equipmentName)] || '') : '',
+                    fieldMappings.maker ? String(row[Number(fieldMappings.maker)] || '') : '',
+                    fieldMappings.model ? String(row[Number(fieldMappings.model)] || '') : '',
+                    fieldMappings.partNumber ? String(row[Number(fieldMappings.partNumber)] || '') : '',
+                    fieldMappings.unit ? String(row[Number(fieldMappings.unit)] || '') : '',
+                    fieldMappings.quantity ? String(row[Number(fieldMappings.quantity)] || '') : '',
+                    fieldMappings.vendorRemark ? String(row[Number(fieldMappings.vendorRemark)] || '') : '',
+                    fieldMappings.vendorEmail ? String(row[Number(fieldMappings.vendorEmail)] || '') : '',
+                    fieldMappings.vendorName ? String(row[Number(fieldMappings.vendorName)] || '') : '',
+                ];
+                // Append all remaining unmapped cell values
+                row.forEach((colVal, cIdx) => {
+                    if (!mappedIndices.has(cIdx)) newRow.push(String(colVal || ''));
+                });
+                return newRow;
+            }
+        });
 
-        // 3. Compute statistics from data
+        // 3. Save standard mapping & standardized raw data
+        const standardMappings: Record<string, string> = {
+            name: '0',
+            vesselName: '1',
+            poNumber: '2',
+            imoNumber: '3',
+            poSentDate: '4',
+            mdRequestedDate: '5',
+            itemDescription: '6',
+            isSuspected: '7',
+            impaCode: '8',
+            issaCode: '9',
+            equipmentCode: '10',
+            equipmentName: '11',
+            maker: '12',
+            model: '13',
+            partNumber: '14',
+            unit: '15',
+            quantity: '16',
+            vendorRemark: '17',
+            vendorEmail: '18',
+            vendorName: '19'
+        };
+        localStorage.setItem(`audit_mapping_${imo}`, JSON.stringify(standardMappings));
+        localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(transformedData));
+
+        // 4. Compute statistics from original data for metrics
         const rows = excelData.slice(1); // skip header row
         const poColIdx = fieldMappings.poNumber ? parseInt(fieldMappings.poNumber) : -1;
         const supColIdx = fieldMappings.supplierCode ? parseInt(fieldMappings.supplierCode) : -1;
         const prodColIdx = fieldMappings.productCode ? parseInt(fieldMappings.productCode) : -1;
+
+        const itemDescColIdx = fieldMappings.itemDescription ? parseInt(fieldMappings.itemDescription) : -1;
+        const qtyColIdx = fieldMappings.quantity ? parseInt(fieldMappings.quantity) : -1;
+        const supplierNameColIdx = fieldMappings.supplierName ? parseInt(fieldMappings.supplierName) : -1;
 
         let totalPO = 0, duplicatePO = 0, duplicateSupplierCode = 0, duplicateProduct = 0;
 
         if (poColIdx !== -1) {
             const poValues = rows.map(r => String(r[poColIdx] || '').trim()).filter(v => v !== '');
             const poSet = new Set<string>();
-            const poDups = new Set<string>();
-            poValues.forEach(v => { if (poSet.has(v)) poDups.add(v); else poSet.add(v); });
+            poValues.forEach(v => poSet.add(v));
             totalPO = poSet.size;
-            duplicatePO = poDups.size;
+
+            const compositeSet = new Set<string>();
+            const compositeDups = new Set<string>();
+            rows.forEach(r => {
+                const po = String(r[poColIdx] || '').trim();
+                if (!po) return;
+                const itemDesc = itemDescColIdx !== -1 ? String(r[itemDescColIdx] || '').trim().toLowerCase() : '';
+                const qty = qtyColIdx !== -1 ? String(r[qtyColIdx] || '').trim().toLowerCase() : '';
+                const supplier = supplierNameColIdx !== -1 ? String(r[supplierNameColIdx] || '').trim().toLowerCase() : '';
+
+                const key = `${po}|${itemDesc}|${qty}|${supplier}`;
+                if (compositeSet.has(key)) compositeDups.add(key);
+                else compositeSet.add(key);
+            });
+            duplicatePO = compositeDups.size;
         }
         if (supColIdx !== -1) {
             const vals = rows.map(r => String(r[supColIdx] || '').trim()).filter(v => v !== '');
@@ -228,12 +326,13 @@ export default function UploadPurchaseOrder() {
             duplicateProduct = dups.size;
         }
 
-        // 4. Update registry
+        // 5. Update registry
         const existingRegistry = JSON.parse(localStorage.getItem('audit_registry_main') || '[]');
 
         const newAudit = {
             imoNumber: imo,
             vesselName: shipName,
+            name: shipName,
             totalPO,
             totalItems: rows.length,
             duplicatePO,
@@ -381,7 +480,7 @@ export default function UploadPurchaseOrder() {
                         return (
                             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', paddingTop: 'calc(var(--header-height) + 16px)', position: 'relative' }}>
                                 {/* Floating Success Banner */}
-                                {allRequiredMapped && (
+                                {showFinalizeBanner && allRequiredMapped && (
                                     <div style={{ position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 10000, width: 'max-content', pointerEvents: 'auto' }}>
                                         <div style={{ background: '#1E293B', borderRadius: '14px', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.08)', animation: 'slideInDown 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)' }}>
                                             <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -467,8 +566,6 @@ export default function UploadPurchaseOrder() {
                                                                 <span style={{ fontSize: '9px', fontWeight: 800, color: '#10B981', background: '#F0FDF4', border: '1px solid #DCFCE7', borderRadius: '4px', padding: '2px 7px', letterSpacing: '0.05em' }}>
                                                                     {f.id === 'poNumber' || f.id === 'supplierName' || f.id === 'itemDescription' ? 'AUTO-MATCHED' : 'MAPPED'}
                                                                 </span>
-                                                            ) : !f.req ? (
-                                                                <span style={{ fontSize: '9px', fontWeight: 800, color: '#94A3B8', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '4px', padding: '2px 7px', letterSpacing: '0.05em' }}>OPTIONAL</span>
                                                             ) : null}
                                                         </div>
                                                         <MappingDropdown
@@ -498,7 +595,7 @@ export default function UploadPurchaseOrder() {
                                         <div style={{ padding: '20px 24px', borderTop: '1px solid #E2E8F0', background: 'white', borderRadius: '0 0 24px 24px', flexShrink: 0 }}>
                                             <button
                                                 style={{ width: '100%', padding: '14px', borderRadius: '8px', border: 'none', background: allRequiredMapped ? '#00B0FA' : '#94A3B8', color: 'white', fontWeight: 700, fontSize: '14px', cursor: allRequiredMapped ? 'pointer' : 'not-allowed', transition: 'all 0.3s', boxShadow: allRequiredMapped ? '0 4px 6px -1px rgba(0, 176, 250, 0.2)' : 'none', textTransform: 'uppercase', letterSpacing: '0.5px' }}
-                                                onClick={finalizeImport}
+                                                onClick={handleConfirmMapping}
                                             >
                                                 CONFIRM MAPPING
                                             </button>

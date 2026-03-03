@@ -1,8 +1,7 @@
-
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import {
-    ChevronDown, ChevronUp, Search, RotateCw, Edit2, Trash2,
-    Calendar, Filter, FileText, Layout
+    ChevronDown, Search, RotateCw, Edit2, Trash2,
+    FileText, Layout, Filter
 } from 'lucide-react';
 import './PurchaseOrderView.css';
 
@@ -70,37 +69,26 @@ const getSupplierMeta = (filter: string) => {
 };
 
 export default function PurchaseOrderView() {
-    const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [activeFilter, setActiveFilter] = useState('All');
-    const [openSuppliers, setOpenSuppliers] = useState<string[]>([]);
+    const [openSuppliers, setOpenSuppliers] = useState<string[]>(['s1']);
+    const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData());
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isFilterBarOpen, setIsFilterBarOpen] = useState(false);
+
     const toggleSupplier = (id: string) => {
         setOpenSuppliers(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
     };
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
-    const [keyword, setKeyword] = useState('');
-    const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData());
 
-    const dateFromRef = useRef<HTMLInputElement>(null);
-    const dateToRef = useRef<HTMLInputElement>(null);
-
-    const currentSuppliers = useMemo(() => {
+    const currentSuppliersData = useMemo(() => {
         const filteredItems = allItems.filter(item => {
             if (activeFilter !== 'All' && item.category !== activeFilter) return false;
-            if (dateFrom || dateTo) {
-                const itemDate = new Date(item.orderDate);
-                const fromDate = dateFrom ? new Date(dateFrom) : null;
-                const toDate = dateTo ? new Date(dateTo) : null;
-                if (fromDate && itemDate < fromDate) return false;
-                if (toDate && itemDate > toDate) return false;
-            }
-            if (keyword && !item.itemDescription.toLowerCase().includes(keyword.toLowerCase())) return false;
+            if (searchTerm && !item.itemDescription.toLowerCase().includes(searchTerm.toLowerCase()) && !item.poNumber.toLowerCase().includes(searchTerm.toLowerCase())) return false;
             return true;
         });
 
         const meta = getSupplierMeta(activeFilter);
         return meta.map((s, idx) => {
-            const supplierItems = filteredItems.slice(idx * 5, (idx + 1) * 5);
+            const supplierItems = filteredItems.slice(idx * 10, (idx + 1) * 10);
             return {
                 ...s,
                 totalItems: `${supplierItems.length * 2}(${supplierItems.length})`,
@@ -109,7 +97,7 @@ export default function PurchaseOrderView() {
                 items: supplierItems
             };
         }).filter(s => s.items.length > 0);
-    }, [activeFilter, dateFrom, dateTo, keyword, allItems]);
+    }, [activeFilter, searchTerm, allItems]);
 
     const selectedCount = allItems.filter(i => i.selected).length;
 
@@ -124,286 +112,175 @@ export default function PurchaseOrderView() {
     };
 
     const handleRequestMDs = () => {
-        if (selectedCount > 0 && activeFilter === 'Request Pending') {
-            setAllItems(prev => prev.map(item => {
-                if (item.selected && item.category === 'Request Pending') {
-                    return {
-                        ...item,
-                        category: 'Pending Mds',
-                        emailStatus: 'SENT',
-                        mdsReq: new Date().toLocaleDateString('en-GB'),
-                        selected: false
-                    };
-                }
-                return item;
-            }));
-            alert('Complete request MDs & SDoCs: Status updated to PENDING MDs.');
-        }
+        setAllItems(prev => prev.map(item => {
+            if (item.selected) {
+                return {
+                    ...item,
+                    category: 'Pending Mds',
+                    emailStatus: 'SENT',
+                    mdsReq: new Date().toLocaleDateString('en-GB'),
+                    selected: false
+                };
+            }
+            return item;
+        }));
+        alert('Action completed for selected items.');
     };
 
     return (
         <div className="po-v4-main-wrapper">
-            <div className="po-v4-scroll-content">
-                <div className="po-v4-container-limited">
-                    {/* Filters Section */}
-                    <div className={`po-v4-filters-box-premium ${isFilterOpen ? 'expanded' : ''}`}>
-                        <div className="po-v4-filters-header-premium" onClick={() => setIsFilterOpen(!isFilterOpen)}>
-                            <div className="po-v4-filters-title-main">
-                                <Filter size={18} />
-                                <span>ORDER STATE & DATE FILTERS</span>
-                            </div>
-                            <div className="po-v4-header-chevron">
-                                {isFilterOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                            </div>
-                        </div>
-
-                        {isFilterOpen && (
-                            <div className="po-v4-filters-content-premium">
-                                <div className="po-v4-filters-row-premium">
-                                    <div className="po-v4-date-inputs-group">
-                                        <div className="filter-date-field" onClick={() => dateFromRef.current?.showPicker()}>
-                                            <label>Order Start Date</label>
-                                            <div className="date-input-with-icon">
-                                                <input
-                                                    ref={dateFromRef}
-                                                    type="date"
-                                                    value={dateFrom}
-                                                    onChange={(e) => setDateFrom(e.target.value)}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                                <Calendar size={18} className="calendar-icon-overlay" />
-                                            </div>
-                                        </div>
-                                        <div className="filter-date-field" onClick={() => dateToRef.current?.showPicker()}>
-                                            <label>Order End Date</label>
-                                            <div className="date-input-with-icon">
-                                                <input
-                                                    ref={dateToRef}
-                                                    type="date"
-                                                    value={dateTo}
-                                                    onChange={(e) => setDateTo(e.target.value)}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                                <Calendar size={18} className="calendar-icon-overlay" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="po-v4-action-group-buttons">
-                                        <button
-                                            type="button"
-                                            className="po-v4-btn-rect-action-styled search"
-                                        >
-                                            Apply Filters
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="po-v4-btn-rect-action-styled reset"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setDateFrom('');
-                                                setDateTo('');
-                                                setActiveFilter('All');
-                                                setKeyword('');
-                                            }}
-                                        >
-                                            Reset Filters
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="po-v4-tags-container-premium" onClick={(e) => e.stopPropagation()}>
-                                    {FILTER_TAGS.map(tag => (
-                                        <button
-                                            key={tag}
-                                            type="button"
-                                            className={`po-v4-tag-item-premium ${activeFilter === tag ? 'active' : ''}`}
-                                            onClick={(e) => { e.stopPropagation(); setActiveFilter(tag); }}
-                                        >
-                                            {tag}
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="po-v4-keyword-search-premium" onClick={(e) => e.stopPropagation()}>
-                                    <div className="po-v4-keyword-label-row">
-                                        <label>Keywords</label>
-                                        <div className="po-v4-keyword-input-box">
-                                            <Search size={14} />
-                                            <input
-                                                type="text"
-                                                placeholder="Search based on keyword"
-                                                className="po-v4-keyword-input-field"
-                                                value={keyword}
-                                                onChange={(e) => setKeyword(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Top strip containing only the soft search now */}
-                    <div className="po-v4-top-strip-clean">
-                        <div className="po-v4-soft-search-box-premium">
-                            <Search size={16} />
-                            <input type="text" placeholder="Search..." className="po-v4-soft-search-input-premium" />
-                        </div>
-                    </div>
-
-                    {/* Details Block */}
-                    <div className="po-v4-details-section-premium">
-                        <div className="po-v4-details-section-title">
-                            <span>Details</span>
-                        </div>
-                        <div className="po-v4-suppliers-list-structured">
-                            {currentSuppliers.map(supplier => (
-                                <div key={supplier.id} className={`po-v4-supplier-item-v4 ${openSuppliers.includes(supplier.id) ? 'is-open' : ''}`}>
-                                    <div className="po-v4-supplier-header-v4" onClick={() => toggleSupplier(supplier.id)}>
-                                        <div className="po-v4-sup-info-v4">
-                                            <div className="po-v4-sup-ref-tag">{supplier.ref}</div>
-                                            <div className="po-v4-sup-name-title">{supplier.name}</div>
-                                        </div>
-                                        <div className="po-v4-sup-metrics-v4">
-                                            <div className="po-v4-sup-metric-pill">
-                                                <span className="lbl">Total Items Supplied (POs)</span>
-                                                <span className="val">{supplier.totalItems}</span>
-                                            </div>
-                                            <div className="po-v4-sup-metric-pill">
-                                                <span className="lbl">MDS</span>
-                                                <span className="val">{supplier.mds}</span>
-                                            </div>
-                                            <div className="po-v4-sup-metric-pill">
-                                                <span className="lbl">HM</span>
-                                                <span className="val">{supplier.hm}</span>
-                                            </div>
-                                            <ChevronDown size={20} className={`po-v4-arrow-icon ${openSuppliers.includes(supplier.id) ? 'up' : ''}`} />
-                                        </div>
-                                    </div>
-
-                                    {openSuppliers.includes(supplier.id) && (
-                                        <div className="po-v4-supplier-details-v4">
-                                            {/* Localized Toolbar just above the column headers */}
-                                            <div className="po-v4-table-toolbar-localized">
-                                                <div className="po-v4-action-icons-localized">
-                                                    {selectedCount > 0 && (
-                                                        <div className="po-v4-action-item-local tooltip-p" onClick={handleRequestMDs}>
-                                                            <div className="po-v4-circle-btn-v4 req-mds">
-                                                                <FileText size={18} />
-                                                            </div>
-                                                            <span className="po-v4-tooltip-text">Complete request MDs & SDoCs</span>
-                                                        </div>
-                                                    )}
-                                                    <div className="po-v4-action-item-local tooltip-p">
-                                                        <div className="po-v4-circle-btn-v4 refresh">
-                                                            <RotateCw size={18} />
-                                                        </div>
-                                                        <span className="po-v4-tooltip-text">Refresh Data</span>
-                                                    </div>
-                                                    <div className="po-v4-action-item-local tooltip-p">
-                                                        <div className="po-v4-circle-btn-v4 layout">
-                                                            <Layout size={18} />
-                                                        </div>
-                                                        <span className="po-v4-tooltip-text">Layout Settings</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="po-v4-table-master-wrapper">
-                                                <table className="po-v4-table-styled-premium">
-                                                    <thead>
-                                                        <tr>
-                                                            <th className="ch-col">
-                                                                <input type="checkbox" className="po-v4-header-checkbox-v4" checked={supplier.items.length > 0 && supplier.items.every(i => i.selected)} onChange={(e) => toggleAllInSupplier(supplier.items, e.target.checked)} onClick={(e) => e.stopPropagation()} />
-                                                            </th>
-                                                            <th className="ac-col">Action</th>
-                                                            <th className="em-col">Email Status</th>
-                                                            <th className="ihm-col">IHM Product Code</th>
-                                                            <th className="po-col">PO Number</th>
-                                                            <th className="mdr-col">MDs SDoCs Req</th>
-                                                            <th className="mdc-col">MDs SDoCs Rec</th>
-                                                            <th className="it-col">Item Description</th>
-                                                            <th className="da-col">Order Date</th>
-                                                            <th className="qt-col"><div style={{display:'flex',flexDirection:'column',gap:'2px'}}><span>Quantity</span><span style={{fontSize:'9px',fontWeight:500,color:'#94A3B8',whiteSpace:'nowrap'}}><span style={{color:'#EF4444'}}>Ord</span>{' | '}<span style={{color:'#10B981'}}>Rec</span>{' | '}<span style={{color:'#3B82F6'}}>Pend</span></span></div></th>
-                                                            <th className="un-col">Unit</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {supplier.items.map(item => (
-                                                            <tr key={item.id} className={item.selected ? 'row-is-selected' : ''}>
-                                                                <td className="ch-col">
-                                                                    <div className={`po-v4-row-action-checkbox-styled ${item.selected ? 'checked' : ''}`} onClick={(e) => toggleItemSelection(item.id, e)}>
-                                                                        {item.selected && <span className="check-icon-v4">✓</span>}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="ac-col">
-                                                                    <div className="po-v4-row-action-btns-premium">
-                                                                        <button type="button" className="po-v4-action-icon-btn-v4 view" title="View Document"><FileText size={14} /></button>
-                                                                        <button type="button" className="po-v4-action-icon-btn-v4 edit" title="Edit Item"><Edit2 size={14} /></button>
-                                                                        <button type="button" className="po-v4-action-icon-btn-v4 delete" title="Delete Item"><Trash2 size={14} /></button>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="em-col">{item.emailStatus}</td>
-                                                                <td className="ihm-col">{item.ihmProductCode}</td>
-                                                                <td className="po-col">{item.poNumber}</td>
-                                                                <td className="mdr-col">{item.mdsReq}</td>
-                                                                <td className="mdc-col">{item.mdsRec}</td>
-                                                                <td className="it-col">{item.itemDescription}</td>
-                                                                <td className="da-col">{item.orderDate}</td>
-                                                                <td className="qt-col">
-                                                                    <span className="q-p red">{item.quantityTotal.split('|')[0]}</span>
-                                                                    <span className="q-s">|</span>
-                                                                    <span className="q-p green">{item.quantityTotal.split('|')[1]}</span>
-                                                                    <span className="q-s">|</span>
-                                                                    <span className="q-p blue">{item.quantityTotal.split('|')[2]}</span>
-                                                                </td>
-                                                                <td className="un-col">{item.unit}</td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                            <div className="po-v4-supplier-footer-v4">
-                                                {supplier.items.filter(i => i.selected).length} selected / {supplier.items.length} total
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
+            <div className="po-v4-top-controls-p">
+                <div className="po-v4-top-strip-clean">
+                    <button className="po-v4-filter-trigger-btn" onClick={() => setIsFilterBarOpen(!isFilterBarOpen)}>
+                        <Filter size={18} />
+                        Filter
+                    </button>
+                    <div className="po-v4-soft-search-box-premium">
+                        <Search size={16} />
+                        <input
+                            type="text"
+                            placeholder="Search PO numbers or descriptions..."
+                            className="po-v4-soft-search-input-premium"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
                     </div>
                 </div>
+
+                {isFilterBarOpen && (
+                    <div className="po-v4-tags-container-premium">
+                        {FILTER_TAGS.map(tag => (
+                            <div
+                                key={tag}
+                                className={`po-v4-tag-item-premium ${activeFilter === tag ? 'active' : ''}`}
+                                onClick={() => setActiveFilter(tag)}
+                            >
+                                {tag}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
-            {/* Metrics Summary footer - Unified Design */}
-            <div className="po-v4-fixed-metrics-footer-premium">
-                <div className="metric-items-group-premium">
-                    <div className="metric-item-v4">
-                        <span className="label-v4">TOTAL POS:</span>
-                        <span className="value-v4">865</span>
+            <div className="po-v4-scroll-content">
+                <div className="po-v4-details-section-premium">
+                    <div className="po-v4-details-section-title">
+                        <span>Details</span>
                     </div>
-                    <div className="metric-item-v4">
-                        <span className="label-v4">MDS REQUESTED:</span>
-                        <span className="value-v4">328</span>
-                    </div>
-                    <div className="metric-item-v4">
-                        <span className="label-v4">MDS RECEIVED:</span>
-                        <span className="value-v4">147</span>
-                    </div>
-                    <div className="metric-item-v4">
-                        <span className="label-v4">MDS PENDING:</span>
-                        <span className="value-v4">181</span>
-                    </div>
-                    <div className="metric-item-v4">
-                        <span className="label-v4">HM GREEN:</span>
-                        <span className="value-v4 green">145</span>
-                    </div>
-                    <div className="metric-item-v4">
-                        <span className="label-v4">HM RED:</span>
-                        <span className="value-v4 red">2</span>
-                    </div>
-                    <div className="metric-item-v4">
-                        <span className="label-v4">PCHM QTY:</span>
-                        <span className="value-v4">0</span>
+                    <div className="po-v4-suppliers-list-structured">
+                        {currentSuppliersData.map(supplier => (
+                            <div key={supplier.id} className={`po-v4-supplier-item-v4 ${openSuppliers.includes(supplier.id) ? 'is-open' : ''}`}>
+                                <div className="po-v4-supplier-header-v4" onClick={() => toggleSupplier(supplier.id)}>
+                                    <div className="po-v4-sup-info-v4">
+                                        <div className="po-v4-sup-ref-tag">{supplier.ref}</div>
+                                        <div className="po-v4-sup-name-title">{supplier.name}</div>
+                                    </div>
+                                    <div className="po-v4-sup-metrics-v4">
+                                        <ChevronDown size={20} className={`po-v4-arrow-icon ${openSuppliers.includes(supplier.id) ? 'up' : ''}`} />
+                                    </div>
+                                </div>
+
+                                {openSuppliers.includes(supplier.id) && (
+                                    <div className="po-v4-supplier-details-v4">
+                                        <div className="po-v4-table-toolbar-localized">
+                                            <div className="po-v4-action-icons-localized">
+                                                {selectedCount > 0 && (
+                                                    <div className="po-v4-action-item-local tooltip-p" onClick={handleRequestMDs}>
+                                                        <div className="po-v4-circle-btn-v4 req-mds">
+                                                            <FileText size={18} />
+                                                        </div>
+                                                        <span className="po-v4-tooltip-text">Process Selected Items</span>
+                                                    </div>
+                                                )}
+                                                <div className="po-v4-action-item-local tooltip-p">
+                                                    <div className="po-v4-circle-btn-v4 refresh">
+                                                        <RotateCw size={18} />
+                                                    </div>
+                                                    <span className="po-v4-tooltip-text">Refresh Data</span>
+                                                </div>
+                                                <div className="po-v4-action-item-local tooltip-p">
+                                                    <div className="po-v4-circle-btn-v4 layout">
+                                                        <Layout size={18} />
+                                                    </div>
+                                                    <span className="po-v4-tooltip-text">Layout Settings</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="po-v4-table-master-wrapper">
+                                            <table className="po-v4-table-styled-premium">
+                                                <thead>
+                                                    <tr>
+                                                        <th className="ch-col">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="po-v4-header-checkbox-v4"
+                                                                checked={supplier.items.length > 0 && supplier.items.every(i => i.selected)}
+                                                                onChange={(e) => toggleAllInSupplier(supplier.items, e.target.checked)}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                        </th>
+                                                        <th className="ac-col">Action</th>
+                                                        <th className="em-col">Email Status</th>
+                                                        <th className="ihm-col">IHM Product Code</th>
+                                                        <th className="po-col">PO Number</th>
+                                                        <th className="mdr-col">MDs SDoCs Req</th>
+                                                        <th className="mdc-col">MDs SDoCs Rec</th>
+                                                        <th className="it-col">Item Description</th>
+                                                        <th className="da-col">Order Date</th>
+                                                        <th className="qt-col">
+                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                                <span>Quantity</span>
+                                                                <span style={{ fontSize: '9px', fontWeight: 500, color: '#94A3B8', whiteSpace: 'nowrap' }}>
+                                                                    <span style={{ color: '#EF4444' }}>Ord</span>{' | '}<span style={{ color: '#10B981' }}>Rec</span>{' | '}<span style={{ color: '#3B82F6' }}>Pend</span>
+                                                                </span>
+                                                            </div>
+                                                        </th>
+                                                        <th className="un-col">Unit</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {supplier.items.map(item => (
+                                                        <tr key={item.id} className={item.selected ? 'row-is-selected' : ''}>
+                                                            <td className="ch-col">
+                                                                <div className={`po-v4-row-action-checkbox-styled ${item.selected ? 'checked' : ''}`} onClick={(e) => toggleItemSelection(item.id, e)}>
+                                                                    {item.selected && <span className="check-icon-v4">✓</span>}
+                                                                </div>
+                                                            </td>
+                                                            <td className="ac-col">
+                                                                <div className="po-v4-row-action-btns-premium">
+                                                                    <button type="button" className="po-v4-action-icon-btn-v4 view" title="View Document"><FileText size={14} /></button>
+                                                                    <button type="button" className="po-v4-action-icon-btn-v4 edit" title="Edit Item"><Edit2 size={14} /></button>
+                                                                    <button type="button" className="po-v4-action-icon-btn-v4 delete" title="Delete Item"><Trash2 size={14} /></button>
+                                                                </div>
+                                                            </td>
+                                                            <td className="em-col">{item.emailStatus}</td>
+                                                            <td className="ihm-col">{item.ihmProductCode}</td>
+                                                            <td className="po-col">{item.poNumber}</td>
+                                                            <td className="mdr-col">{item.mdsReq}</td>
+                                                            <td className="mdc-col">{item.mdsRec}</td>
+                                                            <td className="it-col">{item.itemDescription}</td>
+                                                            <td className="da-col">{item.orderDate}</td>
+                                                            <td className="qt-col">
+                                                                <span className="q-p red">{item.quantityTotal.split('|')[0]}</span>
+                                                                <span className="q-s">|</span>
+                                                                <span className="q-p green">{item.quantityTotal.split('|')[1]}</span>
+                                                                <span className="q-s">|</span>
+                                                                <span className="q-p blue">{item.quantityTotal.split('|')[2]}</span>
+                                                            </td>
+                                                            <td className="un-col">{item.unit}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div className="po-v4-supplier-footer-v4">
+                                            {supplier.items.filter(i => i.selected).length} selected / {supplier.items.length} total
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>

@@ -16,6 +16,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { PLAN_OCEAN_PIONEER, PLAN_ACOSTA, PLAN_AFIF, PLAN_PACIFIC_HORIZON, PLAN_GENERIC } from '../assets/ship_plans';
 import GAPlanViewer from './GAPlanViewer';
 import './DecksView.css';
+import './DecksViewPremium.css';
 
 interface Rect {
     x: number;
@@ -623,25 +624,25 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                                         <FileText size={16} className="plan-icon" />
                                         <div className="plan-text-meta">
                                             <span className="plan-filename">{plan.name}</span>
-                                            <span className="plan-date">{plan.date}</span>
+                                            <span className="plan-date">Uploaded on {plan.date}</span>
                                         </div>
                                     </div>
                                     <div className="plan-row-actions">
-                                        <button className="plan-action-btn" title="Settings">
+                                        <button className="plan-action-btn-refined" title="Settings">
                                             <Settings size={18} />
                                         </button>
-                                        <button className="plan-action-btn delete" onClick={(e) => { e.stopPropagation(); removePlan(plan.id); }} title="Delete">
+                                        <button className="plan-action-btn-refined delete" onClick={(e) => { e.stopPropagation(); removePlan(plan.id); }} title="Delete">
                                             <Trash2 size={18} />
                                         </button>
                                         <button
-                                            className="open-full-viewer-btn"
+                                            className="open-full-viewer-btn-premium"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}&isolated=false`, '_blank');
                                             }}
                                         >
-                                            <ExternalLink size={16} />
-                                            OPEN IN FULL VIEWER
+                                            <ExternalLink size={14} />
+                                            VIEW PLAN
                                         </button>
                                     </div>
                                 </div>
@@ -783,7 +784,7 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                                 </div>
                             ) : (
                                 <>
-                                    {mappedSections.map((deck, idx) => (
+                                    {mappedSections.map((deck) => (
                                         <div key={deck.id} className="deck-row-card">
                                             <div className="deck-row-header" onClick={() => toggleExpand(deck.id)}>
                                                 <div className="deck-row-icon-box" onClick={(e) => { e.stopPropagation(); openMapping(deck); }}>
@@ -799,31 +800,24 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <div className="deck-row-main-info" onClick={(e) => { e.stopPropagation(); openMapping(deck); }}>
-                                                    <h4>{deck.title}</h4>
-                                                    <span className="deck-section-tag">{deck.sectionId || `SECTION 0${idx + 1}`}</span>
+                                                <div className="deck-info-primary">
+                                                    <div className="deck-title-row">
+                                                        <span className="deck-name-txt">{deck.title}</span>
+                                                        <span className="deck-id-tag">{deck.sectionId}</span>
+                                                    </div>
+                                                    <div className="deck-meta-row">
+                                                        <Compass size={12} />
+                                                        <span>{deck.itemsCount} Mapped Items</span>
+                                                        <span className="meta-dot"></span>
+                                                        <span>Ready for Inspection</span>
+                                                    </div>
                                                 </div>
-                                                <div className="items-in-log-badge" onClick={(e) => { e.stopPropagation(); openMapping(deck); }} style={{ cursor: 'pointer' }}>
-                                                    <strong>{deck.itemsCount || 0}</strong> ITEMS IN LOG
-                                                </div>
-                                                <div className="deck-row-actions">
-
-                                                    <button className="action-icon-btn" onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (!activePlan) return;
-                                                        const urlParams = new URLSearchParams({
-                                                            url: activePlan.url,
-                                                            name: activePlan.name,
-                                                            vessel: vesselName,
-                                                            focusedId: deck.id,
-                                                            isolated: 'true'
-                                                        });
-                                                        window.open(`/viewer?${urlParams.toString()}`, '_blank');
-                                                    }} title="Open Viewer / Edit Crop">
-                                                        <Pencil size={18} />
+                                                <div className="deck-row-actions-group">
+                                                    <button className="deck-action-icn-btn" onClick={(e) => { e.stopPropagation(); openMapping(deck, 'edit'); }} title="Edit Mapping">
+                                                        <Pencil size={16} />
                                                     </button>
-                                                    <button className="action-icon-btn" onClick={(e) => { e.stopPropagation(); setMappedSections(prev => prev.filter(s => s.id !== deck.id)); }} title="Delete">
-                                                        <Trash2 size={18} />
+                                                    <button className="deck-action-icn-btn" onClick={(e) => { e.stopPropagation(); setMappedSections(prev => prev.filter(s => s.id !== deck.id)); }} title="Delete Deck">
+                                                        <Trash2 size={16} />
                                                     </button>
                                                     <div className="action-icon-btn" onClick={() => toggleExpand(deck.id)}>
                                                         {expandedDeckId === deck.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
