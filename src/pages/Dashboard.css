@@ -38,8 +38,8 @@ body {
 }
 
 body:has(.sidebar.collapsed) .main-content {
-    margin-left: 80px;
-    width: calc(100% - 80px);
+    margin-left: 90px;
+    width: calc(100% - 90px);
 }
 
 .dashboard-content {

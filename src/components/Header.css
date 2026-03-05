@@ -34,7 +34,7 @@
 }
 
 body:has(.sidebar.collapsed) .dashboard-header {
-    left: 80px;
+    left: 90px;
 }
 
 .header-background {

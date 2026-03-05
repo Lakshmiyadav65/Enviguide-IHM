@@ -5,10 +5,6 @@ import {
     TrendingUp,
     AlertTriangle,
     Filter,
-    Users,
-    UserCheck,
-    UserX,
-    ShoppingCart,
     Package,
     Activity,
     Clock,
@@ -253,86 +249,6 @@ export default function Dashboard() {
                     {/* 4. Content Split */}
                     <div className="content-split">
                         <div className="left-column">
-                            {/* Users Overview */}
-                            <div className="section-card">
-                                <div className="card-title">
-                                    <div className="title-icon blue-bg">
-                                        <Users size={18} />
-                                    </div>
-                                    <h3>Users Overview</h3>
-                                </div>
-                                <div className="users-grid">
-                                    <div className="user-metric">
-                                        <div className="user-icon-circle u-green">
-                                            <UserCheck size={22} />
-                                        </div>
-                                        <div className="u-val">124</div>
-                                        <div className="u-label">New Registrations</div>
-                                    </div>
-                                    <div className="user-metric">
-                                        <div className="user-icon-circle u-blue">
-                                            <Users size={22} />
-                                        </div>
-                                        <div className="u-val">89</div>
-                                        <div className="u-label">IHM Registrations</div>
-                                    </div>
-                                    <div className="user-metric">
-                                        <div className="user-icon-circle u-red">
-                                            <UserX size={22} />
-                                        </div>
-                                        <div className="u-val">12</div>
-                                        <div className="u-label">Inactive Users</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Purchase Orders */}
-                            <div className="section-card">
-                                <div className="card-title">
-                                    <div className="title-icon blue-bg">
-                                        <ShoppingCart size={18} />
-                                    </div>
-                                    <h3>Purchase Orders</h3>
-                                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <Package size={16} color="#667085" />
-                                        <span style={{ fontSize: 13, color: '#667085' }}>Total Line Items</span>
-                                        <span style={{ fontSize: 13, fontWeight: 700, color: '#101828' }}>1,247</span>
-                                    </div>
-                                </div>
-
-                                <div className="po-status-row">
-                                    <div className="po-status-card po-pending">
-                                        <div className="po-s-label">
-                                            <Clock size={14} /> Pending
-                                        </div>
-                                        <div className="po-s-val">34</div>
-                                        <div style={{ fontSize: 12, color: '#B54708', fontWeight: 600 }}>MDs</div>
-                                    </div>
-                                    <div className="po-status-card po-received">
-                                        <div className="po-s-label">
-                                            <UserCheck size={14} /> Received
-                                        </div>
-                                        <div className="po-s-val">189</div>
-                                        <div style={{ fontSize: 12, color: '#027A48', fontWeight: 600 }}>MDs</div>
-                                    </div>
-                                </div>
-
-                                <div className="haz-mat-container">
-                                    <div className="haz-title-block">Hazardous Materials</div>
-                                    <div className="haz-metrics-row">
-                                        <div className="haz-item">
-                                            <div className="dot dot-red"></div>
-                                            <span>Red <span className="haz-count">23</span></span>
-                                        </div>
-                                        <div className="haz-division-line"></div>
-                                        <div className="haz-item">
-                                            <div className="dot dot-green"></div>
-                                            <span>Green <span className="haz-count">156</span></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
                             {/* Recent Activity */}
                             <div className="section-card">
                                 <div className="card-title">
@@ -370,16 +286,6 @@ export default function Dashboard() {
                                             <h4>Materials Received</h4>
                                             <p>45 items marked as received from supplier</p>
                                             <span className="act-time">5 hours ago</span>
-                                        </div>
-                                    </div>
-                                    <div className="activity-item">
-                                        <div className="act-icon blue">
-                                            <Users size={20} />
-                                        </div>
-                                        <div className="act-content">
-                                            <h4>New User Registration</h4>
-                                            <p>Sarah Johnson registered as Ship Manager</p>
-                                            <span className="act-time">6 hours ago</span>
                                         </div>
                                     </div>
                                 </div>

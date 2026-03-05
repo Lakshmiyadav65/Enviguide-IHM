@@ -5,10 +5,7 @@ import {
     Ship,
     Layers,
     FileText,
-    ShoppingCart,
     Settings,
-    Users,
-    Database,
     Upload,
     Mail,
     ChevronDown,
@@ -28,9 +25,6 @@ const menuItems = [
             { path: '/vessels/sub-fleet', icon: Layers, label: 'Sub Fleet' },
         ]
     },
-    { path: '/decks', icon: Layers, label: 'Decks & Materials' },
-    { path: '/materials', icon: FileText, label: 'Materials Record' },
-    { path: '/purchase-orders', icon: ShoppingCart, label: 'Purchase Orders' },
     {
         path: '/administration',
         icon: Settings,
@@ -42,9 +36,6 @@ const menuItems = [
             { path: '/administration/md-sdoc-audit', icon: FileText, label: 'MD SDOC Audit Pending' },
         ]
     },
-    { path: '/users', icon: Users, label: 'Users & Security' },
-    { path: '/master-data', icon: Database, label: 'Master Data' },
-    { path: '/inventory', icon: Upload, label: 'Inventory Onboarding' },
     { path: '/contact', icon: Mail, label: 'Contact Us' },
 ];
 

@@ -289,6 +289,9 @@ export default function UploadPurchaseOrder() {
         const itemDescColIdx = fieldMappings.itemDescription ? parseInt(fieldMappings.itemDescription) : -1;
         const qtyColIdx = fieldMappings.quantity ? parseInt(fieldMappings.quantity) : -1;
         const supplierNameColIdx = fieldMappings.vendorName ? parseInt(fieldMappings.vendorName) : -1;
+        const poSentDateColIdx = fieldMappings.poSentDate ? parseInt(fieldMappings.poSentDate) : -1;
+        const impaCodeColIdx = fieldMappings.impaCode ? parseInt(fieldMappings.impaCode) : -1;
+        const unitColIdx = fieldMappings.unit ? parseInt(fieldMappings.unit) : -1;
 
         let totalPO = 0, duplicatePO = 0, duplicateSupplierCode = 0, duplicateProduct = 0;
 
@@ -308,8 +311,11 @@ export default function UploadPurchaseOrder() {
                 const rawQty = qtyColIdx !== -1 ? String(r[qtyColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
                 const qty = rawQty ? parseFloat(rawQty).toString() : '';
                 const supplier = supplierNameColIdx !== -1 ? String(r[supplierNameColIdx] || '').trim().toLowerCase() : '';
+                const poSentDate = poSentDateColIdx !== -1 ? String(r[poSentDateColIdx] || '').trim() : '';
+                const impaCode = impaCodeColIdx !== -1 ? String(r[impaCodeColIdx] || '').trim() : '';
+                const unit = unitColIdx !== -1 ? String(r[unitColIdx] || '').trim().toLowerCase() : '';
 
-                const key = `${po}|${itemDesc}|${qty}|${supplier}`;
+                const key = `${po}|${itemDesc}|${qty}|${supplier}|${poSentDate}|${impaCode}|${unit}`;
                 counts[key] = (counts[key] || 0) + 1;
             });
 

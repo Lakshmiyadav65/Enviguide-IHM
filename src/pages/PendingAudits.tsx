@@ -32,6 +32,9 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
     const [itemDescColIdx, setItemDescColIdx] = useState<number | null>(null);
     const [qtyColIdx, setQtyColIdx] = useState<number | null>(null);
     const [supplierColIdx, setSupplierColIdx] = useState<number | null>(null);
+    const [sentDateColIdx, setSentDateColIdx] = useState<number | null>(null);
+    const [impaColIdx, setImpaColIdx] = useState<number | null>(null);
+    const [unitColIdx, setUnitColIdx] = useState<number | null>(null);
     const [rowActions, setRowActions] = useState<Record<number, string>>({});
     const [currentDupGroupIdx, setCurrentDupGroupIdx] = useState(0);
     const [, setHistory] = useState<{ data: any[][]; actions: Record<number, string> }[]>([]);
@@ -48,6 +51,9 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
                 if (parsedMapping.itemDescription) setItemDescColIdx(parseInt(parsedMapping.itemDescription));
                 if (parsedMapping.quantity) setQtyColIdx(parseInt(parsedMapping.quantity));
                 if (parsedMapping.vendorName) setSupplierColIdx(parseInt(parsedMapping.vendorName));
+                if (parsedMapping.poSentDate) setSentDateColIdx(parseInt(parsedMapping.poSentDate));
+                if (parsedMapping.impaCode) setImpaColIdx(parseInt(parsedMapping.impaCode));
+                if (parsedMapping.unit) setUnitColIdx(parseInt(parsedMapping.unit));
             }
 
             const savedVisibility = localStorage.getItem(`audit_visible_cols_${imo}`);
@@ -119,8 +125,11 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
             const rawQty = qtyColIdx !== null ? String(row[qtyColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
             const qtyStr = rawQty ? parseFloat(rawQty).toString() : '';
             const supplier = supplierColIdx !== null ? String(row[supplierColIdx] || '').trim().toLowerCase() : '';
+            const poSentDate = sentDateColIdx !== null ? String(row[sentDateColIdx] || '').trim() : '';
+            const impaCode = impaColIdx !== null ? String(row[impaColIdx] || '').trim() : '';
+            const unit = unitColIdx !== null ? String(row[unitColIdx] || '').trim().toLowerCase() : '';
 
-            const key = `${po}|${itemDesc}|${qtyStr}|${supplier}`;
+            const key = `${po}|${itemDesc}|${qtyStr}|${supplier}|${poSentDate}|${impaCode}|${unit}`;
 
             if (!counts[key]) counts[key] = [];
             counts[key].push(originalIdx);
@@ -264,8 +273,11 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
                     const rawQty = qtyColIdx !== null ? String(r[qtyColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
                     const qtyStr = rawQty ? parseFloat(rawQty).toString() : '';
                     const supplier = supplierColIdx !== null ? String(r[supplierColIdx] || '').trim().toLowerCase() : '';
+                    const poSentDate = sentDateColIdx !== null ? String(r[sentDateColIdx] || '').trim() : '';
+                    const impaCode = impaColIdx !== null ? String(r[impaColIdx] || '').trim() : '';
+                    const unit = unitColIdx !== null ? String(r[unitColIdx] || '').trim().toLowerCase() : '';
 
-                    const key = `${po}|${itemDesc}|${qtyStr}|${supplier}`;
+                    const key = `${po}|${itemDesc}|${qtyStr}|${supplier}|${poSentDate}|${impaCode}|${unit}`;
                     counts[key] = (counts[key] || 0) + 1;
                 }
             });
