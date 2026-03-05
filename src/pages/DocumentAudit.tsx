@@ -248,8 +248,8 @@ export default function DocumentAudit() {
                                         <tr>
                                             <th>PO ID</th>
                                             <th>SUPPLIER</th>
-                                            <th>DOCUMENT TYPE</th>
-                                            <th>FILE LINK</th>
+                                            <th>MD FILE LINK</th>
+                                            <th>SDOC FILE LINK</th>
                                             <th>DATE RECEIVED</th>
                                             <th>CLARIFICATION STATUS</th>
                                             <th style={{ textAlign: 'center' }}>AUDIT DECISION</th>
@@ -261,15 +261,24 @@ export default function DocumentAudit() {
                                                 <td className="po-ident">{item.id}</td>
                                                 <td className="supplier-name">{item.supplier}</td>
                                                 <td>
-                                                    <span className="doc-badge-v3">
-                                                        {item.docType}
-                                                    </span>
+                                                    {item.docType === 'MD' ? (
+                                                        <div className="file-link-v3" onClick={() => setSelectedDoc(item)}>
+                                                            <FileText size={16} className="pdf-icon-v3" />
+                                                            MD File Link
+                                                        </div>
+                                                    ) : (
+                                                        <span className="not-available">—</span>
+                                                    )}
                                                 </td>
                                                 <td>
-                                                    <div className="file-link-v3" onClick={() => setSelectedDoc(item)}>
-                                                        <FileText size={16} className="pdf-icon-v3" />
-                                                        {item.fileLink}
-                                                    </div>
+                                                    {item.docType === 'SDOC' ? (
+                                                        <div className="file-link-v3" onClick={() => setSelectedDoc(item)}>
+                                                            <FileText size={16} className="pdf-icon-v3" />
+                                                            SDoC File Link
+                                                        </div>
+                                                    ) : (
+                                                        <span className="not-available">—</span>
+                                                    )}
                                                 </td>
                                                 <td>{item.dateReceived}</td>
                                                 <td>

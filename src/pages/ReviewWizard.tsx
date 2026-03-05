@@ -299,7 +299,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                                                     <div className="menu-filter-label">Filter by value:</div>
                                                                     <input className="menu-search-input" placeholder="Search values..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)} autoFocus />
                                                                     <div className="menu-value-list">
-                                                                        {Array.from(new Set(data.slice(1).map(r => String(r[i]))))
+                                                                        {(String(header).trim().toLowerCase() === 'is suspected' ? ['No', 'Yes'] : Array.from(new Set(data.slice(1).map(r => String(r[i])).filter(v => v.trim() !== ""))))
                                                                             .filter(v => v.toLowerCase().includes(filterSearch.toLowerCase()))
                                                                             .map(val => (
                                                                                 <label key={val} className="menu-value-item">
@@ -307,7 +307,8 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                                                                         const cur = filters[i] || [];
                                                                                         const next = cur.includes(val) ? cur.filter(v => v !== val) : [...cur, val];
                                                                                         setFilters({ ...filters, [i]: next });
-                                                                                    }} /> {val}
+                                                                                    }} />
+                                                                                    <span>{String(val).trim()}</span>
                                                                                 </label>
                                                                             ))}
                                                                     </div>
@@ -377,6 +378,26 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                             <div className="summary-sidebar">
                                 <div className="summary-header">Review Summary</div>
                                 <div className="summary-body">
+                                    {data[0]?.includes('Is Suspected') && visibleCols[data[0].indexOf('Is Suspected')] && (
+                                        <div className="summary-group">
+                                            <h4>Suspected Items</h4>
+                                            {data.slice(1).filter(r => r[data[0].indexOf('Is Suspected')] === 'Yes').length > 0 ? (
+                                                <div className="summary-list">
+                                                    {data.slice(1)
+                                                        .filter(r => r[data[0].indexOf('Is Suspected')] === 'Yes')
+                                                        .map((r, i) => (
+                                                            <div key={i} className="summary-list-item">
+                                                                <span className="dot danger" />
+                                                                <span className="item-name">{String(r[data[0].indexOf('Item Description')] || 'Unknown Item')}</span>
+                                                            </div>
+                                                        ))
+                                                    }
+                                                </div>
+                                            ) : (
+                                                <div className="summary-empty">No Suspected Items Identified</div>
+                                            )}
+                                        </div>
+                                    )}
                                     <div className="summary-group">
                                         <h4>Inactive Suppliers</h4>
                                         <div className="summary-empty">All Suppliers Are Active</div>
