@@ -1,0 +1,215 @@
+/* Fleet Styles matching Pending Audits Premium Style */
+
+.pending-audits-container {
+    display: flex;
+    min-height: 100vh;
+    background: #f8fafc;
+    width: 100%;
+}
+
+.pending-audits-main {
+    flex: 1;
+    margin-left: 280px;
+    display: flex;
+    flex-direction: column;
+}
+
+.pending-audits-content {
+    flex: 1;
+    padding: 0 40px 40px 40px;
+    display: flex;
+    flex-direction: column;
+}
+
+.md-header {
+    height: 140px;
+    display: flex;
+    align-items: center;
+    background: transparent;
+    border-bottom: 2px solid #E2E8F0;
+    margin-bottom: 24px;
+}
+
+.md-title-area h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1e293b;
+    margin: 0 0 8px 0;
+}
+
+.md-title-area p {
+    color: #64748b;
+    font-size: 16px;
+    margin: 0;
+}
+
+.audits-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 20px;
+}
+
+.search-box {
+    flex: 1;
+    height: 60px;
+    background: white;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    border: 1px solid #E2E8F0;
+}
+
+.search-icon {
+    color: #94a3b8;
+    margin-right: 16px;
+}
+
+.search-box input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 16px;
+    color: #1e293b;
+    font-weight: 500;
+}
+
+.add-fleet-btn {
+    height: 60px;
+    padding: 0 32px;
+    background: var(--primary-blue);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.add-fleet-btn:hover {
+    background: #2563eb;
+    transform: translateY(-1px);
+}
+
+.table-container {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+    border: 1px solid #E2E8F0;
+    overflow: hidden;
+}
+
+.audits-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.audits-table th {
+    height: 64px;
+    padding: 0 24px;
+    text-align: left;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    border-bottom: 2px solid #E2E8F0;
+}
+
+.audits-table tr:hover {
+    background: #f1f5f9;
+}
+
+.audits-table td {
+    height: 80px;
+    padding: 0 24px;
+    color: #475569;
+    font-size: 15px;
+    font-weight: 500;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+.vessel-name {
+    color: #1e293b !important;
+    font-weight: 800 !important;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 12px;
+}
+
+.action-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.edit-btn {
+    background: #EEF2FF;
+    color: #4F46E5;
+}
+
+.edit-btn:hover {
+    background: #4F46E5;
+    color: white;
+}
+
+.delete-btn {
+    background: #FEF2F2;
+    color: #EF4444;
+}
+
+.delete-btn:hover {
+    background: #EF4444;
+    color: white;
+}
+
+.pagination {
+    margin-top: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pagination-info {
+    color: #64748b;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.pagination-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.page-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid #E2E8F0;
+    background: white;
+    color: #64748b;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.page-btn.active {
+    background: var(--primary-blue);
+    color: white;
+    border-color: var(--primary-blue);
+}

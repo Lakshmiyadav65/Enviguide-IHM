@@ -21,7 +21,7 @@ const menuItems = [
     {
         path: '/vessels',
         icon: Ship,
-        label: 'Vessels',
+        label: 'Vessel',
         children: [
             { path: '/vessels/ship', icon: Ship, label: 'Ship' },
             { path: '/vessels/fleet', icon: Layers, label: 'Fleet' },
@@ -55,7 +55,6 @@ export default function Sidebar() {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
 
-    // Sync expanded state with route
     useEffect(() => {
         const currentPath = location.pathname;
         const parentItem = menuItems.find(item =>
@@ -82,7 +81,6 @@ export default function Sidebar() {
             setActiveFocus(label);
         }
     };
-
 
     return (
         <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isLocked ? 'locked' : ''}`}>
@@ -114,14 +112,8 @@ export default function Sidebar() {
                 {menuItems.map((item) => {
                     const isExpanded = expandedItem === item.label;
                     const hasChildren = item.children && item.children.length > 0;
-
-                    // Check if we're on a child route of this parent
                     const isOnChildRoute = hasChildren && item.children.some(child => location.pathname === child.path);
-
-                    // A regular page is "active" (blue) if it matches the path AND no category has the manual focus
                     const isActive = !hasChildren && location.pathname === item.path && activeFocus === null;
-
-                    // A category is "blue" if it has the manual focus OR we are on one of its child routes
                     const isCategoryBlue = hasChildren && (activeFocus === item.label || isOnChildRoute);
 
                     return (

@@ -47,7 +47,7 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
                 if (parsedMapping.poNumber) setPoColIdx(parseInt(parsedMapping.poNumber));
                 if (parsedMapping.itemDescription) setItemDescColIdx(parseInt(parsedMapping.itemDescription));
                 if (parsedMapping.quantity) setQtyColIdx(parseInt(parsedMapping.quantity));
-                if (parsedMapping.supplierName) setSupplierColIdx(parseInt(parsedMapping.supplierName));
+                if (parsedMapping.vendorName) setSupplierColIdx(parseInt(parsedMapping.vendorName));
             }
 
             const savedVisibility = localStorage.getItem(`audit_visible_cols_${imo}`);
@@ -115,10 +115,12 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
             if (!po) return;
 
             const itemDesc = itemDescColIdx !== null ? String(row[itemDescColIdx] || '').trim().toLowerCase() : '';
-            const qty = qtyColIdx !== null ? String(row[qtyColIdx] || '').trim().toLowerCase() : '';
+            // Normalize Quantity
+            const rawQty = qtyColIdx !== null ? String(row[qtyColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
+            const qtyStr = rawQty ? parseFloat(rawQty).toString() : '';
             const supplier = supplierColIdx !== null ? String(row[supplierColIdx] || '').trim().toLowerCase() : '';
 
-            const key = `${po}|${itemDesc}|${qty}|${supplier}`;
+            const key = `${po}|${itemDesc}|${qtyStr}|${supplier}`;
 
             if (!counts[key]) counts[key] = [];
             counts[key].push(originalIdx);
@@ -256,12 +258,14 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
             const counts: Record<string, number> = {};
             filteredData.slice(1).forEach(r => {
                 const po = String(r[poColIdx] || '').trim();
-                const itemDesc = itemDescColIdx !== null ? String(r[itemDescColIdx] || '').trim().toLowerCase() : '';
-                const qty = qtyColIdx !== null ? String(r[qtyColIdx] || '').trim().toLowerCase() : '';
-                const supplier = supplierColIdx !== null ? String(r[supplierColIdx] || '').trim().toLowerCase() : '';
 
                 if (po) {
-                    const key = `${po}|${itemDesc}|${qty}|${supplier}`;
+                    const itemDesc = itemDescColIdx !== null ? String(r[itemDescColIdx] || '').trim().toLowerCase() : '';
+                    const rawQty = qtyColIdx !== null ? String(r[qtyColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
+                    const qtyStr = rawQty ? parseFloat(rawQty).toString() : '';
+                    const supplier = supplierColIdx !== null ? String(r[supplierColIdx] || '').trim().toLowerCase() : '';
+
+                    const key = `${po}|${itemDesc}|${qtyStr}|${supplier}`;
                     counts[key] = (counts[key] || 0) + 1;
                 }
             });

@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Vessels from './pages/Vessels';
+import Fleet from './pages/Fleet';
 import FullPlanViewer from './pages/FullPlanViewer';
 import HazardousMaterialMapping from './pages/HazardousMaterialMapping';
 import UploadPurchaseOrder from './pages/UploadPurchaseOrder';
@@ -20,6 +21,8 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/vessels" element={<Vessels />} />
+        <Route path="/vessels/ship" element={<Vessels />} />
+        <Route path="/vessels/fleet" element={<Fleet />} />
         <Route path="/vessels/:id" element={<Vessels />} />
         <Route path="/decks" element={<Vessels />} />
         <Route path="/viewer" element={<FullPlanViewer />} />

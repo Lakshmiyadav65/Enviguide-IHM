@@ -288,7 +288,7 @@ export default function UploadPurchaseOrder() {
 
         const itemDescColIdx = fieldMappings.itemDescription ? parseInt(fieldMappings.itemDescription) : -1;
         const qtyColIdx = fieldMappings.quantity ? parseInt(fieldMappings.quantity) : -1;
-        const supplierNameColIdx = fieldMappings.supplierName ? parseInt(fieldMappings.supplierName) : -1;
+        const supplierNameColIdx = fieldMappings.vendorName ? parseInt(fieldMappings.vendorName) : -1;
 
         let totalPO = 0, duplicatePO = 0, duplicateSupplierCode = 0, duplicateProduct = 0;
 
@@ -298,20 +298,23 @@ export default function UploadPurchaseOrder() {
             poValues.forEach(v => poSet.add(v));
             totalPO = poSet.size;
 
-            const compositeSet = new Set<string>();
-            const compositeDups = new Set<string>();
+            const counts: Record<string, number> = {};
             rows.forEach(r => {
                 const po = String(r[poColIdx] || '').trim();
                 if (!po) return;
+
                 const itemDesc = itemDescColIdx !== -1 ? String(r[itemDescColIdx] || '').trim().toLowerCase() : '';
-                const qty = qtyColIdx !== -1 ? String(r[qtyColIdx] || '').trim().toLowerCase() : '';
+                // Normalize Quantity (handles 10 vs 10.00)
+                const rawQty = qtyColIdx !== -1 ? String(r[qtyColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
+                const qty = rawQty ? parseFloat(rawQty).toString() : '';
                 const supplier = supplierNameColIdx !== -1 ? String(r[supplierNameColIdx] || '').trim().toLowerCase() : '';
 
                 const key = `${po}|${itemDesc}|${qty}|${supplier}`;
-                if (compositeSet.has(key)) compositeDups.add(key);
-                else compositeSet.add(key);
+                counts[key] = (counts[key] || 0) + 1;
             });
-            duplicatePO = compositeDups.size;
+
+            // Count unique items that have duplicates
+            duplicatePO = Object.values(counts).filter(count => count > 1).length;
         }
         if (supColIdx !== -1) {
             const vals = rows.map(r => String(r[supColIdx] || '').trim()).filter(v => v !== '');

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
     Search, Plus, Check, ShieldCheck, BarChart2, ShoppingCart, Layers,
     FolderOpen, Ship as ShipIcon, GripVertical, Book, Paperclip,
@@ -211,7 +211,6 @@ const EMPTY_FORM: VesselData = {
 };
 
 export default function Vessels() {
-    const { id } = useParams();
     const location = useLocation();
     const [notifCount, setNotifCount] = useState(3);
     const [vesselList, setVesselList] = useState<VesselData[]>(INITIAL_VESSELS);
@@ -611,22 +610,6 @@ export default function Vessels() {
     ];
 
     const renderContent = () => {
-
-        if (id !== 'ship') {
-            return (
-                <div className="vessels-placeholder">
-                    <div className="placeholder-card">
-                        <ShipIcon size={48} color="#94A3B8" />
-                        <h3>{id?.replace('-', ' ').toUpperCase()} Management</h3>
-                        <p>Detailed module for {id?.replace('-', ' ')} is under maintenance.</p>
-                        <button className="add-vessel-btn" style={{ margin: '20px auto 0' }}>
-                            Go Back to Ship
-                        </button>
-                    </div>
-                </div>
-            );
-        }
-
         if (activeTab === 'documents') {
             const currentDocs = vesselDocuments[activeVesselName] || [];
             const filteredDocs = currentDocs.filter(doc =>
