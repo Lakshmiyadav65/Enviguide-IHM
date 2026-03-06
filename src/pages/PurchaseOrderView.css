@@ -740,6 +740,11 @@
     padding: 0 40px;
     z-index: 1000;
     box-shadow: 0 -4px 12px rgba(16, 24, 40, 0.05);
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body:has(.sidebar.collapsed) .po-v4-fixed-metrics-footer-premium {
+    left: var(--sidebar-collapsed-width, 80px);
 }
 
 .metric-items-group-premium {

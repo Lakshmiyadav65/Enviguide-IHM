@@ -14,6 +14,11 @@
     overflow: hidden;
     position: relative;
     background: #F8FAFC;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body:has(.sidebar.collapsed) .doc-audit-main {
+    margin-left: var(--sidebar-collapsed-width, 80px);
 }
 
 .doc-audit-content {
@@ -469,6 +474,11 @@
     justify-content: space-between;
     padding: 0 40px;
     z-index: 1000;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body:has(.sidebar.collapsed) .audit-progress-footer-fixed {
+    left: var(--sidebar-collapsed-width, 80px);
 }
 
 .progress-info-v3 {

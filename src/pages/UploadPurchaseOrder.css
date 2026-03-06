@@ -13,7 +13,7 @@
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
-    transition: all 0.3s ease;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body:has(.sidebar.collapsed) .upload-po-main {

@@ -12,6 +12,11 @@
     flex-direction: column;
     height: 100vh;
     overflow: hidden;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body:has(.sidebar.collapsed) .pending-reviews-main {
+    margin-left: var(--sidebar-collapsed-width, 80px);
 }
 
 .pending-reviews-content {
@@ -162,7 +167,7 @@
 
 .registry-table th {
     background: #F8FAFC;
-    padding: 18px 24px;
+    padding: 14px 16px;
     text-align: left;
     font-size: 11px;
     font-weight: 700;
@@ -221,7 +226,7 @@
 /* Action */
 
 .registry-table td {
-    padding: 20px 24px;
+    padding: 16px 16px;
     border-bottom: 1px solid #F1F5F9;
     font-size: 14px;
     color: #334155;
@@ -332,6 +337,7 @@
     align-items: center;
     justify-content: center;
     gap: 12px;
+    white-space: nowrap;
 }
 
 .action-btn {
@@ -426,16 +432,23 @@
     border-top: 1px solid #CCFBF1;
     display: flex;
     align-items: center;
-    padding: 0 40px;
+    padding: 0 24px;
     z-index: 100;
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.03);
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body:has(.sidebar.collapsed) .summary-footer-bar {
+    left: var(--sidebar-collapsed-width, 80px);
 }
 
 .summary-items {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    /* Spread across entire footer */
+    justify-content: center;
+    /* Changed from space-between to center to prevent edge overflow */
+    gap: 16px;
+    /* Added gap instead of just padding */
     width: 100%;
 }
 

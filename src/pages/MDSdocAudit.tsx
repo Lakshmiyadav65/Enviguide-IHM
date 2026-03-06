@@ -84,8 +84,8 @@ export default function MDSdocAudit() {
                 <div className="md-sdoc-content">
                     <div className="md-header">
                         <div className="md-title-area">
-                            <h1>MD SDoC Audit Registry</h1>
-                            <p>Registry of Material Declarations and Supplier's Declaration of Conformity pending audit.</p>
+                            <h1>MD SDoC Audit Pending</h1>
+                            <p>Registry of Material Declarations and Supplier's Declaration of Conformity pending final audit.</p>
                         </div>
                         <div className="md-header-actions">
                             <div className="registry-search-wrapper">
