@@ -281,6 +281,7 @@
     min-width: 100%;
     border-collapse: separate;
     border-spacing: 0;
+    table-layout: fixed;
 }
 
 .wizard-table th {
@@ -298,6 +299,10 @@
     z-index: 10;
     white-space: nowrap;
     user-select: none;
+    min-width: 120px;
+    /* overflow must remain visible so the absolute-positioned
+       filter dropdown can escape the cell boundary */
+    overflow: visible;
 }
 
 .wizard-table tr:hover td {
@@ -311,6 +316,7 @@
     height: 38px;
     position: relative;
     transition: background 0.1s;
+    overflow: hidden;
 }
 
 .cell-inner {
@@ -449,6 +455,16 @@
     align-items: center;
     justify-content: space-between;
     gap: 6px;
+    overflow: hidden;
+    /* clips the text without affecting the dropdown */
+}
+
+.header-content span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
 }
 
 .resizer {

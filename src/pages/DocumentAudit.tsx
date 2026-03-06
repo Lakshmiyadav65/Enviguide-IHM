@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import './DocumentAudit.css';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -23,8 +23,7 @@ import {
     Image as ImageIcon,
     Paperclip,
     Clock,
-    AlertTriangle,
-    ArrowLeft
+    AlertTriangle
 } from 'lucide-react';
 
 interface AuditItem {
@@ -38,7 +37,6 @@ interface AuditItem {
 }
 
 export default function DocumentAudit() {
-    const navigate = useNavigate();
     const { imo } = useParams();
     const [searchQuery, setSearchQuery] = useState('');
     const [isVerified, setIsVerified] = useState(false);
@@ -176,14 +174,6 @@ export default function DocumentAudit() {
                     <div className="audit-sub-header">
                         <div className="audit-header-main">
                             <div className="header-title-section" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                                <button
-                                    onClick={() => navigate('/administration/md-sdoc-audit-pending')}
-                                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#94A3B8', transition: 'all 0.2s', flexShrink: 0 }}
-                                    onMouseOver={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
-                                    onMouseOut={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
-                                >
-                                    <ArrowLeft size={22} />
-                                </button>
                                 <div>
                                     <h1>Document Audit - Pacific Venture</h1>
                                     <div className="imo-badge">IMO: <span>{imo || '9448748'}</span></div>

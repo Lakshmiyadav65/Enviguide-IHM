@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import './PendingAudits.css';
 import './AuditEditor.css';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
-import { Search, ChevronDown, Download, Edit2, Send, Trash2, X, CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
+import { Search, ChevronDown, Download, Edit2, Send, Trash2, X, CheckCircle2, XCircle } from 'lucide-react';
 
 interface AuditRecord {
     imoNumber: string;
@@ -478,35 +477,18 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
 };
 
 export default function PendingAudits() {
-    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState('createDate');
     const [currentPage, setCurrentPage] = useState(1);
     const recordsPerPage = 10;
     const [allRecords, setAllRecords] = useState<AuditRecord[]>([]);
 
-    useEffect(() => {
-        // Initial Sample records
-        const vesselNames = ['ACOSTA', 'MARAN TRITON', 'OCEAN ATLAS', 'PACIFIC ENDEAVOR', 'MAERSK SEOUL', 'EVER GIVEN', 'BLUE WHALE', 'SEA STAR', 'NAUTILUS', 'POSEIDON'];
 
-        const initialRecords: AuditRecord[] = Array.from({ length: 39 }).map((_, idx) => ({
-            imoNumber: (9571648 + idx).toString(),
-            vesselName: vesselNames[idx % vesselNames.length],
-            name: vesselNames[idx % vesselNames.length],
-            totalPO: Math.floor(Math.random() * 100) + 10,
-            totalItems: Math.floor(Math.random() * 5000) + 500,
-            duplicatePO: idx % 5 === 0 ? Math.floor(Math.random() * 30) : 0,
-            duplicateSupplierCode: idx % 8 === 0 ? Math.floor(Math.random() * 5) : 0,
-            duplicateProduct: idx % 6 === 0 ? Math.floor(Math.random() * 10) : 0,
-            createDate: `2023-11-${((idx + 10) % 28) + 1}`
-        }));
-
+    const loadRecords = useCallback(() => {
         const scrubRegistry = (records: AuditRecord[]) => {
             const sentToReview = JSON.parse(localStorage.getItem('sentToReview') || '[]');
             const reviewImos = new Set(sentToReview.map((r: any) => r.imoNumber));
-
             return records.map(r => {
-                // If marked PENDING REVIEW but NOT in the reviews list, clear it
                 if (r.status === 'PENDING REVIEW' && !reviewImos.has(r.imoNumber)) {
                     return { ...r, status: undefined };
                 }
@@ -514,27 +496,27 @@ export default function PendingAudits() {
             });
         };
 
-        // Check for unified registry persistence first
         const persistedRegistry = localStorage.getItem('audit_registry_main');
         if (persistedRegistry) {
             const parsed = JSON.parse(persistedRegistry);
             const scrubbed = scrubRegistry(parsed);
             setAllRecords(scrubbed);
             localStorage.setItem('audit_registry_main', JSON.stringify(scrubbed));
-        } else {
-            // Check for recently added audit from UploadPurchaseOrder
-            const recent = localStorage.getItem('recentlyAddedAudit');
-            if (recent) {
-                const parsedRecent = JSON.parse(recent);
-                const combined = [parsedRecent, ...initialRecords];
-                const scrubbed = scrubRegistry(combined);
-                setAllRecords(scrubbed);
-                localStorage.setItem('audit_registry_main', JSON.stringify(scrubbed));
-            } else {
-                setAllRecords(initialRecords);
-            }
         }
+        // If no registry yet, nothing to show (upload will create it)
     }, []);
+
+    useEffect(() => {
+        loadRecords();
+        // Re-read whenever the tab becomes visible again (e.g. after navigating from UploadPO)
+        const handleVisibility = () => { if (document.visibilityState === 'visible') loadRecords(); };
+        document.addEventListener('visibilitychange', handleVisibility);
+        window.addEventListener('focus', loadRecords);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibility);
+            window.removeEventListener('focus', loadRecords);
+        };
+    }, [loadRecords]);
 
     // Filtering
     const filteredRecords = allRecords.filter(r =>
@@ -646,19 +628,9 @@ export default function PendingAudits() {
 
                 <div className="pending-audits-content">
                     <div className="md-header">
-                        <div className="md-title-area" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                            <button
-                                onClick={() => navigate('/admin-dashboard')}
-                                style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: '12px', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B', transition: 'all 0.2s', flexShrink: 0 }}
-                                onMouseOver={(e) => (e.currentTarget.style.background = '#F8FAFC')}
-                                onMouseOut={(e) => (e.currentTarget.style.background = 'white')}
-                            >
-                                <ArrowLeft size={22} />
-                            </button>
-                            <div>
-                                <h1>Pending Audits Registry</h1>
-                                <p>Manage and review the latest audits before sending for final review.</p>
-                            </div>
+                        <div className="md-title-area">
+                            <h1>Pending Audits Registry</h1>
+                            <p>Manage and review the latest audits before sending for final review.</p>
                         </div>
                     </div>
 
@@ -707,6 +679,7 @@ export default function PendingAudits() {
                                         <th>DUP. SUPPLIER CODE</th>
                                         <th>DUP. PRODUCT CODE</th>
                                         <th>CREATE DATE</th>
+                                        <th>REVIEW STATUS</th>
                                         <th className="action-column">ACTION</th>
                                     </tr>
                                 </thead>
@@ -732,24 +705,27 @@ export default function PendingAudits() {
                                                 </span>
                                             </td>
                                             <td>{record.createDate}</td>
+                                            {/* ── REVIEW STATUS — its own dedicated column ── */}
+                                            <td>
+                                                {record.status === 'PENDING REVIEW' ? (
+                                                    <div className="v3-status-badge pending">
+                                                        <div className="status-dot-pulse" />
+                                                        PENDING REVIEW
+                                                    </div>
+                                                ) : (
+                                                    <span className="status-dash">—</span>
+                                                )}
+                                            </td>
+                                            {/* ── ACTION — icon buttons only ── */}
                                             <td className="action-column">
                                                 <div className="action-buttons">
-                                                    {record.status === 'PENDING REVIEW' ? (
-                                                        <div className="v3-status-badge pending">
-                                                            <div className="status-dot-pulse" />
-                                                            PENDING REVIEW
-                                                        </div>
+                                                    {record.duplicatePO > 0 ? (
+                                                        <button className="action-btn edit-btn" onClick={() => handleEdit(record.imoNumber)} title="Edit"><Edit2 size={16} /></button>
                                                     ) : (
-                                                        <>
-                                                            {record.duplicatePO > 0 ? (
-                                                                <button className="action-btn edit-btn" onClick={() => handleEdit(record.imoNumber)} title="Edit"><Edit2 size={16} /></button>
-                                                            ) : (
-                                                                <span className="na-status-text">NA</span>
-                                                            )}
-                                                            <button className="action-btn send-btn" onClick={() => handleSend(record.imoNumber)} title="Send"><Send size={16} /></button>
-                                                            <button className="action-btn delete-btn" onClick={() => handleDelete(record.imoNumber)} title="Delete"><Trash2 size={16} /></button>
-                                                        </>
+                                                        <span className="na-status-text">NA</span>
                                                     )}
+                                                    <button className="action-btn send-btn" onClick={() => handleSend(record.imoNumber)} title="Send to Review"><Send size={16} /></button>
+                                                    <button className="action-btn delete-btn" onClick={() => handleDelete(record.imoNumber)} title="Delete"><Trash2 size={16} /></button>
                                                 </div>
                                             </td>
                                         </tr>

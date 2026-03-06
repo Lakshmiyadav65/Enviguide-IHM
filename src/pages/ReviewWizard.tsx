@@ -329,6 +329,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                             <tr key={originalIdx}>
                                                 {row.map((cell: any, ci: number) => visibleCols[ci] && (
                                                     <td key={ci}
+                                                        style={{ width: columnWidths[ci], maxWidth: columnWidths[ci] }}
                                                         onMouseDown={() => handleMouseDown(originalIdx, ci)}
                                                         onMouseEnter={() => handleMouseEnter(originalIdx, ci)}
                                                         onDoubleClick={() => handleCellDoubleClick(originalIdx, ci)}

@@ -40,7 +40,7 @@ function App() {
         <Route path="/security" element={<Dashboard />} />
         <Route path="/master-data" element={<Dashboard />} />
         <Route path="/inventory" element={<Dashboard />} />
-        <Route path="/contact" element={<Dashboard />} />
+        <Route path="*" element={<Login />} />
       </Routes>
     </Router>
   );

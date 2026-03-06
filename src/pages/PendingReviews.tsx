@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import './PendingReviews.css';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
-import { Download, Eye, Edit2, Trash2, Ship, X, Search, ArrowLeft } from 'lucide-react';
+import { Download, Eye, Edit2, Trash2, Ship, X, Search } from 'lucide-react';
 import ReviewWizard from './ReviewWizard';
 
 interface ReviewRecord {
     imoNumber: string;
     vesselName: string;
-    name: string;
     totalPO: number;
     totalItems: number;
     reviewStatus: 'In Review' | 'Pending';
@@ -23,7 +21,6 @@ interface ReviewRecord {
 // ReviewEditor removed as per new multi-step wizard requirement
 
 export default function PendingReviews() {
-    const navigate = useNavigate();
     const [currentPage, setCurrentPage] = useState(1);
     const recordsPerPage = 10;
     const [allRecords, setAllRecords] = useState<ReviewRecord[]>([]);
@@ -61,7 +58,6 @@ export default function PendingReviews() {
             return Array.from({ length: 150 }).map((_, idx) => ({
                 imoNumber: (9800000 + idx * 432).toString(),
                 vesselName: vesselPool[idx % vesselPool.length],
-                name: vesselPool[idx % vesselPool.length],
                 totalPO: Math.floor(Math.random() * 95) + 5,
                 totalItems: Math.floor(Math.random() * 4500) + 120,
                 reviewStatus: idx % 4 === 0 ? 'Pending' : 'In Review',
@@ -154,14 +150,6 @@ export default function PendingReviews() {
                     {/* Header Section */}
                     <div className="registry-header">
                         <div className="header-title-area" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                            <button
-                                onClick={() => navigate('/admin-dashboard')}
-                                style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: '12px', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B', transition: 'all 0.2s', flexShrink: 0 }}
-                                onMouseOver={(e) => (e.currentTarget.style.background = '#F8FAFC')}
-                                onMouseOut={(e) => (e.currentTarget.style.background = 'white')}
-                            >
-                                <ArrowLeft size={22} />
-                            </button>
                             <div>
                                 <h1>Pending Reviews Registry</h1>
                                 <p>Audit submissions awaiting administrative verification and quality review.</p>
@@ -192,7 +180,6 @@ export default function PendingReviews() {
                                     <tr>
                                         <th>IMO NUMBER</th>
                                         <th>VESSEL NAME</th>
-                                        <th>NAME</th>
                                         <th>TOTAL PO</th>
                                         <th>TOTAL ITEMS</th>
                                         <th>REVIEW STATUS</th>
@@ -210,7 +197,6 @@ export default function PendingReviews() {
                                                 </div>
                                                 <span className="vessel-name">{record.vesselName}</span>
                                             </td>
-                                            <td>{record.name || record.vesselName}</td>
                                             <td>{record.totalPO}</td>
                                             <td>{record.totalItems.toLocaleString()}</td>
                                             <td>

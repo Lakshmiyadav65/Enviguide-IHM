@@ -13,7 +13,6 @@ import {
     FileText,
     Wand2,
     CheckCircle2,
-    Check,
     ArrowLeft
 } from 'lucide-react';
 
@@ -60,7 +59,7 @@ export default function UploadPurchaseOrder() {
         visible: false,
         type: 'success'
     });
-    const [showFinalizeBanner, setShowFinalizeBanner] = useState(false);
+
 
     const [showManagerDropdown, setShowManagerDropdown] = useState(false);
     const [showVesselDropdown, setShowVesselDropdown] = useState(false);
@@ -100,10 +99,19 @@ export default function UploadPurchaseOrder() {
             reader.onload = (e) => {
                 try {
                     const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                    // Do NOT use cellDates:true — it causes off-by-one timezone bugs.
+                    // Instead, use raw:false in sheet_to_json so SheetJS outputs the
+                    // formatted string exactly as Excel displays it (e.g. "03-06-2026").
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[sheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as ExcelData;
+                    // raw:false → SheetJS honours Excel's own cell format (dates, numbers, etc.)
+                    // header:1  → first row becomes header array
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+                        header: 1,
+                        raw: false,
+                        dateNF: 'DD-MM-YYYY'   // fallback format for date cells
+                    }) as ExcelData;
                     resolve(jsonData);
                 } catch (err) { reject(err); }
             };
@@ -187,7 +195,8 @@ export default function UploadPurchaseOrder() {
             setShowMappingErrors(true);
             return;
         }
-        setShowFinalizeBanner(true);
+        // All required fields mapped — run the full import immediately
+        finalizeImport();
     };
 
     const finalizeImport = () => {
@@ -256,6 +265,12 @@ export default function UploadPurchaseOrder() {
         });
 
         // 3. Save standard mapping & standardized raw data
+        //    Always clear stale cached keys first so a re-upload for the same vessel
+        //    never shows old data from a previous session.
+        localStorage.removeItem(`audit_rows_${imo}`);
+        localStorage.removeItem(`audit_mapping_${imo}`);
+        localStorage.removeItem(`audit_visible_cols_${imo}`);
+
         const standardMappings: Record<string, string> = {
             name: '0',
             vesselName: '1',
@@ -370,10 +385,10 @@ export default function UploadPurchaseOrder() {
         const currentNotifs = JSON.parse(localStorage.getItem('user_notifications') || '[]');
         localStorage.setItem('user_notifications', JSON.stringify([newNotif, ...currentNotifs]));
 
-        showToast("Import Successful", "Navigating to Pending Audits in 5 seconds...", "success");
+        showToast("Import Successful", "Navigating to Pending Audits...", "success");
         setTimeout(() => {
             navigate('/administration/pending-audits');
-        }, 5000);
+        }, 2000);
     };
 
 
@@ -387,14 +402,6 @@ export default function UploadPurchaseOrder() {
                         <div className="step-container-animated">
                             <div className="po-header-section no-breadcrumb">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
-                                    <button
-                                        onClick={() => navigate('/administration/pending-audits')}
-                                        style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B', transition: 'all 0.2s' }}
-                                        onMouseOver={(e) => (e.currentTarget.style.background = '#F1F5F9')}
-                                        onMouseOut={(e) => (e.currentTarget.style.background = '#F8FAFC')}
-                                    >
-                                        <ArrowLeft size={20} />
-                                    </button>
                                     <div>
                                         <h1>Upload Purchase Order</h1>
                                         <p>Manage and initiate the compliance review process for your maritime purchase orders.</p>
@@ -513,26 +520,7 @@ export default function UploadPurchaseOrder() {
                     {currentStep === 'mapping' && (() => {
                         return (
                             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', paddingTop: 'calc(var(--header-height) + 16px)', position: 'relative' }}>
-                                {/* Floating Success Banner */}
-                                {showFinalizeBanner && allRequiredMapped && (
-                                    <div style={{ position: 'fixed', top: '24px', left: '50%', transform: 'translateX(-50%)', zIndex: 10000, width: 'max-content', pointerEvents: 'auto' }}>
-                                        <div style={{ background: '#1E293B', borderRadius: '14px', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '20px', boxShadow: '0 20px 40px rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.08)', animation: 'slideInDown 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)' }}>
-                                            <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                <Check size={20} color="white" strokeWidth={3} />
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                                <div style={{ fontSize: '15px', fontWeight: 700, color: 'white' }}>All Mandatory Fields Mapped</div>
-                                                <div style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 500 }}>You can now proceed to finalize the import.</div>
-                                            </div>
-                                            <button
-                                                onClick={finalizeImport}
-                                                style={{ marginLeft: '12px', background: '#00B0FA', border: 'none', color: 'white', padding: '10px 24px', borderRadius: '8px', fontSize: '12px', fontWeight: 800, cursor: 'pointer', transition: 'all 0.2s', textTransform: 'uppercase', letterSpacing: '0.5px', boxShadow: '0 4px 12px rgba(0, 176, 250, 0.3)' }}
-                                            >
-                                                FINALIZE IMPORT
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
+                                {/* Banner removed — CONFIRM MAPPING now calls finalizeImport directly */}
                                 <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 40px 20px 0', borderBottom: '1px solid #E2E8F0' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
                                         <span style={{ color: '#94A3B8', fontWeight: 500 }}>Administration</span>

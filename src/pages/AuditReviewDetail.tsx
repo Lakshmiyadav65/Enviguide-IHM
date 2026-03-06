@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import './AuditReviewDetail.css';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import {
-    ChevronLeft,
     Search,
     Filter,
     CheckCircle2,
@@ -26,7 +25,6 @@ interface ItemReview {
 
 export default function AuditReviewDetail() {
     const { imo } = useParams();
-    const navigate = useNavigate();
 
     const [vesselInfo, setVesselInfo] = useState<any>(null);
     const [reviewItems, setReviewItems] = useState<ItemReview[]>([]);
@@ -137,15 +135,12 @@ export default function AuditReviewDetail() {
                     {/* Breadcrumbs & Navigation */}
                     <div className="review-top-nav">
                         <div className="breadcrumbs">
-                            <span onClick={() => navigate('/administration/pending-reviews')}>Administration</span>
+                            <span>Administration</span>
                             <span className="sep">&rsaquo;</span>
-                            <span onClick={() => navigate('/administration/pending-reviews')}>Pending Reviews</span>
+                            <span>Pending Reviews</span>
                             <span className="sep">&rsaquo;</span>
                             <span className="active">{vesselInfo?.vesselName || 'Vessel Detail'}</span>
                         </div>
-                        <button className="back-btn" onClick={() => navigate('/administration/pending-reviews')}>
-                            <ChevronLeft size={18} /> BACK TO REGISTRY
-                        </button>
                     </div>
 
                     {/* Vessel Summary Header */}

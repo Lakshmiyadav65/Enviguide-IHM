@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import './MDSdocAudit.css';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
-import { Download, Eye, Ship, Search, ArrowLeft } from 'lucide-react';
+import { Download, Eye, Ship, Search } from 'lucide-react';
 
 interface AuditRecord {
     imoNumber: string;
@@ -83,19 +83,9 @@ export default function MDSdocAudit() {
 
                 <div className="md-sdoc-content">
                     <div className="md-header">
-                        <div className="md-title-area" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                            <button
-                                onClick={() => navigate('/admin-dashboard')}
-                                style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: '12px', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B', transition: 'all 0.2s', flexShrink: 0 }}
-                                onMouseOver={(e) => (e.currentTarget.style.background = '#F8FAFC')}
-                                onMouseOut={(e) => (e.currentTarget.style.background = 'white')}
-                            >
-                                <ArrowLeft size={22} />
-                            </button>
-                            <div>
-                                <h1>MD SDoC Audit Pending</h1>
-                                <p>Registry of Material Declarations and Supplier's Declaration of Conformity pending final audit.</p>
-                            </div>
+                        <div className="md-title-area">
+                            <h1>MD SDoC Audit Pending</h1>
+                            <p>Registry of Material Declarations and Supplier's Declaration of Conformity pending final audit.</p>
                         </div>
                         <div className="md-header-actions">
                             <div className="registry-search-wrapper">

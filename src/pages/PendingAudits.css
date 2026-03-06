@@ -20,7 +20,7 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 
 .pending-audits-content {
     flex: 1;
-    padding: 80px 40px 40px 40px;
+    padding: 92px 40px 20px 40px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -50,7 +50,7 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
     /* Space before search bar */
 }
 
@@ -200,38 +200,52 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     table-layout: fixed;
 }
 
-/* Column Widths */
+/* Column Widths — 9 columns, evenly proportioned */
 .audits-table th:nth-child(1) {
-    width: 20%;
+    width: 16%;
 }
 
+/* VESSEL NAME */
 .audits-table th:nth-child(2) {
-    width: 10%;
+    width: 7%;
 }
 
+/* TOTAL PO */
 .audits-table th:nth-child(3) {
-    width: 12%;
+    width: 8%;
 }
 
+/* TOTAL ITEMS */
 .audits-table th:nth-child(4) {
-    width: 12%;
+    width: 8%;
 }
 
+/* DUPLICATE PO */
 .audits-table th:nth-child(5) {
-    width: 12%;
+    width: 9%;
 }
 
+/* DUP. SUPPLIER CODE */
 .audits-table th:nth-child(6) {
-    width: 12%;
+    width: 9%;
 }
 
+/* DUP. PRODUCT CODE */
 .audits-table th:nth-child(7) {
-    width: 12%;
+    width: 9%;
 }
 
+/* CREATE DATE */
 .audits-table th:nth-child(8) {
-    width: 10%;
+    width: 18%;
 }
+
+/* REVIEW STATUS */
+.audits-table th:nth-child(9) {
+    width: 16%;
+}
+
+/* ACTION */
 
 .audits-table thead {
     position: sticky;
@@ -241,7 +255,7 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 }
 
 .audits-table th {
-    padding: 14px 16px;
+    padding: 12px 10px;
     text-align: left;
     font-size: 11px;
     font-weight: 700;
@@ -249,7 +263,9 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     border-bottom: 1px solid #E2E8F0;
-    white-space: nowrap;
+    white-space: normal;
+    line-height: 1.2;
+    vertical-align: bottom;
 }
 
 .audits-table th.action-column {
@@ -261,10 +277,13 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 }
 
 .audits-table td {
-    padding: 16px;
+    padding: 14px 12px;
+    /* reduced horizontal padding for equal spacing */
     border-bottom: 1px solid #F1F5F9;
     color: #0F172A;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .audits-table tbody tr:hover {
@@ -321,6 +340,10 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     align-items: center;
     justify-content: center;
     gap: 8px;
+    flex-wrap: nowrap;
+    /* keep badge and delete on one line */
+    min-width: 0;
+    /* allow shrink inside fixed-width cell */
 }
 
 .action-btn {
@@ -370,6 +393,15 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     min-width: 32px;
     text-align: center;
     display: inline-block;
+}
+
+/* Dash placeholder shown in REVIEW STATUS when no status set */
+.status-dash {
+    color: #CBD5E1;
+    font-size: 16px;
+    font-weight: 300;
+    display: block;
+    text-align: center;
 }
 
 /* Pagination */
@@ -631,16 +663,19 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
-/* Status Badge */
 .v3-status-badge {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
+    gap: 6px;
+    padding: 5px 10px;
     border-radius: 6px;
-    font-size: 11px;
+    font-size: 10px;
+    /* slightly smaller so it fits next to delete */
     font-weight: 700;
     text-transform: uppercase;
+    white-space: nowrap;
+    /* never wraps onto two lines */
+    flex-shrink: 0;
 }
 
 .v3-status-badge.pending {
