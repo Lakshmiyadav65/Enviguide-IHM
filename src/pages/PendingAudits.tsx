@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './PendingAudits.css';
 import './AuditEditor.css';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
-import { Search, ChevronDown, Download, Edit2, Send, Trash2, X, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, ChevronDown, Download, Edit2, Send, Trash2, X, CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
 
 interface AuditRecord {
     imoNumber: string;
@@ -477,6 +478,7 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
 };
 
 export default function PendingAudits() {
+    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState('createDate');
     const [currentPage, setCurrentPage] = useState(1);
@@ -644,9 +646,19 @@ export default function PendingAudits() {
 
                 <div className="pending-audits-content">
                     <div className="md-header">
-                        <div className="md-title-area">
-                            <h1>Pending Audits Registry</h1>
-                            <p>Manage and review the latest audits before sending for final review.</p>
+                        <div className="md-title-area" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                            <button
+                                onClick={() => navigate('/admin-dashboard')}
+                                style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: '12px', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B', transition: 'all 0.2s', flexShrink: 0 }}
+                                onMouseOver={(e) => (e.currentTarget.style.background = '#F8FAFC')}
+                                onMouseOut={(e) => (e.currentTarget.style.background = 'white')}
+                            >
+                                <ArrowLeft size={22} />
+                            </button>
+                            <div>
+                                <h1>Pending Audits Registry</h1>
+                                <p>Manage and review the latest audits before sending for final review.</p>
+                            </div>
                         </div>
                     </div>
 

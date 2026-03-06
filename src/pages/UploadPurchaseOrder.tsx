@@ -13,7 +13,8 @@ import {
     FileText,
     Wand2,
     CheckCircle2,
-    Check
+    Check,
+    ArrowLeft
 } from 'lucide-react';
 
 type ExcelData = any[][];
@@ -385,8 +386,20 @@ export default function UploadPurchaseOrder() {
                     {currentStep === 'upload' && (
                         <div className="step-container-animated">
                             <div className="po-header-section no-breadcrumb">
-                                <h1>Upload Purchase Order</h1>
-                                <p>Manage and initiate the compliance review process for your maritime purchase orders.</p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
+                                    <button
+                                        onClick={() => navigate('/administration/pending-audits')}
+                                        style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B', transition: 'all 0.2s' }}
+                                        onMouseOver={(e) => (e.currentTarget.style.background = '#F1F5F9')}
+                                        onMouseOut={(e) => (e.currentTarget.style.background = '#F8FAFC')}
+                                    >
+                                        <ArrowLeft size={20} />
+                                    </button>
+                                    <div>
+                                        <h1>Upload Purchase Order</h1>
+                                        <p>Manage and initiate the compliance review process for your maritime purchase orders.</p>
+                                    </div>
+                                </div>
                             </div>
                             <div className="upload-area-card">
                                 <div className="upload-icon-wrapper-v2">
@@ -419,8 +432,20 @@ export default function UploadPurchaseOrder() {
                     {currentStep === 'config' && (
                         <div className="step-container-animated">
                             <div className="po-header-section no-breadcrumb">
-                                <h1>Configure Upload</h1>
-                                <p>Assign the ship manager and vessel for the imported data.</p>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
+                                    <button
+                                        onClick={() => setCurrentStep('upload')}
+                                        style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748B', transition: 'all 0.2s' }}
+                                        onMouseOver={(e) => (e.currentTarget.style.background = '#F1F5F9')}
+                                        onMouseOut={(e) => (e.currentTarget.style.background = '#F8FAFC')}
+                                    >
+                                        <ArrowLeft size={20} />
+                                    </button>
+                                    <div>
+                                        <h1>Configure Upload</h1>
+                                        <p>Assign the ship manager and vessel for the imported data.</p>
+                                    </div>
+                                </div>
                             </div>
                             <div className="upload-area-card" style={{ padding: '40px' }}>
                                 <div style={{ width: '100%', maxWidth: '800px' }}>
