@@ -143,7 +143,8 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 14px;
+    padding: 10px 14px;
+    /* Reduced vertical padding */
     border-radius: var(--radius-premium);
     color: var(--text-secondary);
     text-decoration: none;
@@ -152,7 +153,15 @@
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
     position: relative;
-    white-space: nowrap;
+    line-height: 1.4;
+    /* Better for wrapped text */
+}
+
+/* Allow text wrapping for long menu items */
+.nav-label {
+    white-space: normal;
+    display: block;
+    flex: 1;
 }
 
 .sidebar.collapsed .nav-item {
@@ -234,7 +243,14 @@
 .nav-item.sub-item {
     padding-left: 32px;
     height: auto;
-    min-height: 44px;
+    min-height: 40px;
+    /* Reduced from 44px */
+}
+
+/* Specific fix for MD SDOC Audit Pending or other long labels */
+.nav-item.sub-item .nav-label {
+    font-size: 13px;
+    /* Slightly smaller for sub-items */
 }
 
 .sidebar.collapsed:not(.locked):hover .nav-item.sub-item {
