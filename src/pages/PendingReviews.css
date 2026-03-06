@@ -173,8 +173,9 @@
 }
 
 /* Column Widths */
+/* IMO Number */
 .registry-table th:nth-child(1) {
-    width: 12%;
+    width: 10%;
 }
 
 /* Vessel Name */
@@ -188,13 +189,15 @@
 }
 
 /* Total PO */
+/* Total PO */
 .registry-table th:nth-child(4) {
-    width: 10%;
+    width: 8%;
 }
 
 /* Total Items */
+/* Total Items */
 .registry-table th:nth-child(5) {
-    width: 12%;
+    width: 10%;
 }
 
 /* Review Status */
@@ -203,13 +206,15 @@
 }
 
 /* Review Assigned To */
+/* Review Assigned To */
 .registry-table th:nth-child(7) {
-    width: 14%;
+    width: 16%;
 }
 
 /* Action */
+/* Action */
 .registry-table th:nth-child(8) {
-    width: 10%;
+    width: 14%;
     text-align: center;
 }
 
@@ -312,6 +317,9 @@
 .reviewer-name {
     font-weight: 500;
     color: #475569;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Action Buttons */
@@ -323,7 +331,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 18px;
+    gap: 12px;
 }
 
 .action-btn {
