@@ -153,13 +153,24 @@
     border-radius: 14px;
     width: fit-content;
     box-shadow: 0 8px 20px rgba(14, 165, 233, 0.25);
-    animation: logoFloat 4s ease-in-out infinite;
     position: relative;
     overflow: hidden;
 }
 
 .brand-pill svg {
-    animation: sailingSway 4s ease-in-out infinite;
+    animation: sailingSway 4s ease-in-out infinite, shipFloat 4s ease-in-out infinite;
+}
+
+@keyframes shipFloat {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-3px);
+    }
 }
 
 .brand-pill::after {

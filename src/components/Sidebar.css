@@ -96,15 +96,14 @@
     color: white;
     flex-shrink: 0;
     box-shadow: 0 8px 16px rgba(0, 176, 250, 0.4);
-    animation: logoFloat 4s ease-in-out infinite;
     position: relative;
 }
 
 .logo-icon svg {
-    animation: sailingSway 4s ease-in-out infinite;
+    animation: sailingSway 4s ease-in-out infinite, shipFloat 4s ease-in-out infinite;
 }
 
-@keyframes logoFloat {
+@keyframes shipFloat {
 
     0%,
     100% {
@@ -112,7 +111,7 @@
     }
 
     50% {
-        transform: translateY(-6px);
+        transform: translateY(-3px);
     }
 }
 
