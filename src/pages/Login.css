@@ -124,6 +124,18 @@
     }
 }
 
+@keyframes sailingSway {
+
+    0%,
+    100% {
+        transform: rotate(-8deg);
+    }
+
+    50% {
+        transform: rotate(8deg);
+    }
+}
+
 .auth-header-v2 {
     margin-bottom: 24px;
 }
@@ -144,6 +156,10 @@
     animation: logoFloat 4s ease-in-out infinite;
     position: relative;
     overflow: hidden;
+}
+
+.brand-pill svg {
+    animation: sailingSway 4s ease-in-out infinite;
 }
 
 .brand-pill::after {

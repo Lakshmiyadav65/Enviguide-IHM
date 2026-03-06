@@ -95,7 +95,37 @@
     justify-content: center;
     color: white;
     flex-shrink: 0;
-    box-shadow: 0 2px 4px rgba(0, 176, 250, 0.2);
+    box-shadow: 0 8px 16px rgba(0, 176, 250, 0.4);
+    animation: logoFloat 4s ease-in-out infinite;
+    position: relative;
+}
+
+.logo-icon svg {
+    animation: sailingSway 4s ease-in-out infinite;
+}
+
+@keyframes logoFloat {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-6px);
+    }
+}
+
+@keyframes sailingSway {
+
+    0%,
+    100% {
+        transform: rotate(-5deg);
+    }
+
+    50% {
+        transform: rotate(5deg);
+    }
 }
 
 .sidebar.collapsed .logo-text {
