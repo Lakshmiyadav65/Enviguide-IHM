@@ -302,12 +302,14 @@ export default function UploadPurchaseOrder() {
         const supColIdx = fieldMappings.supplierCode ? parseInt(fieldMappings.supplierCode) : -1;
         const prodColIdx = fieldMappings.productCode ? parseInt(fieldMappings.productCode) : -1;
 
+        const vesselNameColIdx = fieldMappings.vesselName ? parseInt(fieldMappings.vesselName) : -1;
         const itemDescColIdx = fieldMappings.itemDescription ? parseInt(fieldMappings.itemDescription) : -1;
         const qtyColIdx = fieldMappings.quantity ? parseInt(fieldMappings.quantity) : -1;
-        const supplierNameColIdx = fieldMappings.vendorName ? parseInt(fieldMappings.vendorName) : -1;
         const poSentDateColIdx = fieldMappings.poSentDate ? parseInt(fieldMappings.poSentDate) : -1;
         const impaCodeColIdx = fieldMappings.impaCode ? parseInt(fieldMappings.impaCode) : -1;
-        const unitColIdx = fieldMappings.unit ? parseInt(fieldMappings.unit) : -1;
+        const vendorEmailColIdx = fieldMappings.vendorEmail ? parseInt(fieldMappings.vendorEmail) : -1;
+        const vendorNameColIdx = fieldMappings.vendorName ? parseInt(fieldMappings.vendorName) : -1;
+        const mdReqDateColIdx = fieldMappings.mdRequestedDate ? parseInt(fieldMappings.mdRequestedDate) : -1;
 
         let totalPO = 0, duplicatePO = 0, duplicateSupplierCode = 0, duplicateProduct = 0;
 
@@ -317,25 +319,29 @@ export default function UploadPurchaseOrder() {
             poValues.forEach(v => poSet.add(v));
             totalPO = poSet.size;
 
+            // Strict Duplicate matching based on user requested fields:
+            // Vessel Name, PO Number, Item Description, PO Sent Date, IMPA Code, Quantity, Vendor Email, Vendor Name, MD Requested Date
             const counts: Record<string, number> = {};
             rows.forEach(r => {
                 const po = String(r[poColIdx] || '').trim();
                 if (!po) return;
 
+                const vName = vesselNameColIdx !== -1 ? String(r[vesselNameColIdx] || '').trim().toLowerCase() : '';
                 const itemDesc = itemDescColIdx !== -1 ? String(r[itemDescColIdx] || '').trim().toLowerCase() : '';
-                // Normalize Quantity (handles 10 vs 10.00)
-                const rawQty = qtyColIdx !== -1 ? String(r[qtyColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
-                const qty = rawQty ? parseFloat(rawQty).toString() : '';
-                const supplier = supplierNameColIdx !== -1 ? String(r[supplierNameColIdx] || '').trim().toLowerCase() : '';
                 const poSentDate = poSentDateColIdx !== -1 ? String(r[poSentDateColIdx] || '').trim() : '';
                 const impaCode = impaCodeColIdx !== -1 ? String(r[impaCodeColIdx] || '').trim() : '';
-                const unit = unitColIdx !== -1 ? String(r[unitColIdx] || '').trim().toLowerCase() : '';
+                const rawQty = qtyColIdx !== -1 ? String(r[qtyColIdx] || '').replace(/[^0-9.-]+/g, '') : '';
+                const qty = rawQty ? parseFloat(rawQty).toString() : '';
+                const vEmail = vendorEmailColIdx !== -1 ? String(r[vendorEmailColIdx] || '').trim().toLowerCase() : '';
+                const vNameVendor = vendorNameColIdx !== -1 ? String(r[vendorNameColIdx] || '').trim().toLowerCase() : '';
+                const mdReqDate = mdReqDateColIdx !== -1 ? String(r[mdReqDateColIdx] || '').trim() : '';
 
-                const key = `${po}|${itemDesc}|${qty}|${supplier}|${poSentDate}|${impaCode}|${unit}`;
+                // Composite key for strict matching
+                const key = `${vName}|${po}|${itemDesc}|${poSentDate}|${impaCode}|${qty}|${vEmail}|${vNameVendor}|${mdReqDate}`;
                 counts[key] = (counts[key] || 0) + 1;
             });
 
-            // Count unique items that have duplicates
+            // Count unique combinations that appear more than once
             duplicatePO = Object.values(counts).filter(count => count > 1).length;
         }
         if (supColIdx !== -1) {
