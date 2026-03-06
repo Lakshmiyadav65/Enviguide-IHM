@@ -3,7 +3,7 @@
     position: absolute;
     top: 72px;
     /* Below header */
-    left: 280px;
+    left: var(--sidebar-width, 240px);
     /* After sidebar */
     right: 0;
     bottom: 0;

@@ -8,7 +8,7 @@
     padding: 0 40px;
     position: fixed;
     top: 0;
-    left: 280px;
+    left: var(--sidebar-width, 240px);
     right: 0;
     z-index: 1300;
     gap: 20px;
@@ -34,7 +34,7 @@
 }
 
 body:has(.sidebar.collapsed) .dashboard-header {
-    left: 90px;
+    left: var(--sidebar-collapsed-width, 80px);
 }
 
 .header-background {

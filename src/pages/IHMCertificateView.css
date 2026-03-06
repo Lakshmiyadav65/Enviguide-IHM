@@ -71,7 +71,7 @@
 
 /* Sidebar Progress */
 .wizard-progress-sidebar {
-    width: 280px;
+    width: var(--sidebar-width, 240px);
     flex-shrink: 0;
     border-right: 1px solid #f1f5f9;
     padding-right: 40px;

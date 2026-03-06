@@ -39,13 +39,14 @@
     background-size: cover;
     background-position: center;
     opacity: 0;
-    transition: opacity 1.5s ease-in-out, transform 8s ease;
-    transform: scale(1.05);
+    transition: opacity 2s ease-in-out;
+    transform: scale(1.2);
 }
 
 .slide-v2.active {
     opacity: 0.7;
-    transform: scale(1);
+    transform: scale(1.05);
+    transition: opacity 2s ease-in-out, transform 10s ease-out;
 }
 
 .visual-overlay {
@@ -92,12 +93,34 @@
 @keyframes authFadeUp {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(30px);
     }
 
     to {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@keyframes logoFloat {
+
+    0%,
+    100% {
+        transform: translateY(0) rotate(0);
+    }
+
+    50% {
+        transform: translateY(-6px) rotate(2deg);
+    }
+}
+
+@keyframes waveMove {
+    0% {
+        transform: translateX(0);
+    }
+
+    100% {
+        transform: translateX(-50%);
     }
 }
 
@@ -108,15 +131,31 @@
 .brand-pill {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 11px;
+    gap: 10px;
+    font-size: 12px;
     font-weight: 700;
-    color: var(--primary-black);
-    margin-bottom: 20px;
-    background: #f8fafc;
-    padding: 5px 12px;
-    border-radius: 100px;
+    color: white;
+    margin-bottom: 24px;
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    padding: 8px 18px;
+    border-radius: 14px;
     width: fit-content;
+    box-shadow: 0 8px 20px rgba(14, 165, 233, 0.25);
+    animation: logoFloat 4s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.brand-pill::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 0;
+    width: 200%;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    animation: waveMove 3s linear infinite;
 }
 
 .auth-header-v2 h2 {
@@ -137,6 +176,7 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
+    animation: authFadeUp 0.8s ease-out 0.2s backwards;
 }
 
 .form-group-v2 {
@@ -274,7 +314,23 @@
 
 .btn-blocker:hover {
     background: #27272a;
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+}
+
+.btn-blocker::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transition: 0.5s;
+}
+
+.btn-blocker:hover::after {
+    left: 100%;
 }
 
 .btn-google-v2 {
@@ -335,24 +391,39 @@
     opacity: 0.5;
 }
 
-/* Dot Loading */
-.dot-loading {
+/* Bouncing Loading Dots */
+.dot-loading-container {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+}
+
+.dot-v2 {
     width: 6px;
     height: 6px;
     background: white;
     border-radius: 50%;
-    animation: dotPulse 1s infinite alternate;
+    animation: dotBounce 0.6s infinite alternate;
 }
 
-@keyframes dotPulse {
+.dot-v2:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.dot-v2:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes dotBounce {
     from {
-        transform: scale(1);
-        opacity: 0.5;
+        transform: translateY(0);
+        opacity: 1;
     }
 
     to {
-        transform: scale(1.5);
-        opacity: 1;
+        transform: translateY(-6px);
+        opacity: 0.4;
     }
 }
 

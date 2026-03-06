@@ -8,7 +8,7 @@
 
 .doc-audit-main {
     flex: 1;
-    margin-left: 280px;
+    margin-left: var(--sidebar-width, 240px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -459,7 +459,7 @@
 .audit-progress-footer-fixed {
     position: fixed;
     bottom: 0;
-    left: 280px;
+    left: var(--sidebar-width, 240px);
     right: 0;
     height: 80px;
     background: white;

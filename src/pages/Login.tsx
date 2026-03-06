@@ -114,7 +114,13 @@ export default function Login() {
                             className="btn-blocker"
                             disabled={isLoading}
                         >
-                            {isLoading ? <div className="dot-loading"></div> : "Sign In"}
+                            {isLoading ? (
+                                <div className="dot-loading-container">
+                                    <div className="dot-v2"></div>
+                                    <div className="dot-v2"></div>
+                                    <div className="dot-v2"></div>
+                                </div>
+                            ) : "Sign In"}
                         </button>
 
                         <button type="button" className="btn-google-v2">

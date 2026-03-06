@@ -7,7 +7,7 @@
 
 .pending-audits-main {
     flex: 1;
-    margin-left: 280px;
+    margin-left: var(--sidebar-width, 240px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -15,7 +15,7 @@
 }
 
 body:has(.sidebar.collapsed) .pending-audits-main {
-    margin-left: 90px;
+    margin-left: var(--sidebar-collapsed-width, 80px);
 }
 
 .pending-audits-content {

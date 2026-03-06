@@ -4,7 +4,7 @@
 }
 
 .sidebar {
-    width: 280px;
+    width: var(--sidebar-width, 240px);
     height: 100vh;
     background: var(--bg-white);
     color: var(--text-primary);
@@ -20,11 +20,11 @@
 }
 
 .sidebar.collapsed {
-    width: 90px;
+    width: var(--sidebar-collapsed-width, 80px);
 }
 
 .sidebar.collapsed:not(.locked):hover {
-    width: 280px;
+    width: var(--sidebar-width, 240px);
     box-shadow: 10px 0 40px rgba(0, 0, 0, 0.12);
 }
 

@@ -7,8 +7,8 @@
 }
 
 .upload-po-main {
-    margin-left: 280px;
-    width: calc(100% - 280px);
+    margin-left: var(--sidebar-width, 240px);
+    width: calc(100% - var(--sidebar-width, 240px));
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -17,8 +17,8 @@
 }
 
 body:has(.sidebar.collapsed) .upload-po-main {
-    margin-left: 90px;
-    width: calc(100% - 90px);
+    margin-left: var(--sidebar-collapsed-width, 80px);
+    width: calc(100% - var(--sidebar-collapsed-width, 80px));
 }
 
 .upload-po-content {

@@ -39,8 +39,8 @@
     padding: var(--header-height) 0 0 0 !important;
     height: 100vh;
     overflow: hidden;
-    margin-left: 280px;
-    width: calc(100% - 280px);
+    margin-left: var(--sidebar-width, 240px);
+    width: calc(100% - var(--sidebar-width, 240px));
     position: relative;
     display: flex;
     flex-direction: column;
@@ -49,8 +49,8 @@
 }
 
 body:has(.sidebar.collapsed) .vessel-page-main {
-    margin-left: 80px;
-    width: calc(100% - 80px);
+    margin-left: var(--sidebar-collapsed-width, 80px);
+    width: calc(100% - var(--sidebar-collapsed-width, 80px));
 }
 
 .vessel-page-main .dashboard-header {

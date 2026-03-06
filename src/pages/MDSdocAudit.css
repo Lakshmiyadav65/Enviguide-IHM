@@ -7,7 +7,7 @@
 
 .md-sdoc-main {
     flex: 1;
-    margin-left: 280px;
+    margin-left: var(--sidebar-width, 240px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -331,7 +331,7 @@
 .metrics-footer-bar {
     position: fixed;
     bottom: 0;
-    left: 280px;
+    left: var(--sidebar-width, 240px);
     right: 0;
     height: 60px;
     background: #F0FDFA;

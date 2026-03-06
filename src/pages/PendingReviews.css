@@ -7,7 +7,7 @@
 
 .pending-reviews-main {
     flex: 1;
-    margin-left: 280px;
+    margin-left: var(--sidebar-width, 240px);
     display: flex;
     flex-direction: column;
     height: 100vh;
@@ -16,9 +16,9 @@
 
 .pending-reviews-content {
     flex: 1;
-    padding: 80px 24px 80px 24px;
-    overflow-y: hidden;
-    /* Main content shouldn't scroll, inner wrapper should */
+    padding: 80px 24px 72px 24px;
+    /* Bottom padding matches summary footer height */
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
 }
@@ -123,16 +123,34 @@
     display: flex;
     flex-direction: column;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-    flex: 1;
-    margin-bottom: 0;
+    margin-bottom: 24px;
+    /* Added margin instead of flex: 1 */
 }
 
 .table-wrapper {
-    flex: 1;
-    overflow-y: auto;
+    overflow-y: visible;
+    /* Let the content container handle vertical scroll */
     overflow-x: auto;
-    max-height: calc(100vh - 380px);
-    /* Allow vertical scroll */
+    /* No flex: 1 here to keep footer close to table */
+}
+
+/* Slim Scrollbar for Table */
+.table-wrapper::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+    background: #F8FAFC;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 10px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
 }
 
 .registry-table {
@@ -337,7 +355,8 @@
 
 /* Pagination Footer */
 .table-footer {
-    padding: 16px 24px;
+    padding: 12px 24px;
+    /* Reduced vertical padding */
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -392,7 +411,7 @@
 .summary-footer-bar {
     position: fixed;
     bottom: 0;
-    left: 280px;
+    left: var(--sidebar-width, 240px);
     right: 0;
     height: 72px;
     background: #F0FDFA;
