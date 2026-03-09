@@ -275,7 +275,9 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
             vendorEmail: row[data[0].indexOf('Vendor Email')],
             status: 'Clarification Pending',
             date: new Date().toISOString().split('T')[0],
-            details: row
+            details: row,
+            mailSubject: mailContent.subject,
+            mailBody: mailContent.body
         }))];
 
         localStorage.setItem(`pending_clarifications_${imo}`, JSON.stringify(newClarifications));
