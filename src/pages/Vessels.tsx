@@ -455,6 +455,13 @@ export default function Vessels() {
         return vesselList.find(v => v.name === activeVesselName);
     }, [vesselList, activeVesselName]);
 
+    // Sync formData with selected vessel when not editing/adding
+    useEffect(() => {
+        if (!isEditing && !isAdding && activeVesselData) {
+            setFormData(activeVesselData);
+        }
+    }, [activeVesselData, isEditing, isAdding]);
+
     const handleVesselSelect = (vessel: VesselData) => {
         if (isEditing || isAdding) {
             if (!formData.name || !formData.shipOwner || !formData.imoNo) {
@@ -550,6 +557,7 @@ export default function Vessels() {
             setModalMessage('New vessel added successfully!');
         } else {
             setVesselList(prev => prev.map(v => v.name === activeVesselName ? formData : v));
+            setActiveVesselName(formData.name); // Ensure the new name is tracked if it changed
             setIsEditing(false);
             setModalMessage('Vessel data updated successfully!');
         }
