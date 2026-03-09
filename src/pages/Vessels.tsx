@@ -456,10 +456,26 @@ export default function Vessels() {
     }, [vesselList, activeVesselName]);
 
     const handleVesselSelect = (vessel: VesselData) => {
+        if (isEditing || isAdding) {
+            if (!formData.name || !formData.shipOwner || !formData.imoNo) {
+                alert('Please fill the required vessel details (Name, Ship Owner, IMO No) before switching vessels.');
+                return;
+            }
+        }
         setActiveVesselName(vessel.name);
         setFormData(vessel);
         setIsAdding(false);
         setIsEditing(false);
+    };
+
+    const handleTabClick = (tabId: string) => {
+        if (isEditing || isAdding) {
+            if (!formData.name || !formData.shipOwner || !formData.imoNo) {
+                alert('Please fill the required vessel details (Name, Ship Owner, IMO No) before switching tabs.');
+                return;
+            }
+        }
+        setActiveTab(tabId);
     };
 
     const handleAddClick = () => {
@@ -519,6 +535,13 @@ export default function Vessels() {
 
     const handleSave = (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Manual validation check as a fallback if browser validation is bypassed
+        if (!formData.name || !formData.shipOwner || !formData.imoNo) {
+            alert('Please fill all required fields (marked with *) before saving.');
+            return;
+        }
+
         if (isAdding) {
             setVesselList(prev => [...prev, formData]);
             setIsAdding(false);
@@ -1532,7 +1555,7 @@ export default function Vessels() {
                                     <div
                                         key={tab.id}
                                         className={`tab-item-inline ${activeTab === tab.id ? 'active' : ''}`}
-                                        onClick={() => setActiveTab(tab.id)}
+                                        onClick={() => handleTabClick(tab.id)}
                                     >
                                         <tab.icon size={18} />
                                         <span>{tab.label}</span>
@@ -1621,6 +1644,7 @@ function FormGroup({ label, name, value, onChange, required, readOnly }: { label
                 onChange={onChange}
                 readOnly={readOnly}
                 placeholder={`Enter ${label.toLowerCase()}`}
+                required={required}
             />
         </div>
     );
