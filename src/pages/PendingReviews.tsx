@@ -30,69 +30,11 @@ export default function PendingReviews() {
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
-        // Sample records as per design - 150 Diverse Records for testing scale
-        const reviewers = [
-            { name: 'Sarah Johnson', avatar: 'https://i.pravatar.cc/150?u=sarah' },
-            { name: 'Michael Chen', avatar: 'https://i.pravatar.cc/150?u=michael' },
-            { name: 'John Doe', avatar: 'https://i.pravatar.cc/150?u=john' },
-            { name: 'Emily White', avatar: 'https://i.pravatar.cc/150?u=emily' },
-            { name: 'David Wilson', avatar: 'https://i.pravatar.cc/150?u=david' },
-            { name: 'Jessica Brown', avatar: 'https://i.pravatar.cc/150?u=jessica' }
-        ];
-
-        const vesselPool = [
-            'Pacific Venture', 'Nordic Star', 'Ocean Atlas', 'Arctic Peak',
-            'Baltic Sea', 'Caspian Ray', 'Indian Wave', 'Golden Gate',
-            'Silver Stream', 'Emerald Wave', 'Midnight Sun', 'Morning Star',
-            'Polaris Express', 'Equator Line', 'Horizon Spirit', 'Deep Sea Explorer',
-            'Navigator One', 'Crested Wave', 'Tidal Surge', 'Blue Horizon',
-            'Maersk Advancer', 'MSC Isabella', 'Ever Given II', 'CMA CGM Rivoli',
-            'Hapag-Lloyd Algeciras', 'COSCO Shipping Universe', 'ONE Minato',
-            'Yang Ming Wellhead', 'Hyundai Pride', 'ZIM Rotterdam',
-            'Glory of the Seas', 'Storm Runner', 'Arctic Mariner', 'Neptune Chariot',
-            'Stolt Tanker 01', 'Berge Bulk 4', 'Global Explorer', 'Sea Sapphire',
-            'Iron Maiden', 'Viking Quest', 'Black Pearl', 'Flying Dutchman'
-        ];
-
-        const generateRecords = (): ReviewRecord[] => {
-            return Array.from({ length: 150 }).map((_, idx) => ({
-                imoNumber: (9800000 + idx * 432).toString(),
-                vesselName: vesselPool[idx % vesselPool.length],
-                totalPO: Math.floor(Math.random() * 95) + 5,
-                totalItems: Math.floor(Math.random() * 4500) + 120,
-                reviewStatus: idx % 4 === 0 ? 'Pending' : 'In Review',
-                assignedTo: reviewers[idx % reviewers.length],
-                createDate: `2023-11-${((idx + 5) % 28) + 1}`
-            }));
-        };
-
         const storedSent = localStorage.getItem('sentToReview');
-
-        if (!storedSent) {
-            // No data at all, generate fresh 150
-            const newSet = generateRecords();
-            setAllRecords(newSet);
-            localStorage.setItem('sentToReview', JSON.stringify(newSet));
+        if (storedSent) {
+            setAllRecords(JSON.parse(storedSent));
         } else {
-            const parsedSent = JSON.parse(storedSent) as ReviewRecord[];
-
-            // Separate real sent items (from PendingAudits) from dummy records
-            // Real records won't be in the dummy IMO range (9800000 + idx * 432)
-            const dummyImos = new Set(
-                Array.from({ length: 150 }).map((_, idx) => (9800000 + idx * 432).toString())
-            );
-            const realSentItems = parsedSent.filter(r => !dummyImos.has(r.imoNumber));
-            const existingDummies = parsedSent.filter(r => dummyImos.has(r.imoNumber));
-
-            // Rebuild: real items first, then dummies padded to 150 total
-            const existingImos = new Set(parsedSent.map(r => r.imoNumber));
-            const newDummies = generateRecords().filter(d => !existingImos.has(d.imoNumber));
-            const allDummies = [...existingDummies, ...newDummies];
-            const needed = Math.max(0, 150 - realSentItems.length);
-            const merged = [...realSentItems, ...allDummies.slice(0, needed)];
-
-            setAllRecords(merged);
-            localStorage.setItem('sentToReview', JSON.stringify(merged));
+            setAllRecords([]);
         }
     }, []);
 

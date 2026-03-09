@@ -5,7 +5,6 @@ import {
     TrendingUp,
     AlertTriangle,
     Filter,
-    Package,
     Activity,
     Clock,
     ChevronRight,
@@ -23,6 +22,21 @@ export default function Dashboard() {
         supplier: 'Supplier',
         vessel: 'Vessel'
     });
+
+    const [vesselList, setVesselList] = useState<any[]>([]);
+    const [auditRegistry, setAuditRegistry] = useState<any[]>([]);
+
+    useEffect(() => {
+        const savedVessels = localStorage.getItem('vessel_list_main');
+        if (savedVessels) setVesselList(JSON.parse(savedVessels));
+
+        const savedAudits = localStorage.getItem('audit_registry_main');
+        if (savedAudits) setAuditRegistry(JSON.parse(savedAudits));
+    }, []);
+
+    const totalVessels = vesselList.length;
+    const totalPOs = auditRegistry.reduce((acc, curr) => acc + (curr.totalPO || 0), 0);
+    const totalItems = auditRegistry.reduce((acc, curr) => acc + (curr.totalItems || 0), 0);
 
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const filterRef = useRef<HTMLDivElement>(null);
@@ -202,7 +216,7 @@ export default function Dashboard() {
                                     <Ship size={24} />
                                 </div>
                             </div>
-                            <div className="kpi-value">24</div>
+                            <div className="kpi-value">{totalVessels}</div>
                         </div>
 
                         <div className="kpi-card">
@@ -213,36 +227,36 @@ export default function Dashboard() {
                                 </div>
                             </div>
                             <div className="kpi-middle">
-                                <div className="kpi-value">156</div>
+                                <div className="kpi-value">{totalPOs}</div>
                                 <div className="kpi-trend up">
-                                    <TrendingUp size={16} /> 12%
+                                    <TrendingUp size={16} /> {auditRegistry.length > 0 ? 'Live' : '0%'}
                                 </div>
                             </div>
                         </div>
 
                         <div className="kpi-card">
                             <div className="kpi-top">
-                                <span className="kpi-label">Compliance Rate</span>
+                                <span className="kpi-label">Total Items Audit</span>
                                 <div className="kpi-icon-box green">
                                     <TrendingUp size={24} />
                                 </div>
                             </div>
                             <div className="kpi-middle">
-                                <div className="kpi-value">94%</div>
+                                <div className="kpi-value">{totalItems}</div>
                                 <div className="kpi-trend up">
-                                    <TrendingUp size={16} /> 3%
+                                    <TrendingUp size={16} /> Verified
                                 </div>
                             </div>
                         </div>
 
                         <div className="kpi-card">
                             <div className="kpi-top">
-                                <span className="kpi-label">Pending Actions</span>
+                                <span className="kpi-label">Pending Audits</span>
                                 <div className="kpi-icon-box orange">
                                     <AlertTriangle size={24} />
                                 </div>
                             </div>
-                            <div className="kpi-value">18</div>
+                            <div className="kpi-value">{auditRegistry.length}</div>
                         </div>
                     </div>
 
@@ -258,36 +272,23 @@ export default function Dashboard() {
                                     <h3>Recent Activity</h3>
                                 </div>
                                 <div className="activity-list">
-                                    <div className="activity-item">
-                                        <div className="act-icon green">
-                                            <Ship size={20} />
+                                    {auditRegistry.slice(0, 3).map((item, idx) => (
+                                        <div key={idx} className="activity-item">
+                                            <div className="act-icon blue">
+                                                <FileText size={20} />
+                                            </div>
+                                            <div className="act-content">
+                                                <h4>Audit Initialized</h4>
+                                                <p>{item.totalPO} POs for {item.vesselName} sent to registry</p>
+                                                <span className="act-time">{item.uploadDate || 'Recently'}</span>
+                                            </div>
                                         </div>
-                                        <div className="act-content">
-                                            <h4>Vessel Onboarded</h4>
-                                            <p>MV Atlantic Voyager successfully onboarded</p>
-                                            <span className="act-time">2 hours ago</span>
+                                    ))}
+                                    {auditRegistry.length === 0 && (
+                                        <div className="summary-empty" style={{ padding: '20px', textAlign: 'center', color: '#64748B' }}>
+                                            No recent activity found. Start by uploading a Purchase Order.
                                         </div>
-                                    </div>
-                                    <div className="activity-item">
-                                        <div className="act-icon blue">
-                                            <FileText size={20} />
-                                        </div>
-                                        <div className="act-content">
-                                            <h4>PO Updated</h4>
-                                            <p>23 new line items added to PO-2024-156</p>
-                                            <span className="act-time">4 hours ago</span>
-                                        </div>
-                                    </div>
-                                    <div className="activity-item">
-                                        <div className="act-icon green">
-                                            <Package size={20} />
-                                        </div>
-                                        <div className="act-content">
-                                            <h4>Materials Received</h4>
-                                            <p>45 items marked as received from supplier</p>
-                                            <span className="act-time">5 hours ago</span>
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
                                 <div style={{ textAlign: 'center' }}>
                                     <a href="#" className="view-all-link">View All Activity →</a>
@@ -302,65 +303,65 @@ export default function Dashboard() {
                                     <div className="title-icon blue-bg">
                                         <Ship size={18} />
                                     </div>
-                                    <h3>Vessels</h3>
+                                    <h3>Vessel Registry</h3>
                                 </div>
                                 <div className="vessels-color-grid">
                                     <div className="v-color-card v-green">
-                                        <div className="v-top"><TrendingUp size={14} /> Onboarded</div>
-                                        <div className="v-count">8</div>
-                                        <div className="v-sub">• New</div>
+                                        <div className="v-top"><TrendingUp size={14} /> Total</div>
+                                        <div className="v-count">{vesselList.length}</div>
+                                        <div className="v-sub">• Fleet</div>
                                     </div>
                                     <div className="v-color-card v-red">
-                                        <div className="v-top"><AlertTriangle size={14} /> Expired</div>
-                                        <div className="v-count">3</div>
-                                        <div className="v-sub">SOC</div>
+                                        <div className="v-top"><AlertTriangle size={14} /> In Audit</div>
+                                        <div className="v-count">{auditRegistry.length}</div>
+                                        <div className="v-sub">Phase</div>
                                     </div>
                                     <div className="v-color-card v-blue">
-                                        <div className="v-top"><ArrowUpRight size={14} /> From Deck</div>
-                                        <div className="v-count">145</div>
-                                        <div className="v-sub">Items moved</div>
+                                        <div className="v-top"><ArrowUpRight size={14} /> Managers</div>
+                                        <div className="v-count">{new Set(vesselList.map(v => v.shipManager)).size}</div>
+                                        <div className="v-sub">Active</div>
                                     </div>
                                     <div className="v-color-card v-purple">
-                                        <div className="v-top"><ArrowUpRight size={14} /> To Ashore</div>
-                                        <div className="v-count">67</div>
-                                        <div className="v-sub">Items moved</div>
+                                        <div className="v-top"><ArrowUpRight size={14} /> New</div>
+                                        <div className="v-count">0</div>
+                                        <div className="v-sub">Pending</div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* SOC Expiry */}
+                            {/* SOC Status */}
                             <div className="section-card">
                                 <div className="card-title">
                                     <div className="title-icon orange-bg">
                                         <Clock size={18} />
                                     </div>
                                     <div>
-                                        <h3>SOC Expiry</h3>
-                                        <div style={{ fontSize: 11, color: '#98A2B3' }}>Statement of Compliance</div>
+                                        <h3>Vessel Status</h3>
+                                        <div style={{ fontSize: 11, color: '#98A2B3' }}>Review and Onboarding</div>
                                     </div>
                                 </div>
                                 <div className="soc-list">
-                                    {[
-                                        { name: 'MV Nordic Star', imo: '9123456', date: '2024-08-20', badge: '45 days overdue', type: 'red' },
-                                        { name: 'MV Atlantic Voyager', imo: '9654321', date: '2024-12-01', badge: '38 days left', type: 'orange' },
-                                        { name: 'MV Pacific Horizon', imo: '9234567', date: '2025-03-10', badge: '127 days left', type: 'green' },
-                                        { name: 'MV Ocean Pioneer', imo: '9876543', date: '2025-06-15', badge: '254 days left', type: 'green' }
-                                    ].map((v, i) => (
+                                    {vesselList.slice(0, 4).map((v, i) => (
                                         <div key={i} className="soc-item">
                                             <div className="soc-left">
                                                 <div className="soc-icon"><Ship size={20} /></div>
                                                 <div className="soc-info">
                                                     <h4>{v.name}</h4>
-                                                    <p>IMO: {v.imo}</p>
+                                                    <p>IMO: {v.imoNo}</p>
                                                 </div>
                                             </div>
                                             <div className="soc-right">
-                                                <span className="soc-date-label">Expiry Date</span>
-                                                <span className="soc-date-val">{v.date}</span>
-                                                <span className={`soc-badge badge-${v.type}`}>{v.badge}</span>
+                                                <span className="soc-date-label">Created</span>
+                                                <span className="soc-date-val">{v.keelLaidDate || 'N/A'}</span>
+                                                <span className="soc-badge badge-green">Onboarded</span>
                                             </div>
                                         </div>
                                     ))}
+                                    {vesselList.length === 0 && (
+                                        <div className="summary-empty" style={{ padding: '20px', textAlign: 'center', color: '#64748B' }}>
+                                            No vessels registered.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -369,8 +370,8 @@ export default function Dashboard() {
                     {/* 5. Operational Overview Table */}
                     <div className="section-card ops-table-container">
                         <div className="ops-table-header">
-                            <h3>Operational Overview</h3>
-                            <p>Track purchase orders and supplier responses across vessels</p>
+                            <h3>Operational Overview - Pending Audits</h3>
+                            <p>Track purchase orders awaiting audit across your fleet</p>
                         </div>
                         <div style={{ overflowX: 'auto' }}>
                             <table className="ops-table">
@@ -381,35 +382,35 @@ export default function Dashboard() {
                                         <th>VESSEL NAME</th>
                                         <th>TOTAL POS</th>
                                         <th>LINE ITEMS</th>
-                                        <th><div className="th-inner"><div className="th-dot orange"></div>REMINDER 1</div></th>
-                                        <th><div className="th-inner"><div className="th-dot red"></div>REMINDER 2</div></th>
-                                        <th><div className="th-inner"><div className="th-dot dark-red"></div>NON-RESPONSIVE</div></th>
+                                        <th>STATUS</th>
+                                        <th>PROGRESS</th>
+                                        <th>ACTIONS</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {[
-                                        { imo: '9876543', name: 'MV Ocean Pioneer', pos: 45, items: 320, r1: 5, r2: 2, non: 1 },
-                                        { imo: '9654321', name: 'MV Atlantic Voyager', pos: 38, items: 275, r1: 0, r2: 3, non: 2 },
-                                        { imo: '9123456', name: 'MV Nordic Star', pos: 52, items: 410, r1: 3, r2: 1, non: 0 },
-                                        { imo: '9234567', name: 'MV Pacific Horizon', pos: 29, items: 185, r1: 12, r2: 8, non: 3 }
-                                    ].map((v, i) => (
+                                    {auditRegistry.map((v, i) => (
                                         <tr key={i}>
                                             <td><div className="chevron-cell"><ChevronRight size={18} /></div></td>
-                                            <td className="row-imo">{v.imo}</td>
-                                            <td className="row-name">{v.name}</td>
-                                            <td>{v.pos}</td>
-                                            <td>{v.items}</td>
-                                            <td><div className={v.r1 > 0 ? 'reminder-badge rem-1' : 'reminder-badge rem-0'}>{v.r1}</div></td>
-                                            <td><div className={v.r2 > 0 ? 'reminder-badge rem-2' : 'reminder-badge rem-0'}>{v.r2}</div></td>
+                                            <td className="row-imo">{v.imoNumber}</td>
+                                            <td className="row-name">{v.vesselName}</td>
+                                            <td>{v.totalPO}</td>
+                                            <td>{v.totalItems}</td>
+                                            <td><span className="reminder-badge rem-1">Pending</span></td>
+                                            <td><div className="reminder-badge rem-good">0%</div></td>
                                             <td>
-                                                {v.non > 0 ? (
-                                                    <div className="reminder-badge non-resp">{v.non}</div>
-                                                ) : (
-                                                    <div className="reminder-badge rem-good">0</div>
-                                                )}
+                                                <div className="chevron-cell">
+                                                    <ArrowUpRight size={18} style={{ cursor: 'pointer', color: '#00B0FA' }} />
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
+                                    {auditRegistry.length === 0 && (
+                                        <tr>
+                                            <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>
+                                                No pending audits in the system.
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>

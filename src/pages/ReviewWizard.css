@@ -825,3 +825,426 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* ── GMAIL STYLE MAIL MODAL ────────────────────────────────── */
+.gmail-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 20000;
+    display: flex;
+    align-items: flex-end;
+    /* Gmail style - bottom right */
+    justify-content: flex-end;
+    padding: 0 40px 0 0;
+    animation: fadeIn 0.3s ease;
+}
+
+.gmail-compose {
+    background: white;
+    width: 550px;
+    height: 600px;
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: slideUpCompose 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    border: 1px solid #ccc;
+    font-family: 'Roboto', 'Arial', sans-serif;
+}
+
+@keyframes slideUpCompose {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+.gmail-header {
+    background: #f2f6fc;
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e1e1e1;
+}
+
+.gmail-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f1f1f;
+}
+
+.gmail-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: #444746;
+}
+
+.gmail-header-actions svg {
+    cursor: pointer;
+    transition: background 0.2s;
+    border-radius: 4px;
+    padding: 2px;
+}
+
+.gmail-header-actions svg:hover {
+    background: #e1e4e8;
+}
+
+.gmail-row {
+    display: flex;
+    align-items: center;
+    padding: 4px 16px;
+    border-bottom: 1px solid #e1e1e1;
+    min-height: 44px;
+}
+
+.gmail-label {
+    width: 62px;
+    font-size: 14px;
+    color: #444746;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+/* ── Gmail-style To chips row ── */
+.gmail-to-row {
+    align-items: flex-start;
+    min-height: 48px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    flex-wrap: nowrap;
+    cursor: text;
+}
+
+.gmail-chips-area {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+}
+
+/* Each recipient chip */
+.recipient-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    background: #e8f0fe;
+    border-radius: 100px;
+    padding: 0;
+    overflow: hidden;
+    max-width: 240px;
+    height: 30px;
+    border: 1px solid #c5d4f6;
+}
+
+.recipient-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+
+.recipient-label {
+    font-size: 13px;
+    color: #1f1f1f;
+    padding: 0 8px 0 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 160px;
+}
+
+.recipient-remove {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #5f6368;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 8px 0 0;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+
+.recipient-remove:hover {
+    color: #ea4335;
+}
+
+/* Invisible input inside chips area */
+.chips-input {
+    flex: 1;
+    min-width: 80px;
+    padding: 4px 0 !important;
+}
+
+/* Cc / Bcc toggle buttons */
+.gmail-cc-bcc-btns {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    align-self: flex-start;
+    padding-top: 5px;
+}
+
+.cc-bcc-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #444746;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.cc-bcc-btn:hover {
+    background: #f1f3f4;
+    color: #1a73e8;
+}
+
+.gmail-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    padding: 8px 0;
+    font-family: inherit;
+    color: #1f1f1f;
+}
+
+.gmail-input::placeholder {
+    color: #70757a;
+}
+
+.gmail-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    overflow-y: auto;
+    background: white;
+}
+
+.gmail-content {
+    flex: 1;
+    border: none;
+    outline: none;
+    resize: none;
+    font-size: 14px;
+    line-height: 1.55;
+    color: #1f1f1f;
+    font-family: inherit;
+    min-height: 200px;
+}
+
+.gmail-infobox {
+    margin-top: 24px;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #f29900;
+}
+
+.infobox-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #1f1f1f;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.infobox-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.infobox-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: #444746;
+    padding: 6px 10px;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #e1e1e1;
+}
+
+.gmail-footer {
+    padding: 12px 16px;
+    border-top: 1px solid #e8eaed;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.footer-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.gmail-send-btn {
+    background: #1a73e8;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 2px 0 rgba(60, 64, 67, .3), 0 1px 3px 1px rgba(60, 64, 67, .15);
+    transition: all 0.2s;
+}
+
+.gmail-send-btn:hover {
+    background: #1967d2;
+    box-shadow: 0 1px 3px 0 rgba(60, 64, 67, .3), 0 4px 8px 3px rgba(60, 64, 67, .15);
+    transform: translateY(-1px);
+}
+
+/* Bigger tappable icon buttons */
+.gmail-tool-icons {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    color: #444746;
+}
+
+.tool-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #444746;
+    transition: background 0.15s;
+    flex-shrink: 0;
+}
+
+.tool-icon-btn:hover {
+    background: #f1f3f4;
+    color: #1a73e8;
+}
+
+.tool-icon-btn.trash-icon:hover {
+    background: #fce8e6;
+    color: #d93025;
+}
+
+.footer-right {
+    color: #444746;
+}
+
+/* ── UPLOAD CTA inside body ── */
+.gmail-upload-cta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0 4px 0;
+    border-top: 1px dashed #e0e0e0;
+    margin-top: 16px;
+}
+
+.upload-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    background: #f8f9fa;
+    border: 1.5px solid #dadce0;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #3c4043;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.upload-cta-btn:hover {
+    background: #e8f0fe;
+    border-color: #1a73e8;
+    color: #1a73e8;
+    box-shadow: 0 1px 4px rgba(26, 115, 232, 0.2);
+}
+
+.upload-hint {
+    font-size: 11px;
+    color: #80868b;
+    white-space: nowrap;
+}
+
+/* ── Attached file chips ── */
+.gmail-attachments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 4px 0;
+}
+
+.attach-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px 5px 10px;
+    background: #e8f0fe;
+    border: 1px solid #c5d4f6;
+    border-radius: 100px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #1a73e8;
+    max-width: 220px;
+}
+
+.attach-chip span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 160px;
+}
+
+.chip-remove {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #5f6368;
+    font-size: 15px;
+    line-height: 1;
+    padding: 0 2px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+
+.chip-remove:hover {
+    color: #d93025;
+}

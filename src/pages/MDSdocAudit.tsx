@@ -23,42 +23,12 @@ export default function MDSdocAudit() {
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
-        const vesselNames = ['Pacific Venture', 'Nordic Star', 'Ocean Atlas', 'Arctic Peak', 'Baltic Sea', 'Caspian Ray', 'Indian Wave', 'Golden Gate', 'Silver Stream', 'Emerald Wave'];
-
-        // Match specific design records first
-        const designRecords: AuditRecord[] = [
-            {
-                imoNumber: '9448748',
-                vesselName: 'Pacific Venture',
-                totalPOs: 42,
-                pendingMDS: 8,
-                pendingSdocs: 12,
-                clarificationStatus: 'Awaiting Clarification',
-                lastSubmissionDate: '24 Oct 2023'
-            },
-            {
-                imoNumber: '9311234',
-                vesselName: 'Nordic Star',
-                totalPOs: 15,
-                pendingMDS: 3,
-                pendingSdocs: 3,
-                clarificationStatus: 'Resolved',
-                lastSubmissionDate: '22 Oct 2023'
-            }
-        ];
-
-        // Fill remaining up to 150 records
-        const fillerRecords: AuditRecord[] = Array.from({ length: 148 }).map((_, idx) => ({
-            imoNumber: (9448748 - (idx + 2) * 1234).toString(),
-            vesselName: vesselNames[(idx + 2) % vesselNames.length],
-            totalPOs: Math.floor(Math.random() * 60) + 10,
-            pendingMDS: [5, 2, 1, 9, 4, 3][idx % 6],
-            pendingSdocs: [7, 4, 3, 11, 6, 2][idx % 6],
-            clarificationStatus: idx % 3 === 0 ? 'Awaiting Clarification' : 'Resolved',
-            lastSubmissionDate: `${20 - (idx % 15)} Oct 2023`
-        }));
-
-        setAllRecords([...designRecords, ...fillerRecords]);
+        const stored = localStorage.getItem('md_sdoc_audit_registry');
+        if (stored) {
+            setAllRecords(JSON.parse(stored));
+        } else {
+            setAllRecords([]);
+        }
     }, []);
 
     const filteredRecords = allRecords.filter(record =>

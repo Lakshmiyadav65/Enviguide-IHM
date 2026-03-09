@@ -18,12 +18,13 @@ interface PurchaseOrderItem {
     unit: string;
     selected?: boolean;
     category: string;
+    isSuspected?: boolean;
 }
 
 const FILTER_TAGS = [
     'Pending Mds', 'Received Mds', 'Tracked Items', 'Non Tracked Items',
     'Request Pending', 'Reminder 1', 'Reminder 2', 'Non-Responsive Supplier',
-    'HM Red', 'HM Green', 'PCHM', 'Non HM', 'Review Repeated Items', 'All'
+    'HM Red', 'HM Green', 'PCHM', 'Non HM', 'Review Repeated Items', 'Suspected Items', 'All'
 ];
 
 const initializeData = () => {
@@ -68,10 +69,34 @@ const getSupplierMeta = (filter: string) => {
     ];
 };
 
-export default function PurchaseOrderView() {
+interface PurchaseOrderViewProps {
+    imo: string;
+}
+
+export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
     const [activeFilter, setActiveFilter] = useState('All');
     const [openSuppliers, setOpenSuppliers] = useState<string[]>(['s1']);
-    const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData());
+    const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(() => {
+        const base = initializeData();
+        const stored = JSON.parse(localStorage.getItem(`pending_clarifications_${imo}`) || '[]');
+        const mapped = stored.map((s: any) => ({
+            id: s.id,
+            emailStatus: 'SENT (Clarification)',
+            ihmProductCode: s.details?.[8] || 'N/A',
+            poNumber: s.poNumber,
+            mdsReq: s.date,
+            mdsRec: '',
+            itemDescription: s.itemDescription,
+            orderDate: s.date,
+            quantityTotal: `${s.details?.[16] || '0'} | 0 | ${s.details?.[16] || '0'}`,
+            unit: s.details?.[15] || 'PCS',
+            category: 'Suspected Items',
+            isSuspected: true,
+            selected: false,
+            vendorName: s.vendorName
+        }));
+        return [...base, ...mapped];
+    });
     const [searchTerm, setSearchTerm] = useState('');
     const [isFilterBarOpen, setIsFilterBarOpen] = useState(false);
 
@@ -88,7 +113,14 @@ export default function PurchaseOrderView() {
 
         const meta = getSupplierMeta(activeFilter);
         return meta.map((s, idx) => {
-            const supplierItems = filteredItems.slice(idx * 10, (idx + 1) * 10);
+            const supplierItems = filteredItems.filter(item => {
+                // If it's a suspected item, match by vendor name if we have it
+                if (item.isSuspected) {
+                    return s.name.toLowerCase().includes((item as any).vendorName?.toLowerCase() || '');
+                }
+                return true;
+            }).slice(idx * 10, (idx + 1) * 10);
+
             return {
                 ...s,
                 totalItems: `${supplierItems.length * 2}(${supplierItems.length})`,

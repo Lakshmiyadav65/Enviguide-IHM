@@ -15,15 +15,23 @@ import {
     CheckCircle2,
     ArrowLeft
 } from 'lucide-react';
+import { type VesselData, INITIAL_VESSELS } from '../data/vesselData';
 
 type ExcelData = any[][];
 
-const SHIP_MANAGERS_DATA = [
-    { name: 'Bernhard Schulte Shipmanagement (BSM)', vessels: [{ name: 'Express 1', imo: '9876543' }, { name: 'Ocean Star', imo: '9123456' }] },
-    { name: 'V.Ships', vessels: [{ name: 'Marine Leader', imo: '9543210' }, { name: 'Sky Voyager', imo: '9345678' }] },
-    { name: 'Columbia Shipmanagement', vessels: [{ name: 'Blue Danube', imo: '9678901' }, { name: 'Clipper Fortune', imo: '9890123' }] },
-    { name: 'Thome Ship Management', vessels: [{ name: 'Pacific Pride', imo: '9456789' }, { name: 'Thome Jewel', imo: '9123890' }] }
-];
+const getShipManagersFromVessels = (vessels: VesselData[]) => {
+    const managersMap: Record<string, { name: string; vessels: { name: string; imo: string }[] }> = {};
+
+    vessels.forEach(v => {
+        const managerName = v.shipManager || 'Unassigned';
+        if (!managersMap[managerName]) {
+            managersMap[managerName] = { name: managerName, vessels: [] };
+        }
+        managersMap[managerName].vessels.push({ name: v.name, imo: v.imoNo });
+    });
+
+    return Object.values(managersMap);
+};
 
 const ALL_MAPPING_FIELDS = [
     { id: 'vesselName', label: 'VESSEL NAME', req: true },
@@ -69,15 +77,21 @@ export default function UploadPurchaseOrder() {
     const [showMappingErrors, setShowMappingErrors] = useState(false);
     const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+    const shipManagersData = useMemo(() => {
+        const saved = localStorage.getItem('vessel_list_main');
+        const vessels = saved ? JSON.parse(saved) : INITIAL_VESSELS;
+        return getShipManagersFromVessels(vessels);
+    }, []);
+
     const filteredManagers = useMemo(() =>
-        SHIP_MANAGERS_DATA.filter(m => m.name.toLowerCase().includes(shipManager.toLowerCase())),
-        [shipManager]);
+        shipManagersData.filter(m => m.name.toLowerCase().includes(shipManager.toLowerCase())),
+        [shipManager, shipManagersData]);
 
     const filteredVessels = useMemo(() => {
-        const manager = SHIP_MANAGERS_DATA.find(m => m.name === shipManager);
+        const manager = shipManagersData.find(m => m.name === shipManager);
         if (!manager) return [];
         return manager.vessels.filter(v => v.name.toLowerCase().includes(shipName.toLowerCase()));
-    }, [shipManager, shipName]);
+    }, [shipManager, shipName, shipManagersData]);
 
     const showToast = (title: string, subtitle: string, type: 'success' | 'error' = 'success') => {
         setToast({ title, subtitle, visible: true, type });

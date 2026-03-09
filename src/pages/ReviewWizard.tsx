@@ -1,6 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import './ReviewWizard.css';
-import { ChevronDown } from 'lucide-react';
+import {
+    ChevronDown,
+    Send,
+    X,
+    Mail,
+    Minus,
+    Maximize2,
+    Type,
+    Paperclip,
+    Link as LinkIcon,
+    Smile,
+    Image,
+    Trash2,
+    FileUp
+} from 'lucide-react';
 
 interface ReviewWizardProps {
     imo: string;
@@ -13,6 +27,41 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
     const [step, setStep] = useState(1);
     const [data, setData] = useState<any[][]>([]);
     const [visibleCols, setVisibleCols] = useState<boolean[]>([]);
+    const [showMailModal, setShowMailModal] = useState(false);
+    const [mailContent, setMailContent] = useState({
+        to: '',
+        subject: '',
+        body: ''
+    });
+    const [suspectedItems, setSuspectedItems] = useState<any[]>([]);
+    const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const toInputRef = useRef<HTMLInputElement>(null);
+
+    // Recipient chip state
+    const [toChips, setToChips] = useState<string[]>([]);
+    const [toInputVal, setToInputVal] = useState('');
+    const [showCc, setShowCc] = useState(false);
+    const [showBcc, setShowBcc] = useState(false);
+    const [ccVal, setCcVal] = useState('');
+    const [bccVal, setBccVal] = useState('');
+
+    // Parse emails into chips when modal opens
+    const initChips = (emailStr: string) => {
+        const chips = emailStr.split(',').map(e => e.trim()).filter(Boolean);
+        setToChips(chips);
+        setToInputVal('');
+    };
+
+    const addChip = (val: string) => {
+        const trimmed = val.trim();
+        if (trimmed) setToChips(prev => [...prev, trimmed]);
+        setToInputVal('');
+    };
+
+    // Colour palette for avatar circles
+    const chipColors = ['#1a73e8', '#0f9d58', '#f29900', '#ea4335', '#9c27b0', '#00acc1', '#e91e63', '#ff5722'];
+    const getChipColor = (email: string) => chipColors[email.charCodeAt(0) % chipColors.length];
 
     // Excel-like Drag selection
     const [dragStart, setDragStart] = useState<{ r: number, c: number } | null>(null);
@@ -33,54 +82,19 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
 
     const [, setHistory] = useState<any[][][]>([]);
 
-    // State removed: suspectedCol unused
-
     useEffect(() => {
         const rows = localStorage.getItem(`audit_rows_${imo}`);
         if (rows) {
             const parsed = JSON.parse(rows);
             setData(parsed);
-
-            // Assume the first column is vesselName, second is poNumber from our new map
-            // Adjust lengths
             setVisibleCols(new Array(parsed[0]?.length || 0).fill(true));
             setColumnWidths(new Array(parsed[0]?.length || 0).fill(150));
         } else {
-            // Default sample headers matching our new mandated structure
-            const sampleHeaders = [
-                'Name', 'Vessel Name', 'PO Number', 'IMO Number',
-                'PO Sent Date', 'MD Requested Date', 'Item Description', 'Is Suspected',
-                'IMPA Code', 'ISSA Code', 'Equipment Code', 'Equipment Name',
-                'Maker', 'Model', 'Part Number', 'Unit', 'Quantity', 'Vendor Remark',
-                'Vendor Email', 'Vendor Name'
-            ];
-            const sampleRows = Array.from({ length: 25 }).map((_, i) => [
-                vesselName, // Name (Project)
-                vesselName, // Vessel Name
-                `PO-123${456 + i}`,
-                imo,
-                '2026-02-20', // PO Sent Date
-                '2026-02-19', // MD Requested Date
-                'Main Battery Pack', // Item Description
-                'No', // Is Suspected
-                '46072',
-                '564362',
-                'EQ-001',
-                'Battery',
-                'Exide',
-                'XP-200',
-                'PN-99',
-                'PCS',
-                '2',
-                'Urgent delivery required',
-                'supplier@example.com',
-                'Global Marine Parts'
-            ]);
-            setData([sampleHeaders, ...sampleRows]);
-            setVisibleCols(new Array(sampleHeaders.length).fill(true));
-            setColumnWidths(new Array(sampleHeaders.length).fill(150));
+            setData([]);
+            setVisibleCols([]);
+            setColumnWidths([]);
         }
-    }, [imo, vesselName]);
+    }, [imo]);
 
     const pushToHistory = useCallback(() => {
         setHistory(prev => [...prev.slice(-49), JSON.parse(JSON.stringify(data))]);
@@ -125,9 +139,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
             const startC = Math.min(dragStart.c, dragEnd.c);
             const endC = Math.max(dragStart.c, dragEnd.c);
 
-            // Anchor value is from the drag start cell
             const sourceValue = data[dragStart.r][dragStart.c];
-
             const newData = JSON.parse(JSON.stringify(data));
             for (let r = startR; r <= endR; r++) {
                 for (let c = startC; c <= endC; c++) {
@@ -215,20 +227,62 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
         );
 
     const nextStep = () => {
-        // Persist data to localStorage on every step transition or finish
         localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(data));
+        if (step < 3) setStep(step + 1);
+        else handleFinalize();
+    };
 
-        if (step < 3) {
-            setStep(step + 1);
-        }
-        else {
+    const handleFinalize = () => {
+        const header = data[0];
+        const suspectedIdx = header.indexOf('Is Suspected');
+        const descIdx = header.indexOf('Item Description');
+        const poIdx = header.indexOf('PO Number');
+        const emailIdx = header.indexOf('Vendor Email');
+
+        const suspected = data.slice(1).filter(row => row[suspectedIdx] === 'Yes');
+
+        if (suspected.length > 0) {
+            setSuspectedItems(suspected);
+            const vendorEmails = Array.from(new Set(suspected.map(r => r[emailIdx]).filter(e => e))) as string[];
+            const body = `Dear Team,\n\nWe are currently reviewing the IHM documentation for ${vesselName} (IMO: ${imo}). During our audit, we identified some items that require additional clarification or documentation (SDoC/MD).\n\nSuspected Items List:\n${suspected.map((r, i) => `${i + 1}. PO: ${r[poIdx]} - ${r[descIdx]}`).join('\n')}\n\nPlease provide the requested info at your earliest convenience.\n\nBest Regards,\nIHM Audit Team`;
+
+            setMailContent({
+                to: vendorEmails.join(', '),
+                subject: `Clarification Needed: IHM Audit - ${vesselName} (${imo})`,
+                body: body
+            });
+            initChips(vendorEmails.join(', '));
+            setShowMailModal(true);
+        } else {
             onComplete();
         }
     };
 
+    const handleSendMail = () => {
+        const existingClarifications = JSON.parse(localStorage.getItem(`pending_clarifications_${imo}`) || '[]');
+        const newClarifications = [...existingClarifications, ...suspectedItems.map(row => ({
+            id: Date.now() + Math.random(),
+            imo,
+            vesselName,
+            poNumber: row[data[0].indexOf('PO Number')],
+            itemDescription: row[data[0].indexOf('Item Description')],
+            vendorName: row[data[0].indexOf('Vendor Name')],
+            vendorEmail: row[data[0].indexOf('Vendor Email')],
+            status: 'Clarification Pending',
+            date: new Date().toISOString().split('T')[0],
+            details: row
+        }))];
+
+        localStorage.setItem(`pending_clarifications_${imo}`, JSON.stringify(newClarifications));
+        const header = data[0];
+        const suspectedIdx = header.indexOf('Is Suspected');
+        const newData = [header, ...data.slice(1).filter(row => row[suspectedIdx] !== 'Yes')];
+        localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(newData));
+        onComplete();
+    };
+
     return (
         <div className="review-wizard-overlay" onMouseUp={handleMouseUp} onMouseLeave={() => isDragging.current = false}>
-            {/* Header */}
             <div className="wizard-header">
                 <div className={`step-item ${step >= 1 ? 'active' : ''}`} style={{ justifySelf: 'start' }}>
                     <div className="step-number">1</div>
@@ -244,130 +298,106 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                 </div>
             </div>
 
-            {/* Main Content Area */}
             <div className="wizard-content">
                 {step === 1 && (
                     <>
                         <div className="wizard-title-row">
-                            <div className="wizard-title-left">
-                                <h1>Review & Audit Purchase Orders</h1>
-                                <p>{vesselName} • {imo}</p>
-                            </div>
+                            <h1>Review & Audit Purchase Orders</h1>
+                            <p>{vesselName} • {imo}</p>
                         </div>
-
-                        {/* Toolbar — column toggles on the left, bulk buttons on the right */}
                         <div className="toolbar-container">
                             <div className="col-toggles">
-                                {data[0]?.map((header, i) => (
-                                    <label key={i} className="col-toggle">
-                                        <input type="checkbox" checked={visibleCols[i]} onChange={() => {
-                                            const n = [...visibleCols]; n[i] = !n[i]; setVisibleCols(n);
-                                        }} /> {String(header)}
+                                {data[0]?.map((col, idx) => (
+                                    <label key={idx} className="col-toggle">
+                                        <input type="checkbox" checked={visibleCols[idx]} onChange={() => {
+                                            const next = [...visibleCols]; next[idx] = !next[idx]; setVisibleCols(next);
+                                        }} />
+                                        {col}
                                     </label>
                                 ))}
                             </div>
-                            {/* Bulk action buttons — right side of toolbar */}
                             <div className="bulk-actions">
-                                <button className="bulk-btn accept">✓ Bulk Accept</button>
-                                <button className="bulk-btn reject">✕ Bulk Reject</button>
+                                <button className="bulk-btn accept" onClick={() => {
+                                    pushToHistory();
+                                    const suspectedIdx = data[0].indexOf('Is Suspected');
+                                    setData(prev => [prev[0], ...prev.slice(1).map(r => {
+                                        const next = [...r]; next[suspectedIdx] = 'No'; return next;
+                                    })]);
+                                }}>Bulk Accept</button>
+                                <button className="bulk-btn reject" onClick={() => {
+                                    pushToHistory();
+                                    const suspectedIdx = data[0].indexOf('Is Suspected');
+                                    setData(prev => [prev[0], ...prev.slice(1).map(r => {
+                                        const next = [...r]; next[suspectedIdx] = 'Yes'; return next;
+                                    })]);
+                                }}>Bulk Reject</button>
                             </div>
                         </div>
 
-                        {/* Main layout: scrollable table + fixed sidebar */}
                         <div className="main-layout">
                             <div className="table-section">
                                 <table className="wizard-table">
                                     <thead>
                                         <tr>
-                                            {data[0]?.map((header, i) => {
-                                                return visibleCols[i] && (
-                                                    <th key={`h_${i}`} style={{ width: columnWidths[i], minWidth: columnWidths[i] }}>
-                                                        <div className="header-content">
-                                                            <span>{String(header)}</span>
-                                                            <button className="filter-trigger" onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === i ? null : i); }}>
-                                                                <ChevronDown size={12} />
-                                                            </button>
-                                                        </div>
-                                                        <div className="resizer" onMouseDown={(e) => handleResizeStart(e, i)} />
-                                                        {activeMenu === i && (
-                                                            <div className="column-menu" onClick={e => e.stopPropagation()}>
-                                                                <div className="menu-item" onClick={() => insertColumn(i, 'left')}>Insert column left</div>
-                                                                <div className="menu-item" onClick={() => insertColumn(i, 'right')}>Insert column right</div>
-                                                                <div className="menu-item" onClick={() => { const n = [...visibleCols]; n[i] = false; setVisibleCols(n); setActiveMenu(null); }}>Remove column</div>
-                                                                <div className="menu-divider" />
-                                                                <div className="menu-filter-section">
-                                                                    <div className="menu-filter-label">Filter by value:</div>
-                                                                    <input className="menu-search-input" placeholder="Search values..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)} autoFocus />
-                                                                    <div className="menu-value-list">
-                                                                        {(String(header).trim().toLowerCase() === 'is suspected' ? ['No', 'Yes'] : Array.from(new Set(data.slice(1).map(r => String(r[i])).filter(v => v.trim() !== ""))))
-                                                                            .filter(v => v.toLowerCase().includes(filterSearch.toLowerCase()))
-                                                                            .map(val => (
-                                                                                <label key={val} className="menu-value-item">
-                                                                                    <input type="checkbox" checked={(filters[i] || []).includes(val)} onChange={() => {
-                                                                                        const cur = filters[i] || [];
-                                                                                        const next = cur.includes(val) ? cur.filter(v => v !== val) : [...cur, val];
-                                                                                        setFilters({ ...filters, [i]: next });
-                                                                                    }} />
-                                                                                    <span>{String(val).trim()}</span>
-                                                                                </label>
-                                                                            ))}
-                                                                    </div>
-                                                                    <div className="menu-footer">
-                                                                        <button className="menu-btn ok" onClick={() => setActiveMenu(null)}>Apply</button>
-                                                                        <button className="menu-btn" onClick={() => { setFilters({}); setActiveMenu(null); }}>Clear</button>
-                                                                    </div>
+                                            {data[0]?.map((col, idx) => visibleCols[idx] && (
+                                                <th key={idx} style={{ width: columnWidths[idx] }}>
+                                                    <div className="header-content">
+                                                        <span>{col}</span>
+                                                        <button className="filter-trigger" onClick={() => setActiveMenu(activeMenu === idx ? null : idx)}>
+                                                            <ChevronDown size={14} />
+                                                        </button>
+                                                    </div>
+                                                    <div className="resizer" onMouseDown={e => handleResizeStart(e, idx)} />
+                                                    {activeMenu === idx && (
+                                                        <div className="column-menu">
+                                                            <div className="menu-item" onClick={() => {
+                                                                const next = [...visibleCols]; next[idx] = false; setVisibleCols(next); setActiveMenu(null);
+                                                            }}>Hide Column</div>
+                                                            <div className="menu-divider" />
+                                                            <div className="menu-item" onClick={() => insertColumn(idx, 'left')}>Insert Left</div>
+                                                            <div className="menu-item" onClick={() => insertColumn(idx, 'right')}>Insert Right</div>
+                                                            <div className="menu-divider" />
+                                                            <div className="menu-filter-section">
+                                                                <input className="menu-search-input" placeholder="Filter..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)} />
+                                                                <div className="menu-value-list">
+                                                                    {Array.from(new Set(data.slice(1).map(r => String(r[idx])))).filter(v => v.toLowerCase().includes(filterSearch.toLowerCase())).map((val, vi) => (
+                                                                        <label key={vi} className="menu-value-item">
+                                                                            <input type="checkbox" checked={!filters[idx] || filters[idx].includes(val)} onChange={() => {
+                                                                                const current = filters[idx] || Array.from(new Set(data.slice(1).map(r => String(r[idx]))));
+                                                                                const next = current.includes(val) ? current.filter(v => v !== val) : [...current, val];
+                                                                                setFilters({ ...filters, [idx]: next });
+                                                                            }} />
+                                                                            {val}
+                                                                        </label>
+                                                                    ))}
                                                                 </div>
                                                             </div>
-                                                        )}
-                                                    </th>
-                                                );
-                                            })}
+                                                        </div>
+                                                    )}
+                                                </th>
+                                            ))}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {filteredRows.map(({ row, originalIdx }) => (
                                             <tr key={originalIdx}>
-                                                {row.map((cell: any, ci: number) => visibleCols[ci] && (
-                                                    <td key={ci}
-                                                        style={{ width: columnWidths[ci], maxWidth: columnWidths[ci] }}
-                                                        onMouseDown={() => handleMouseDown(originalIdx, ci)}
-                                                        onMouseEnter={() => handleMouseEnter(originalIdx, ci)}
-                                                        onDoubleClick={() => handleCellDoubleClick(originalIdx, ci)}
-                                                    >
+                                                {row.map((cell, ci) => visibleCols[ci] && (
+                                                    <td key={ci} onMouseDown={() => handleMouseDown(originalIdx, ci)} onMouseEnter={() => handleMouseEnter(originalIdx, ci)} onDoubleClick={() => handleCellDoubleClick(originalIdx, ci)}>
                                                         <div className={`cell-inner ${getSelectionClass(originalIdx, ci)}`}>
-                                                            {String(data[0][ci]) === 'Is Suspected' ? (
-                                                                <select
-                                                                    className="suspicious-select"
-                                                                    value={String(cell)}
-                                                                    onChange={(e) => {
-                                                                        pushToHistory();
-                                                                        setData(prev => {
-                                                                            const nd = JSON.parse(JSON.stringify(prev));
-                                                                            nd[originalIdx][ci] = e.target.value;
-                                                                            return nd;
-                                                                        });
-                                                                    }}
-                                                                >
-                                                                    <option value="No">No</option>
-                                                                    <option value="Yes">Yes</option>
-                                                                </select>
-                                                            ) : editingCell?.r === originalIdx && editingCell.c === ci ? (
-                                                                <input
-                                                                    autoFocus
-                                                                    className="cell-input"
-                                                                    value={String(cell)}
-                                                                    onChange={(e) => {
-                                                                        setData(prev => {
-                                                                            const nd = JSON.parse(JSON.stringify(prev));
-                                                                            nd[originalIdx][ci] = e.target.value;
-                                                                            return nd;
-                                                                        });
-                                                                    }}
-                                                                    onFocus={() => pushToHistory()}
-                                                                    onKeyDown={(e) => handleKeyDown(e, originalIdx, ci)}
-                                                                    onBlur={() => setEditingCell(null)}
-                                                                />
-                                                            ) : String(cell)}
+                                                            {editingCell?.r === originalIdx && editingCell?.c === ci ? (
+                                                                <input className="cell-input" autoFocus value={cell} onChange={e => {
+                                                                    const nd = [...data]; nd[originalIdx][ci] = e.target.value; setData(nd);
+                                                                }} onBlur={() => setEditingCell(null)} onKeyDown={e => handleKeyDown(e, originalIdx, ci)} />
+                                                            ) : (
+                                                                data[0][ci] === 'Is Suspected' ? (
+                                                                    <select className="suspicious-select" value={cell} onChange={e => {
+                                                                        const nd = [...data]; nd[originalIdx][ci] = e.target.value; setData(nd);
+                                                                    }}>
+                                                                        <option value="No">No</option>
+                                                                        <option value="Yes">Yes</option>
+                                                                    </select>
+                                                                ) : cell
+                                                            )}
                                                         </div>
                                                     </td>
                                                 ))}
@@ -376,114 +406,204 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                     </tbody>
                                 </table>
                             </div>
+
                             <div className="summary-sidebar">
                                 <div className="summary-header">Review Summary</div>
                                 <div className="summary-body">
-                                    {data[0]?.includes('Is Suspected') && visibleCols[data[0].indexOf('Is Suspected')] && (
-                                        <div className="summary-group">
-                                            <h4>Suspected Items</h4>
-                                            {data.slice(1).filter(r => r[data[0].indexOf('Is Suspected')] === 'Yes').length > 0 ? (
-                                                <div className="summary-list">
-                                                    {data.slice(1)
-                                                        .filter(r => r[data[0].indexOf('Is Suspected')] === 'Yes')
-                                                        .map((r, i) => (
-                                                            <div key={i} className="summary-list-item">
-                                                                <span className="dot danger" />
-                                                                <span className="item-name">{String(r[data[0].indexOf('Item Description')] || 'Unknown Item')}</span>
-                                                            </div>
-                                                        ))
-                                                    }
+                                    <div className="summary-group">
+                                        <h4>Suspected Items ({data.slice(1).filter(r => r[data[0]?.indexOf('Is Suspected')] === 'Yes').length})</h4>
+                                        <div className="summary-list">
+                                            {data.slice(1).filter(r => r[data[0]?.indexOf('Is Suspected')] === 'Yes').map((r, i) => (
+                                                <div key={i} className="summary-list-item">
+                                                    <div className="dot danger" />
+                                                    <span className="item-name">{r[data[0]?.indexOf('Item Description')]}</span>
                                                 </div>
-                                            ) : (
-                                                <div className="summary-empty">No Suspected Items Identified</div>
-                                            )}
+                                            ))}
                                         </div>
-                                    )}
-                                    <div className="summary-group">
-                                        <h4>Inactive Suppliers</h4>
-                                        <div className="summary-empty">All Suppliers Are Active</div>
                                     </div>
                                     <div className="summary-group">
-                                        <h4>New Suppliers</h4>
-                                        <div className="summary-empty">No New Suppliers Added</div>
-                                    </div>
-                                    <div className="summary-group">
-                                        <h4>Active Supplier New Emails</h4>
-                                        <div className="summary-empty">No Supplier New Emails Added</div>
+                                        <h4>Verified Suppliers</h4>
+                                        <div className="summary-list">
+                                            {Array.from(new Set(data.slice(1).map(r => r[data[0]?.indexOf('Vendor Name')]))).map((v, i) => (
+                                                <div key={i} className="summary-list-item">
+                                                    <div className="dot" style={{ background: '#10B981' }} />
+                                                    <span>{String(v)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
                     </>
                 )}
 
                 {step === 2 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-                        <div className="wizard-title-row">
-                            <h1>Supplier Product Creation</h1>
-                        </div>
-                        <div className="table-section" style={{ border: 'none', borderTop: '1px solid #E2E8F0' }}>
-                            <table className="wizard-table">
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: 100 }}>Is Active</th>
-                                        {data[0]?.map((h, i) => (
-                                            <th key={i} style={{ width: columnWidths[i] || 150 }}>{String(h)}</th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {data.slice(1).map((row, ri) => (
-                                        <tr key={ri}>
-                                            <td><div className="cell-inner" style={{ justifyContent: 'center' }}>
-                                                <input type="checkbox" defaultChecked />
-                                            </div></td>
-                                            {row.map((cell, ci) => (
-                                                <td key={ci}><div className="cell-inner">{String(cell)}</div></td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                    <div style={{ padding: '40px', textAlign: 'center' }}>
+                        <h1>Supplier & Product Mapping</h1>
+                        <p>This automated phase verifies and creates entries in the global materials library.</p>
+                        <div style={{ marginTop: '40px', padding: '20px', background: '#F0F9FF', borderRadius: '12px', display: 'inline-block' }}>
+                            <p style={{ fontWeight: 700, color: '#0369A1' }}>{data.length - 1} Items ready for validation</p>
                         </div>
                     </div>
                 )}
 
                 {step === 3 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-                        <div className="wizard-title-row">
-                            <h1>Final Review & Confirmation</h1>
-                        </div>
-                        <div className="table-section" style={{ border: 'none', borderTop: '1px solid #E2E8F0', background: '#F8FAFC' }}>
-                            <table className="wizard-table" style={{ opacity: 0.8 }}>
-                                <tbody>
-                                    {data.slice(1).map((row, ri) => (
-                                        <tr key={ri}>
-                                            {row.map((cell, ci) => (
-                                                <td key={ci}><div className="cell-inner">{String(cell)}</div></td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                    <div style={{ padding: '40px', textAlign: 'center' }}>
+                        <h1>Final Review & Confirmation</h1>
+                        <p>Please double check the mappings before moving to the audit registry.</p>
+                        <button className="footer-btn next" style={{ marginTop: '20px' }} onClick={handleFinalize}>Finalize Review</button>
                     </div>
                 )}
             </div>
 
-            {/* Footer */}
+            {showMailModal && (
+                <div className="gmail-overlay">
+                    <div className="gmail-compose">
+                        {/* Header */}
+                        <div className="gmail-header">
+                            <span className="gmail-title">New Message</span>
+                            <div className="gmail-header-actions">
+                                <Minus size={18} />
+                                <Maximize2 size={16} />
+                                <X size={20} className="close-icon" onClick={() => setShowMailModal(false)} />
+                            </div>
+                        </div>
+
+                        {/* To — Gmail chip-style recipient row */}
+                        <div className="gmail-row gmail-to-row" onClick={() => toInputRef.current?.focus()}>
+                            <span className="gmail-label">To</span>
+                            <div className="gmail-chips-area">
+                                {toChips.map((chip, i) => (
+                                    <span key={i} className="recipient-chip">
+                                        <span
+                                            className="recipient-avatar"
+                                            style={{ background: getChipColor(chip) }}
+                                        >
+                                            {chip[0].toUpperCase()}
+                                        </span>
+                                        <span className="recipient-label">{chip}</span>
+                                        <button
+                                            className="recipient-remove"
+                                            onClick={e => { e.stopPropagation(); setToChips(prev => prev.filter((_, fi) => fi !== i)); }}
+                                        >×</button>
+                                    </span>
+                                ))}
+                                <input
+                                    ref={toInputRef}
+                                    className="gmail-input chips-input"
+                                    value={toInputVal}
+                                    placeholder={toChips.length === 0 ? 'Recipients' : ''}
+                                    onChange={e => setToInputVal(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' || e.key === ',') {
+                                            e.preventDefault();
+                                            addChip(toInputVal);
+                                        } else if (e.key === 'Backspace' && toInputVal === '' && toChips.length > 0) {
+                                            setToChips(prev => prev.slice(0, -1));
+                                        }
+                                    }}
+                                    onBlur={() => { if (toInputVal.trim()) addChip(toInputVal); }}
+                                />
+                            </div>
+                            <div className="gmail-cc-bcc-btns">
+                                {!showCc && <button className="cc-bcc-btn" onClick={e => { e.stopPropagation(); setShowCc(true); }}>Cc</button>}
+                                {!showBcc && <button className="cc-bcc-btn" onClick={e => { e.stopPropagation(); setShowBcc(true); }}>Bcc</button>}
+                            </div>
+                        </div>
+
+                        {/* Cc */}
+                        {showCc && (
+                            <div className="gmail-row">
+                                <span className="gmail-label">Cc</span>
+                                <input className="gmail-input" value={ccVal} onChange={e => setCcVal(e.target.value)} placeholder="" />
+                            </div>
+                        )}
+
+                        {/* Bcc */}
+                        {showBcc && (
+                            <div className="gmail-row">
+                                <span className="gmail-label">Bcc</span>
+                                <input className="gmail-input" value={bccVal} onChange={e => setBccVal(e.target.value)} placeholder="" />
+                            </div>
+                        )}
+
+                        {/* Subject with label */}
+                        <div className="gmail-row">
+                            <span className="gmail-label">Subject</span>
+                            <input className="gmail-input" value={mailContent.subject} onChange={e => setMailContent({ ...mailContent, subject: e.target.value })} />
+                        </div>
+
+                        {/* Body */}
+                        <div className="gmail-body">
+                            <textarea className="gmail-content" autoFocus value={mailContent.body} onChange={e => setMailContent({ ...mailContent, body: e.target.value })} />
+
+                            {/* Attached files chips */}
+                            {attachedFiles.length > 0 && (
+                                <div className="gmail-attachments">
+                                    {attachedFiles.map((file, i) => (
+                                        <div key={i} className="attach-chip">
+                                            <Paperclip size={13} />
+                                            <span>{file.name}</span>
+                                            <button className="chip-remove" onClick={() => setAttachedFiles(prev => prev.filter((_, fi) => fi !== i))}>×</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Upload CTA */}
+                            <div className="gmail-upload-cta">
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    multiple
+                                    style={{ display: 'none' }}
+                                    onChange={e => {
+                                        if (e.target.files) {
+                                            setAttachedFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+                                        }
+                                    }}
+                                />
+                                <button className="upload-cta-btn" onClick={() => fileInputRef.current?.click()}>
+                                    <FileUp size={16} />
+                                    Attach Supporting Documents
+                                </button>
+                                <span className="upload-hint">MD / SDoC / Certificates</span>
+                            </div>
+                        </div>
+
+                        {/* Footer toolbar */}
+                        <div className="gmail-footer">
+                            <div className="footer-left">
+                                <button className="gmail-send-btn" onClick={handleSendMail}>
+                                    <Send size={15} style={{ marginRight: 6 }} />
+                                    Send
+                                </button>
+                                <div className="gmail-tool-icons">
+                                    <span className="tool-icon-btn"><Type size={22} /></span>
+                                    <span className="tool-icon-btn" onClick={() => fileInputRef.current?.click()}><Paperclip size={22} /></span>
+                                    <span className="tool-icon-btn"><LinkIcon size={22} /></span>
+                                    <span className="tool-icon-btn"><Smile size={22} /></span>
+                                    <span className="tool-icon-btn"><Image size={22} /></span>
+                                    <span className="tool-icon-btn"><Mail size={22} /></span>
+                                </div>
+                            </div>
+                            <div className="footer-right">
+                                <span className="tool-icon-btn trash-icon" onClick={() => setShowMailModal(false)}><Trash2 size={22} /></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="wizard-footer">
                 <div className="footer-stats">
                     <span>Total Line Items: <strong>{data.length - 1}</strong></span>
-                    <span>Audit POs: <strong>17</strong></span>
                     <span>Verified: <strong>{filteredRows.length}/{data.length - 1}</strong></span>
                 </div>
                 <div className="footer-btns">
                     <button className="footer-btn discard" onClick={onClose}>Discard Changes</button>
-                    <button className="footer-btn next" onClick={() => (step === 3 ? onComplete() : nextStep())}>
-                        {step === 3 ? 'FINALIZE REVIEW' : 'NEXT STEP'}
-                    </button>
+                    <button className="footer-btn next" onClick={nextStep}>{step === 3 ? 'FINALIZE REVIEW' : 'NEXT STEP'}</button>
                 </div>
             </div>
         </div>
