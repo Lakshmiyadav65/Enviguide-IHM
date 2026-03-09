@@ -13,7 +13,8 @@ import {
     Smile,
     Image,
     Trash2,
-    FileUp
+    FileUp,
+    CheckCircle2
 } from 'lucide-react';
 
 interface ReviewWizardProps {
@@ -45,6 +46,10 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
     const [showBcc, setShowBcc] = useState(false);
     const [ccVal, setCcVal] = useState('');
     const [bccVal, setBccVal] = useState('');
+
+    // Toast state
+    const [showToast, setShowToast] = useState(false);
+    const [toastData, setToastData] = useState({ title: '', message: '' });
 
     // Parse emails into chips when modal opens
     const initChips = (emailStr: string) => {
@@ -278,21 +283,33 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
         const suspectedIdx = header.indexOf('Is Suspected');
         const newData = [header, ...data.slice(1).filter(row => row[suspectedIdx] !== 'Yes')];
         localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(newData));
-        onComplete();
+
+        // Show success toast
+        setToastData({
+            title: 'Mail Sent Successfully',
+            message: `Clarification request has been sent to ${toChips.join(', ')}`
+        });
+        setShowToast(true);
+        setShowMailModal(false);
+
+        // Wait for toast before completing
+        setTimeout(() => {
+            onComplete();
+        }, 3000);
     };
 
     return (
         <div className="review-wizard-overlay" onMouseUp={handleMouseUp} onMouseLeave={() => isDragging.current = false}>
             <div className="wizard-header">
-                <div className={`step-item ${step >= 1 ? 'active' : ''}`} style={{ justifySelf: 'start' }}>
+                <div className={`step - item ${step >= 1 ? 'active' : ''} `} style={{ justifySelf: 'start' }}>
                     <div className="step-number">1</div>
                     <span>Adjust Data or Suppliers</span>
                 </div>
-                <div className={`step-item ${step >= 2 ? 'active' : ''}`} style={{ justifySelf: 'center' }}>
+                <div className={`step - item ${step >= 2 ? 'active' : ''} `} style={{ justifySelf: 'center' }}>
                     <div className="step-number">2</div>
                     <span>Supplier Product Creation</span>
                 </div>
-                <div className={`step-item ${step >= 3 ? 'active' : ''}`} style={{ justifySelf: 'end' }}>
+                <div className={`step - item ${step >= 3 ? 'active' : ''} `} style={{ justifySelf: 'end' }}>
                     <div className="step-number">3</div>
                     <span>Finish</span>
                 </div>
@@ -383,7 +400,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                             <tr key={originalIdx}>
                                                 {row.map((cell, ci) => visibleCols[ci] && (
                                                     <td key={ci} onMouseDown={() => handleMouseDown(originalIdx, ci)} onMouseEnter={() => handleMouseEnter(originalIdx, ci)} onDoubleClick={() => handleCellDoubleClick(originalIdx, ci)}>
-                                                        <div className={`cell-inner ${getSelectionClass(originalIdx, ci)}`}>
+                                                        <div className={`cell - inner ${getSelectionClass(originalIdx, ci)} `}>
                                                             {editingCell?.r === originalIdx && editingCell?.c === ci ? (
                                                                 <input className="cell-input" autoFocus value={cell} onChange={e => {
                                                                     const nd = [...data]; nd[originalIdx][ci] = e.target.value; setData(nd);
@@ -606,6 +623,21 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                     <button className="footer-btn next" onClick={nextStep}>{step === 3 ? 'FINALIZE REVIEW' : 'NEXT STEP'}</button>
                 </div>
             </div>
+            {/* Design-Accurate Notification Toast */}
+            {showToast && (
+                <div className="audit-success-toast">
+                    <div className="toast-content-wrapper">
+                        <div className="toast-icon-green">
+                            <CheckCircle2 size={24} fill="#10B981" color="white" />
+                        </div>
+                        <div className="toast-text-area">
+                            <h3>{toastData.title}</h3>
+                            <p>{toastData.message}</p>
+                        </div>
+                    </div>
+                    <button className="undo-action-btn" onClick={() => setShowToast(false)}>UNDO</button>
+                </div>
+            )}
         </div>
     );
 };
