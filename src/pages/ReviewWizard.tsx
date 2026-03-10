@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './ReviewWizard.css';
 import {
     ChevronDown,
@@ -81,6 +81,9 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
     // Column resizing
     const [columnWidths, setColumnWidths] = useState<number[]>([]);
     const resizingCol = useRef<{ idx: number, startX: number, startWidth: number } | null>(null);
+
+    // Row Selection
+    const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
 
     // Edit state
     const [editingCell, setEditingCell] = useState<{ r: number, c: number } | null>(null);
@@ -224,12 +227,65 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
         setActiveMenu(null);
     };
 
-    const filteredRows = data.slice(1).map((row, i) => ({ row, originalIdx: i + 1 }))
-        .filter(({ row }) =>
-            Object.entries(filters).every(([colIdx, activeValues]) =>
-                !activeValues || activeValues.length === 0 || activeValues.includes(String(row[parseInt(colIdx)]))
-            )
-        );
+    const filteredRows = useMemo(() => {
+        return data.slice(1).map((row, i) => ({ row, originalIdx: i + 1 }))
+            .filter(({ row }) =>
+                Object.entries(filters).every(([colIdx, activeValues]) => {
+                    if (!activeValues) return true;
+                    if (activeValues.length === 0) return false;
+                    const cellVal = String(row[parseInt(colIdx)] || '').trim();
+                    return activeValues.includes(cellVal);
+                })
+            );
+    }, [data, filters]);
+
+    // Selection handlers
+    const toggleRowSelection = (idx: number) => {
+        const next = new Set(selectedRows);
+        if (next.has(idx)) next.delete(idx);
+        else next.add(idx);
+        setSelectedRows(next);
+    };
+
+    const toggleAll = () => {
+        if (selectedRows.size === filteredRows.length && filteredRows.length > 0) {
+            setSelectedRows(new Set());
+        } else {
+            setSelectedRows(new Set(filteredRows.map((f: any) => f.originalIdx)));
+        }
+    };
+
+    const handleDeleteSelected = () => {
+        if (selectedRows.size === 0) return;
+        pushToHistory();
+        const newData = data.filter((_, idx) => idx === 0 || !selectedRows.has(idx));
+        setData(newData);
+        setSelectedRows(new Set());
+    };
+
+    const handleBulkAccept = () => {
+        pushToHistory();
+        const suspectedIdx = data[0].indexOf('Is Suspected');
+        setData(prev => [
+            prev[0],
+            ...prev.slice(1).map((r, i) => {
+                if (selectedRows.size > 0 && !selectedRows.has(i + 1)) return r;
+                const next = [...r]; next[suspectedIdx] = 'No'; return next;
+            })
+        ]);
+    };
+
+    const handleBulkReject = () => {
+        pushToHistory();
+        const suspectedIdx = data[0].indexOf('Is Suspected');
+        setData(prev => [
+            prev[0],
+            ...prev.slice(1).map((r, i) => {
+                if (selectedRows.size > 0 && !selectedRows.has(i + 1)) return r;
+                const next = [...r]; next[suspectedIdx] = 'Yes'; return next;
+            })
+        ]);
+    };
 
     const nextStep = () => {
         localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(data));
@@ -336,20 +392,17 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                 ))}
                             </div>
                             <div className="bulk-actions">
-                                <button className="bulk-btn accept" onClick={() => {
-                                    pushToHistory();
-                                    const suspectedIdx = data[0].indexOf('Is Suspected');
-                                    setData(prev => [prev[0], ...prev.slice(1).map(r => {
-                                        const next = [...r]; next[suspectedIdx] = 'No'; return next;
-                                    })]);
-                                }}>Bulk Accept</button>
-                                <button className="bulk-btn reject" onClick={() => {
-                                    pushToHistory();
-                                    const suspectedIdx = data[0].indexOf('Is Suspected');
-                                    setData(prev => [prev[0], ...prev.slice(1).map(r => {
-                                        const next = [...r]; next[suspectedIdx] = 'Yes'; return next;
-                                    })]);
-                                }}>Bulk Reject</button>
+                                {selectedRows.size > 0 && (
+                                    <button className="bulk-btn delete" onClick={handleDeleteSelected}>
+                                        <Trash2 size={12} /> Delete
+                                    </button>
+                                )}
+                                <button className="bulk-btn accept" onClick={handleBulkAccept}>
+                                    {selectedRows.size > 0 ? 'Accept Selected' : 'Bulk Accept'}
+                                </button>
+                                <button className="bulk-btn reject" onClick={handleBulkReject}>
+                                    {selectedRows.size > 0 ? 'Reject Selected' : 'Bulk Reject'}
+                                </button>
                             </div>
                         </div>
 
@@ -358,6 +411,17 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                 <table className="wizard-table">
                                     <thead>
                                         <tr>
+                                            <th style={{ width: 40, minWidth: 40, padding: '13px 8px' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="col-toggle-input"
+                                                        style={{ width: 14, height: 14, cursor: 'pointer' }}
+                                                        checked={selectedRows.size === filteredRows.length && filteredRows.length > 0}
+                                                        onChange={toggleAll}
+                                                    />
+                                                </div>
+                                            </th>
                                             {data[0]?.map((col, idx) => visibleCols[idx] && (
                                                 <th key={idx} style={{ width: columnWidths[idx] }}>
                                                     <div className="header-content">
@@ -379,16 +443,31 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                                             <div className="menu-filter-section">
                                                                 <input className="menu-search-input" placeholder="Filter..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)} />
                                                                 <div className="menu-value-list">
-                                                                    {Array.from(new Set(data.slice(1).map(r => String(r[idx])))).filter(v => v.toLowerCase().includes(filterSearch.toLowerCase())).map((val, vi) => (
-                                                                        <label key={vi} className="menu-value-item">
-                                                                            <input type="checkbox" checked={!filters[idx] || filters[idx].includes(val)} onChange={() => {
-                                                                                const current = filters[idx] || Array.from(new Set(data.slice(1).map(r => String(r[idx]))));
-                                                                                const next = current.includes(val) ? current.filter(v => v !== val) : [...current, val];
-                                                                                setFilters({ ...filters, [idx]: next });
-                                                                            }} />
-                                                                            {val}
-                                                                        </label>
-                                                                    ))}
+                                                                    {(() => {
+                                                                        const allValues = Array.from(new Set(data.slice(1).map(r =>
+                                                                            String(r[idx] || '').trim()
+                                                                        ))).filter(v => v !== '');
+
+                                                                        return allValues
+                                                                            .filter(v => v.toLowerCase().includes(filterSearch.toLowerCase()))
+                                                                            .sort((a, b) => a.localeCompare(b))
+                                                                            .map((val, vi) => (
+                                                                                <label key={vi} className="menu-value-item">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={!filters[idx] || filters[idx].includes(val)}
+                                                                                        onChange={() => {
+                                                                                            const current = filters[idx] || allValues;
+                                                                                            const next = current.includes(val)
+                                                                                                ? current.filter(v => v !== val)
+                                                                                                : [...current, val];
+                                                                                            setFilters({ ...filters, [idx]: next });
+                                                                                        }}
+                                                                                    />
+                                                                                    {val}
+                                                                                </label>
+                                                                            ));
+                                                                    })()}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -398,9 +477,17 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filteredRows.map(({ row, originalIdx }) => (
-                                            <tr key={originalIdx}>
-                                                {row.map((cell, ci) => visibleCols[ci] && (
+                                        {filteredRows.map(({ row, originalIdx }: any) => (
+                                            <tr key={originalIdx} className={selectedRows.has(originalIdx) ? 'row-selected' : ''}>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedRows.has(originalIdx)}
+                                                        onChange={() => toggleRowSelection(originalIdx)}
+                                                        style={{ cursor: 'pointer' }}
+                                                    />
+                                                </td>
+                                                {(row as any[]).map((cell: any, ci: number) => visibleCols[ci] && (
                                                     <td key={ci} onMouseDown={() => handleMouseDown(originalIdx, ci)} onMouseEnter={() => handleMouseEnter(originalIdx, ci)} onDoubleClick={() => handleCellDoubleClick(originalIdx, ci)}>
                                                         <div className={`cell - inner ${getSelectionClass(originalIdx, ci)} `}>
                                                             {editingCell?.r === originalIdx && editingCell?.c === ci ? (

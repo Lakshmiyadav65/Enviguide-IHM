@@ -258,6 +258,17 @@
     border-color: #FCA5A5;
 }
 
+.bulk-btn.delete {
+    background: #FFF7ED;
+    color: #EA580C;
+    border-color: #FED7AA;
+}
+
+.bulk-btn.delete:hover {
+    background: #FFEDD5;
+    border-color: #FB923C;
+}
+
 /* ── MAIN LAYOUT (Table + Sidebar) ────────────────────────── */
 .main-layout {
     display: flex;
@@ -307,6 +318,14 @@
 
 .wizard-table tr:hover td {
     background: rgba(0, 176, 250, 0.02);
+}
+
+.wizard-table tr.row-selected td {
+    background: rgba(0, 176, 250, 0.05) !important;
+}
+
+.wizard-table tr.row-selected:hover td {
+    background: rgba(0, 176, 250, 0.08) !important;
 }
 
 .wizard-table td {

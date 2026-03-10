@@ -232,8 +232,14 @@ export default function UploadPurchaseOrder() {
         localStorage.setItem('recentlyAddedAudit', JSON.stringify({ imo, timestamp: Date.now() }));
 
         // 2. Transform raw data to enforce exact column order requested
+        const header = excelData[0];
+        const bodyRows = excelData.slice(1).filter(row =>
+            row && row.some(cell => cell !== undefined && cell !== null && String(cell).trim() !== '')
+        );
+        const dataToProcess = [header, ...bodyRows];
+
         const mappedIndices = new Set(Object.values(fieldMappings).map(Number));
-        const transformedData = excelData.map((row, rIdx) => {
+        const transformedData = dataToProcess.map((row, rIdx) => {
             if (rIdx === 0) {
                 const newHeader = [
                     'Name', 'Vessel Name', 'PO Number', 'IMO Number',
