@@ -123,10 +123,13 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                 e.preventDefault();
                 handleUndo();
             }
+            if (e.key === 'Delete' && dragStart && dragEnd && !editingCell) {
+                handleClearSelectionData();
+            }
         };
         window.addEventListener('keydown', handleGlobalKeys);
         return () => window.removeEventListener('keydown', handleGlobalKeys);
-    }, [handleUndo]);
+    }, [handleUndo, dragStart, dragEnd, editingCell]);
 
     const handleMouseDown = (r: number, c: number) => {
         if (editingCell) return;
@@ -140,25 +143,10 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
     };
 
     const handleMouseUp = () => {
-        if (dragStart && dragEnd && (dragStart.r !== dragEnd.r || dragStart.c !== dragEnd.c)) {
-            pushToHistory();
-            const startR = Math.min(dragStart.r, dragEnd.r);
-            const endR = Math.max(dragStart.r, dragEnd.r);
-            const startC = Math.min(dragStart.c, dragEnd.c);
-            const endC = Math.max(dragStart.c, dragEnd.c);
-
-            const sourceValue = data[dragStart.r][dragStart.c];
-            const newData = JSON.parse(JSON.stringify(data));
-            for (let r = startR; r <= endR; r++) {
-                for (let c = startC; c <= endC; c++) {
-                    newData[r][c] = sourceValue;
-                }
-            }
-            setData(newData);
-        }
         isDragging.current = false;
-        setDragStart(null);
-        setDragEnd(null);
+        // Persistence is handled by NOT nulling dragStart/dragEnd immediately
+        // unless it's a single cell and we want to deselect or something.
+        // Actually, let's just keep the last range.
     };
 
     const getSelectionClass = (r: number, c: number) => {
@@ -175,9 +163,72 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
         if (r === endR) classes += ' sel-bottom';
         if (c === startC) classes += ' sel-left';
         if (c === endC) classes += ' sel-right';
-        if (r === endR && c === endC) classes += ' sel-handle';
+        if (r === endR && c === endC && isDragging.current) classes += ' sel-handle';
 
         return classes;
+    };
+
+    const handleClearSelectionData = () => {
+        if (!dragStart || !dragEnd) return;
+        pushToHistory();
+        const startR = Math.min(dragStart.r, dragEnd.r);
+        const endR = Math.max(dragStart.r, dragEnd.r);
+        const startC = Math.min(dragStart.c, dragEnd.c);
+        const endC = Math.max(dragStart.c, dragEnd.c);
+
+        const newData = JSON.parse(JSON.stringify(data));
+        const visibleIndices = new Set(filteredRows.map(f => f.originalIdx));
+
+        for (let r = startR; r <= endR; r++) {
+            if (!visibleIndices.has(r)) continue;
+            for (let c = startC; c <= endC; c++) {
+                newData[r][c] = '';
+            }
+        }
+        setData(newData);
+        setDragStart(null);
+        setDragEnd(null);
+    };
+
+    const handleDeleteSelectionRows = () => {
+        if (!dragStart || !dragEnd) return;
+        pushToHistory();
+        const startR = Math.min(dragStart.r, dragEnd.r);
+        const endR = Math.max(dragStart.r, dragEnd.r);
+        const rangeIndices = new Set();
+        const visibleIndices = new Set(filteredRows.map(f => f.originalIdx));
+
+        for (let r = startR; r <= endR; r++) {
+            if (visibleIndices.has(r)) rangeIndices.add(r);
+        }
+
+        if (window.confirm(`Delete all ${rangeIndices.size} rows in current selection?`)) {
+            const newData = data.filter((_, idx) => idx === 0 || !rangeIndices.has(idx));
+            setData(newData);
+            setDragStart(null);
+            setDragEnd(null);
+        }
+    };
+
+    const handleDragFill = () => {
+        if (!dragStart || !dragEnd) return;
+        pushToHistory();
+        const startR = Math.min(dragStart.r, dragEnd.r);
+        const endR = Math.max(dragStart.r, dragEnd.r);
+        const startC = Math.min(dragStart.c, dragEnd.c);
+        const endC = Math.max(dragStart.c, dragEnd.c);
+
+        const sourceValue = data[dragStart.r][dragStart.c];
+        const newData = JSON.parse(JSON.stringify(data));
+        const visibleIndices = new Set(filteredRows.map(f => f.originalIdx));
+
+        for (let r = startR; r <= endR; r++) {
+            if (!visibleIndices.has(r)) continue;
+            for (let c = startC; c <= endC; c++) {
+                newData[r][c] = sourceValue;
+            }
+        }
+        setData(newData);
     };
 
     const handleResizeStart = (e: React.MouseEvent, idx: number) => {
@@ -231,8 +282,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
         return data.slice(1).map((row, i) => ({ row, originalIdx: i + 1 }))
             .filter(({ row }) =>
                 Object.entries(filters).every(([colIdx, activeValues]) => {
-                    if (!activeValues) return true;
-                    if (activeValues.length === 0) return false;
+                    if (!activeValues || activeValues.length === 0) return true;
                     const cellVal = String(row[parseInt(colIdx)] || '').trim();
                     return activeValues.includes(cellVal);
                 })
@@ -261,6 +311,28 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
         const newData = data.filter((_, idx) => idx === 0 || !selectedRows.has(idx));
         setData(newData);
         setSelectedRows(new Set());
+    };
+
+    const handleDeleteFiltered = () => {
+        const count = filteredRows.length;
+        if (count === 0) return;
+        if (window.confirm(`Are you sure you want to delete all ${count} displayed items?`)) {
+            pushToHistory();
+            const filteredIndices = new Set(filteredRows.map(f => f.originalIdx));
+            const newData = data.filter((_, idx) => idx === 0 || !filteredIndices.has(idx));
+            setData(newData);
+            setSelectedRows(new Set());
+        }
+    };
+
+    const handleClearAll = () => {
+        if (data.length <= 1) return;
+        if (window.confirm("Are you sure you want to delete ALL data in this audit?")) {
+            pushToHistory();
+            setData([data[0]]);
+            setSelectedRows(new Set());
+            setFilters({});
+        }
     };
 
     const handleBulkAccept = () => {
@@ -392,17 +464,46 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                 ))}
                             </div>
                             <div className="bulk-actions">
-                                {selectedRows.size > 0 && (
-                                    <button className="bulk-btn delete" onClick={handleDeleteSelected}>
-                                        <Trash2 size={12} /> Delete
-                                    </button>
+                                {dragStart && dragEnd && (dragStart.r !== dragEnd.r || dragStart.c !== dragEnd.c) ? (
+                                    <>
+                                        <button className="bulk-btn delete" onClick={handleClearSelectionData}>
+                                            <Trash2 size={12} /> Clear Selected Cells
+                                        </button>
+                                        <button className="bulk-btn delete" style={{ background: '#FEE2E2', color: '#B91C1C' }} onClick={handleDeleteSelectionRows}>
+                                            <Trash2 size={12} /> Delete Rows In Range
+                                        </button>
+                                        <button className="bulk-btn accept" onClick={handleDragFill}>
+                                            Fill Selection
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        {selectedRows.size > 0 ? (
+                                            <button className="bulk-btn delete" onClick={handleDeleteSelected}>
+                                                <Trash2 size={12} /> Delete Selected ({selectedRows.size})
+                                            </button>
+                                        ) : (
+                                            Object.keys(filters).length > 0 && filteredRows.length > 0 && (
+                                                <button className="bulk-btn delete" onClick={handleDeleteFiltered}>
+                                                    <Trash2 size={12} /> Delete Filtered ({filteredRows.length})
+                                                </button>
+                                            )
+                                        )}
+
+                                        <button className="bulk-btn accept" onClick={handleBulkAccept}>
+                                            {selectedRows.size > 0 ? 'Accept Selected' : 'Bulk Accept'}
+                                        </button>
+                                        <button className="bulk-btn reject" onClick={handleBulkReject}>
+                                            {selectedRows.size > 0 ? 'Reject Selected' : 'Bulk Reject'}
+                                        </button>
+
+                                        {data.length > 1 && !Object.keys(filters).length && !selectedRows.size && (
+                                            <button className="bulk-btn delete" style={{ background: '#FFF7ED', color: '#EA580C', borderColor: '#FED7AA' }} onClick={handleClearAll}>
+                                                <Trash2 size={12} /> Clear All
+                                            </button>
+                                        )}
+                                    </>
                                 )}
-                                <button className="bulk-btn accept" onClick={handleBulkAccept}>
-                                    {selectedRows.size > 0 ? 'Accept Selected' : 'Bulk Accept'}
-                                </button>
-                                <button className="bulk-btn reject" onClick={handleBulkReject}>
-                                    {selectedRows.size > 0 ? 'Reject Selected' : 'Bulk Reject'}
-                                </button>
                             </div>
                         </div>
 
@@ -455,9 +556,9 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                                                                 <label key={vi} className="menu-value-item">
                                                                                     <input
                                                                                         type="checkbox"
-                                                                                        checked={!filters[idx] || filters[idx].includes(val)}
+                                                                                        checked={filters[idx]?.includes(val) || false}
                                                                                         onChange={() => {
-                                                                                            const current = filters[idx] || allValues;
+                                                                                            const current = filters[idx] || [];
                                                                                             const next = current.includes(val)
                                                                                                 ? current.filter(v => v !== val)
                                                                                                 : [...current, val];
