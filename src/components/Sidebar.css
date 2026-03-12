@@ -231,9 +231,15 @@
     margin-left: 12px;
 }
 
-.nav-icon {
+.nav-icon,
+.nav-icon-placeholder {
     flex-shrink: 0;
     transition: transform 0.2s ease;
+}
+
+.nav-icon-placeholder {
+    width: 18px;
+    height: 18px;
 }
 
 .nav-item:hover .nav-icon {
@@ -244,6 +250,18 @@
 .nav-item.active {
     background: var(--primary-blue-subtle) !important;
     color: var(--primary-blue) !important;
+}
+
+.nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    background: var(--primary-blue);
+    border-radius: 0 4px 4px 0;
 }
 
 .sidebar.collapsed .nav-item.active {

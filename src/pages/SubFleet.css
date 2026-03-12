@@ -1,0 +1,123 @@
+/* Sub-Fleet Specific Styles */
+.sub-fleet-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding: 0 4px;
+}
+
+.add-subfleet-btn {
+    width: 44px;
+    height: 44px;
+    background: #f97316; /* Orange/Coral color */
+    color: white;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(249, 115, 22, 0.3);
+    transition: all 0.2s ease;
+}
+
+.add-subfleet-btn:hover {
+    background: #ea580c;
+    transform: scale(1.05);
+}
+
+.sub-fleet-search {
+    position: relative;
+    width: 280px;
+}
+
+.sub-fleet-search input {
+    width: 100%;
+    height: 40px;
+    padding: 0 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid #E2E8F0;
+    font-size: 14px;
+    color: #475569;
+    outline: none;
+    transition: border-color 0.3s ease;
+}
+
+.sub-fleet-search input:focus {
+    border-bottom-color: var(--primary-blue);
+}
+
+.sub-fleet-search input::placeholder {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.table-footer {
+    margin-top: 16px;
+    padding-left: 12px;
+}
+
+.total-count {
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.archived-section {
+    margin-top: 60px;
+    padding-top: 30px;
+    border-top: 1px solid #E2E8F0;
+}
+
+.archived-section h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #64748b;
+    margin: 0;
+}
+
+/* Icon Styles within table */
+.table-edit-icon {
+    color: #475569;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.table-edit-icon:hover {
+    color: var(--primary-blue);
+}
+
+.table-delete-icon {
+    color: #ef4444; /* Red bin color */
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.table-delete-icon:hover {
+    transform: scale(1.1);
+}
+
+.action-buttons {
+    display: flex;
+    gap: 16px;
+    justify-content: flex-start;
+    padding-left: 8px;
+}
+
+/* Row Hover specific to this design */
+.audits-table tbody tr:hover {
+    background-color: #f1f5f9 !important;
+}
+
+.pending-audits-content .md-header {
+    border-bottom: none !important;
+    padding-bottom: 10px !important;
+}
+
+.pending-audits-content .md-header h1 {
+    font-size: 20px;
+    color: #64748b;
+    font-weight: 600;
+}

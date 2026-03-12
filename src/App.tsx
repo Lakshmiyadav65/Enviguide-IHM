@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Vessels from './pages/Vessels';
 import Fleet from './pages/Fleet';
+import SubFleet from './pages/SubFleet';
 import FullPlanViewer from './pages/FullPlanViewer';
 import HazardousMaterialMapping from './pages/HazardousMaterialMapping';
 import UploadPurchaseOrder from './pages/UploadPurchaseOrder';
@@ -23,6 +24,7 @@ function App() {
         <Route path="/vessels" element={<Vessels />} />
         <Route path="/vessels/ship" element={<Vessels />} />
         <Route path="/vessels/fleet" element={<Fleet />} />
+        <Route path="/vessels/sub-fleet" element={<SubFleet />} />
         <Route path="/vessels/:id" element={<Vessels />} />
         <Route path="/decks" element={<Vessels />} />
         <Route path="/viewer" element={<FullPlanViewer />} />
@@ -40,6 +42,12 @@ function App() {
         <Route path="/security" element={<Dashboard />} />
         <Route path="/master-data" element={<Dashboard />} />
         <Route path="/inventory" element={<Dashboard />} />
+        <Route path="/menu/registered" element={<Dashboard />} />
+        <Route path="/menu/ownership" element={<Dashboard />} />
+        <Route path="/menu/ownership-manager" element={<Dashboard />} />
+        <Route path="/menu/supplier" element={<Dashboard />} />
+        <Route path="/menu/equipment" element={<Dashboard />} />
+        <Route path="/menu/suspected-keyword" element={<Dashboard />} />
         <Route path="*" element={<Login />} />
       </Routes>
     </Router>

@@ -9,11 +9,23 @@ import {
     Upload,
     Mail,
     ChevronDown,
-    ChevronLeft
+    ChevronLeft,
+    Menu as MenuIcon
 } from 'lucide-react';
 import './Sidebar.css';
 
-const menuItems = [
+interface MenuItem {
+    path: string;
+    icon: any;
+    label: string;
+    children?: {
+        path: string;
+        label: string;
+        icon?: any;
+    }[];
+}
+
+const menuItems: MenuItem[] = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Admin Dashboard' },
     {
         path: '/vessels',
@@ -23,6 +35,19 @@ const menuItems = [
             { path: '/vessels/ship', icon: Ship, label: 'Ship' },
             { path: '/vessels/fleet', icon: Layers, label: 'Fleet' },
             { path: '/vessels/sub-fleet', icon: Layers, label: 'Sub Fleet' },
+        ]
+    },
+    {
+        path: '/menu',
+        icon: MenuIcon,
+        label: 'Menu',
+        children: [
+            { path: '/menu/registered', label: 'Registered' },
+            { path: '/menu/ownership', label: 'Ownership' },
+            { path: '/menu/ownership-manager', label: 'Ownership Manager' },
+            { path: '/menu/supplier', label: 'Supplier' },
+            { path: '/menu/equipment', label: 'Equipment' },
+            { path: '/menu/suspected-keyword', label: 'Suspected Keyword' },
         ]
     },
     {
@@ -49,7 +74,7 @@ export default function Sidebar() {
     useEffect(() => {
         const currentPath = location.pathname;
         const parentItem = menuItems.find(item =>
-            item.children && item.children.some(child => currentPath === child.path)
+            item.children?.some(child => currentPath === child.path)
         );
         if (parentItem) {
             setExpandedItem(parentItem.label);
@@ -102,8 +127,8 @@ export default function Sidebar() {
             <nav className="sidebar-nav">
                 {menuItems.map((item) => {
                     const isExpanded = expandedItem === item.label;
-                    const hasChildren = item.children && item.children.length > 0;
-                    const isOnChildRoute = hasChildren && item.children.some(child => location.pathname === child.path);
+                    const hasChildren = !!(item.children && item.children.length > 0);
+                    const isOnChildRoute = hasChildren && item.children?.some(child => location.pathname === child.path);
                     const isActive = !hasChildren && location.pathname === item.path && activeFocus === null;
                     const isCategoryBlue = hasChildren && (activeFocus === item.label || isOnChildRoute);
 
@@ -137,7 +162,7 @@ export default function Sidebar() {
 
                             {hasChildren && isExpanded && (
                                 <div className="submenu">
-                                    {item.children.map((child) => (
+                                    {item.children?.map((child) => (
                                         <Link
                                             key={child.path}
                                             to={child.path}
@@ -147,7 +172,11 @@ export default function Sidebar() {
                                                 if (isCollapsed) setIsCollapsed(false);
                                             }}
                                         >
-                                            <child.icon size={18} className="nav-icon" />
+                                            {child.icon ? (
+                                                <child.icon size={18} className="nav-icon" />
+                                            ) : (
+                                                <div className="nav-icon-placeholder" />
+                                            )}
                                             <span className="nav-label">{child.label}</span>
                                         </Link>
                                     ))}
