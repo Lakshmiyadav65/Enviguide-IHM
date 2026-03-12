@@ -13,6 +13,12 @@ import MDSdocAudit from './pages/MDSdocAudit';
 import DocumentAudit from './pages/DocumentAudit';
 import AuditReviewDetail from './pages/AuditReviewDetail';
 import DocTab from './pages/DocTab';
+import Registered from './pages/Registered';
+import Ownership from './pages/Ownership';
+import OwnershipManager from './pages/OwnershipManager';
+import Supplier from './pages/Supplier';
+import Equipment from './pages/Equipment';
+import SuspectedKeyword from './pages/SuspectedKeyword';
 import './index.css';
 
 function App() {
@@ -40,14 +46,21 @@ function App() {
         <Route path="/administration/document-audit/:imo" element={<DocumentAudit />} />
         <Route path="/administration/upload-docs" element={<DocTab />} />
         <Route path="/security" element={<Dashboard />} />
+        <Route path="/security/users" element={<Dashboard />} />
+        <Route path="/security/user-profile" element={<Dashboard />} />
+        <Route path="/security/user-menu" element={<Dashboard />} />
+        <Route path="/security/user-rights" element={<Dashboard />} />
+        <Route path="/security/user-role-rights" element={<Dashboard />} />
+        <Route path="/security/user-category" element={<Dashboard />} />
         <Route path="/master-data" element={<Dashboard />} />
         <Route path="/inventory" element={<Dashboard />} />
-        <Route path="/menu/registered" element={<Dashboard />} />
-        <Route path="/menu/ownership" element={<Dashboard />} />
-        <Route path="/menu/ownership-manager" element={<Dashboard />} />
-        <Route path="/menu/supplier" element={<Dashboard />} />
-        <Route path="/menu/equipment" element={<Dashboard />} />
-        <Route path="/menu/suspected-keyword" element={<Dashboard />} />
+        <Route path="/menu/registered" element={<Registered />} />
+        <Route path="/menu/ownership" element={<Ownership />} />
+        <Route path="/menu/ownership-manager" element={<OwnershipManager />} />
+        <Route path="/menu/supplier" element={<Supplier />} />
+        <Route path="/menu/equipment" element={<Equipment />} />
+        <Route path="/menu/suspended" element={<Dashboard />} />
+        <Route path="/menu/suspected-keyword" element={<SuspectedKeyword />} />
         <Route path="*" element={<Login />} />
       </Routes>
     </Router>

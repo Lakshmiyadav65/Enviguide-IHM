@@ -200,52 +200,17 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     table-layout: fixed;
 }
 
-/* Column Widths — 9 columns, evenly proportioned */
-.audits-table th:nth-child(1) {
-    width: 16%;
+/* Column Widths Distribution - 8 Data Columns + 1 Action Column */
+.audits-table th:not(.action-column) {
+    width: calc((100% - 140px) / 8);
 }
 
-/* VESSEL NAME */
-.audits-table th:nth-child(2) {
-    width: 7%;
+.th-action,
+.action-column {
+    width: 140px !important;
+    min-width: 140px !important;
+    text-align: center;
 }
-
-/* TOTAL PO */
-.audits-table th:nth-child(3) {
-    width: 8%;
-}
-
-/* TOTAL ITEMS */
-.audits-table th:nth-child(4) {
-    width: 8%;
-}
-
-/* DUPLICATE PO */
-.audits-table th:nth-child(5) {
-    width: 9%;
-}
-
-/* DUP. SUPPLIER CODE */
-.audits-table th:nth-child(6) {
-    width: 9%;
-}
-
-/* DUP. PRODUCT CODE */
-.audits-table th:nth-child(7) {
-    width: 9%;
-}
-
-/* CREATE DATE */
-.audits-table th:nth-child(8) {
-    width: 18%;
-}
-
-/* REVIEW STATUS */
-.audits-table th:nth-child(9) {
-    width: 16%;
-}
-
-/* ACTION */
 
 .audits-table thead {
     position: sticky;
@@ -347,7 +312,8 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 }
 
 .action-btn {
-    padding: 8px;
+    width: 26px;
+    height: 26px;
     background: transparent;
     border: none;
     border-radius: 6px;
@@ -359,27 +325,33 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 }
 
 .edit-btn {
-    color: #0369A1;
+    color: #94A3B8;
+    background: #F1F5F9;
 }
 
 .edit-btn:hover {
-    background: #DBEAFE;
+    background: #E2E8F0;
+    color: #1E293B;
 }
 
 .send-btn {
-    color: #0369A1;
+    color: #00B0FA;
+    background: transparent;
 }
 
 .send-btn:hover {
-    background: #DBEAFE;
+    background: #f0f9ff;
+    color: #0284c7;
 }
 
 .delete-btn {
-    color: #DC2626;
+    color: #EF4444;
+    background: #FEF2F2;
 }
 
 .delete-btn:hover {
-    background: #FEE2E2;
+    background: #EF4444;
+    color: white;
 }
 
 .na-status-text {

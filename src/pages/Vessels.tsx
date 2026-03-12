@@ -4,7 +4,7 @@ import {
     Search, Plus, Check, ShieldCheck, BarChart2, ShoppingCart, Layers,
     FolderOpen, Ship as ShipIcon, GripVertical, Book, Paperclip,
     ExternalLink, Download, X, AlertTriangle, Monitor, FileText,
-    ChevronDown, Trash2, Edit2, Calendar, ChevronLeft, ChevronRight, Pin, Upload, Eye, EyeOff, RotateCw, ZoomIn, ZoomOut, Maximize2
+    ChevronDown, Trash2, Edit2, Calendar, ChevronLeft, ChevronRight, Pin, Upload, Eye, EyeOff, RotateCw, ZoomIn, ZoomOut, Maximize2, Send
 } from 'lucide-react';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
@@ -644,8 +644,9 @@ export default function Vessels() {
                                         <td><span className={`status-pill ${doc.status.toLowerCase()}`}>{doc.status}</span></td>
                                         <td>
                                             <div className="doc-actions">
-                                                <button className="action-icn-btn" onClick={() => setSelectedDoc(doc)}><Eye size={16} /></button>
-                                                <button className="action-icn-btn" onClick={() => handleDeleteDocClick(doc)}><Trash2 size={16} /></button>
+                                                <button className="action-icn-btn" onClick={() => setSelectedDoc(doc)}><Eye size={14} /></button>
+                                                <button className="action-icn-btn"><Send size={14} /></button>
+                                                <button className="action-icn-btn" onClick={() => handleDeleteDocClick(doc)}><Trash2 size={14} /></button>
                                             </div>
                                         </td>
                                     </tr>

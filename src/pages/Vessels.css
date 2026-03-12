@@ -6164,12 +6164,12 @@ body:has(.sidebar.collapsed) .vessel-page-main {
 }
 
 .action-icn-btn {
-    width: 32px;
-    height: 32px;
+    width: 26px; /* Compacted */
+    height: 26px;
     border-radius: 6px;
     border: none;
     background: #f1f5f9;
-    color: #64748b;
+    color: #94a3b8;
     cursor: pointer;
     transition: all 0.2s;
     display: flex;
@@ -6179,6 +6179,21 @@ body:has(.sidebar.collapsed) .vessel-page-main {
 
 .action-icn-btn:hover {
     background: #00B0FA;
+    color: white;
+}
+
+.action-icn-btn:has(svg[data-lucide="send"]) {
+    background: transparent;
+    color: #00B0FA;
+}
+
+.action-icn-btn:has(svg[data-lucide="trash-2"]) {
+    background: #fef2f2;
+    color: #ef4444;
+}
+
+.action-icn-btn:hover:has(svg[data-lucide="trash-2"]) {
+    background: #ef4444;
     color: white;
 }
 

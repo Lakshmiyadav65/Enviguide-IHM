@@ -10,7 +10,8 @@ import {
     Mail,
     ChevronDown,
     ChevronLeft,
-    Menu as MenuIcon
+    Menu as MenuIcon,
+    Lock
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -47,6 +48,7 @@ const menuItems: MenuItem[] = [
             { path: '/menu/ownership-manager', label: 'Ownership Manager' },
             { path: '/menu/supplier', label: 'Supplier' },
             { path: '/menu/equipment', label: 'Equipment' },
+            { path: '/menu/suspended', label: 'Suspended' },
             { path: '/menu/suspected-keyword', label: 'Suspected Keyword' },
         ]
     },
@@ -59,6 +61,19 @@ const menuItems: MenuItem[] = [
             { path: '/administration/pending-audits', icon: FileText, label: 'Pending Audits' },
             { path: '/administration/pending-reviews', icon: FileText, label: 'Pending Reviews' },
             { path: '/administration/md-sdoc-audit', icon: FileText, label: 'MD SDOC Audit Pending' },
+        ]
+    },
+    {
+        path: '/security',
+        icon: Lock,
+        label: 'Security',
+        children: [
+            { path: '/security/users', label: 'Users' },
+            { path: '/security/user-profile', label: 'User Profile' },
+            { path: '/security/user-menu', label: 'User Menu' },
+            { path: '/security/user-rights', label: 'User Rights' },
+            { path: '/security/user-role-rights', label: 'User Role Rights' },
+            { path: '/security/user-category', label: 'User Category' },
         ]
     },
     { path: '/contact', icon: Mail, label: 'Contact Us' },

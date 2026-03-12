@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Send } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import './SubFleet.css';
@@ -36,22 +36,26 @@ export default function SubFleet() {
                 <div className="pending-audits-content">
                     <div className="md-header">
                         <div className="md-title-area">
-                            <h1>Sub-Fleets</h1>
+                            <h1>Sub-Fleet Management</h1>
+                            <p>Organize your vessels into specialized sub-fleets for better reporting and tracking.</p>
                         </div>
                     </div>
 
-                    <div className="sub-fleet-controls">
-                        <button className="add-subfleet-btn">
-                            <Plus size={24} />
-                        </button>
-                        
-                        <div className="sub-fleet-search">
-                            <input 
-                                type="text" 
-                                placeholder="Search..." 
+                    <div className="audits-top-bar">
+                        <div className="search-box">
+                            <Search size={24} className="search-icon" />
+                            <input
+                                type="text"
+                                placeholder="Search here..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                             />
+                        </div>
+
+                        <div className="top-bar-right">
+                            <button className="add-fleet-btn">
+                                <Plus size={18} /> ADD SUB-FLEET
+                            </button>
                         </div>
                     </div>
 
@@ -60,7 +64,7 @@ export default function SubFleet() {
                             <table className="audits-table">
                                 <thead>
                                     <tr>
-                                        <th style={{ width: '80px' }}>Action</th>
+                                        <th className="th-action">Action</th>
                                         <th>Name</th>
                                         <th>Parent Fleet</th>
                                         <th>Owner</th>
@@ -72,8 +76,15 @@ export default function SubFleet() {
                                         <tr key={item.id}>
                                             <td className="action-column">
                                                 <div className="action-buttons">
-                                                    <Edit2 size={16} className="table-edit-icon" />
-                                                    <Trash2 size={16} className="table-delete-icon" />
+                                                    <button className="action-btn edit-btn" title="Edit">
+                                                        <Edit2 size={14} />
+                                                    </button>
+                                                    <button className="action-btn send-btn" title="Send">
+                                                        <Send size={14} />
+                                                    </button>
+                                                    <button className="action-btn delete-btn" title="Delete">
+                                                        <Trash2 size={14} />
+                                                    </button>
                                                 </div>
                                             </td>
                                             <td>{item.name}</td>

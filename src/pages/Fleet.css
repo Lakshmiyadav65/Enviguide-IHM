@@ -1,5 +1,4 @@
-/* Fleet Styles matching Pending Audits Premium Style */
-
+/* Fleet Styles Standardized */
 .pending-audits-container {
     display: flex;
     min-height: 100vh;
@@ -24,16 +23,13 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 .pending-audits-content {
     flex: 1;
     padding: 24px 40px 40px 40px;
-    /* Added top padding */
     display: flex;
     flex-direction: column;
     gap: 24px;
-    /* Consistent gap between sections */
 }
 
 .md-header {
     height: auto;
-    /* Changed from fixed height */
     padding-bottom: 20px;
     display: flex;
     align-items: center;
@@ -43,7 +39,6 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 
 .md-title-area h1 {
     font-size: 24px;
-    /* Reduced from 28px */
     font-weight: 800;
     color: #1e293b;
     margin: 0 0 4px 0;
@@ -52,7 +47,6 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 .md-title-area p {
     color: #64748b;
     font-size: 14px;
-    /* Reduced from 16px */
     margin: 0;
 }
 
@@ -62,7 +56,6 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     justify-content: space-between;
     gap: 16px;
     margin-top: 8px;
-    /* Spacing from header border */
 }
 
 .search-box {
@@ -75,7 +68,6 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     align-items: center;
     padding: 0 16px;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07);
-    /* Better shadow */
     border: 1px solid #E2E8F0;
 }
 
@@ -89,14 +81,12 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     border: none;
     outline: none;
     font-size: 14px;
-    /* Reduced from 16px */
     color: #1e293b;
     font-weight: 500;
 }
 
 .add-fleet-btn {
     height: 48px;
-    /* Reduced from 60px */
     padding: 0 24px;
     background: var(--primary-blue);
     color: white;
@@ -104,7 +94,6 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     border-radius: 10px;
     font-weight: 700;
     font-size: 13px;
-    /* Reduced from 14px */
     display: flex;
     align-items: center;
     gap: 10px;
@@ -120,9 +109,9 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 
 .table-container {
     background: white;
-    border-radius: 20px;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
-    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    border: 1px solid #f1f5f9;
     overflow: hidden;
 }
 
@@ -131,56 +120,59 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     border-collapse: collapse;
 }
 
+/* Roomy Action Column and Equal Data Columns */
+.th-action,
+.action-column {
+    width: 140px;
+    min-width: 140px;
+}
+
+.audits-table th:not(.th-action),
+.audits-table td:not(.action-column) {
+    width: calc((100% - 140px) / 3);
+}
+
 .audits-table th {
-    height: 52px;
-    /* Reduced from 64px */
+    height: 44px;
     padding: 0 16px;
     text-align: left;
-    background: #f8fafc;
-    color: #64748b;
-    font-size: 12px;
-    /* Reduced from 13px */
+    background: #ffffff;
+    color: #94a3b8;
+    font-size: 11px;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    border-bottom: 2px solid #E2E8F0;
+    border-bottom: 1px solid #f1f5f9;
 }
 
 .audits-table tr:hover {
-    background: #f1f5f9;
+    background: #f8fafc;
 }
 
 .audits-table td {
-    height: 60px;
-    /* Reduced from 80px */
+    height: 52px;
     padding: 0 16px;
     color: #475569;
     font-size: 14px;
-    /* Reduced from 15px */
     font-weight: 500;
-    border-bottom: 1px solid #E2E8F0;
+    border-bottom: 1px solid #f1f5f9;
 }
 
 .vessel-name {
     color: #1e293b !important;
-    font-weight: 800 !important;
+    font-weight: 700 !important;
 }
 
-.audits-table th:first-child,
-.audits-table td:first-child {
-    text-align: center;
-}
-
+/* Standardized Compact Action Buttons */
 .action-buttons {
     display: flex;
-    gap: 12px;
-    justify-content: center;
+    gap: 6px;
+    justify-content: flex-start;
 }
 
 .action-btn {
-    width: 32px;
-    /* Smoother size */
-    height: 32px;
+    width: 26px;
+    height: 26px;
     border-radius: 6px;
     border: none;
     display: flex;
@@ -190,16 +182,29 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     transition: all 0.2s;
 }
 
+/* Edit/NA Style */
 .edit-btn {
-    background: #EEF2FF;
-    color: #4F46E5;
+    background: #F1F5F9;
+    color: #64748B;
 }
 
 .edit-btn:hover {
-    background: #4F46E5;
-    color: white;
+    background: #E2E8F0;
+    color: #1E293B;
 }
 
+/* Send Style */
+.send-btn {
+    background: transparent;
+    color: #0ea5e9;
+}
+
+.send-btn:hover {
+    background: #f0f9ff;
+    color: #0284c7;
+}
+
+/* Delete Style */
 .delete-btn {
     background: #FEF2F2;
     color: #EF4444;
@@ -219,7 +224,7 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 
 .pagination-info {
     color: #64748b;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
 }
 
@@ -229,16 +234,14 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 }
 
 .page-btn {
-    width: 36px;
-    /* Reduced from 44px */
-    height: 36px;
-    /* Reduced from 44px */
+    width: 32px;
+    height: 32px;
     border-radius: 6px;
     border: 1px solid #E2E8F0;
     background: white;
     color: #64748b;
     font-weight: 700;
-    font-size: 13px;
+    font-size: 12px;
     cursor: pointer;
 }
 

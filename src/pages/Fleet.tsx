@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, Edit2, Trash2 } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Send } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import './Fleet.css';
@@ -64,7 +64,7 @@ export default function Fleet() {
                             <table className="audits-table">
                                 <thead>
                                     <tr>
-                                        <th style={{ width: '120px' }}>ACTION</th>
+                                        <th className="th-action">ACTION</th>
                                         <th>NAME</th>
                                         <th>OWNER</th>
                                         <th>MANAGER</th>
@@ -75,8 +75,9 @@ export default function Fleet() {
                                         <tr key={fleet.id}>
                                             <td className="action-column">
                                                 <div className="action-buttons">
-                                                    <button className="action-btn edit-btn" title="Edit"><Edit2 size={16} /></button>
-                                                    <button className="action-btn delete-btn" title="Delete"><Trash2 size={16} /></button>
+                                                    <button className="action-btn edit-btn" title="Edit"><Edit2 size={14} /></button>
+                                                    <button className="action-btn send-btn" title="Send"><Send size={14} /></button>
+                                                    <button className="action-btn delete-btn" title="Delete"><Trash2 size={14} /></button>
                                                 </div>
                                             </td>
                                             <td className="vessel-name">{fleet.name}</td>
