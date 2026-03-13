@@ -21,6 +21,7 @@ import Equipment from './pages/Equipment';
 import SuspectedKeyword from './pages/SuspectedKeyword';
 import UserProfile from './pages/UserProfile';
 import UserMenu from './pages/UserMenu';
+import UserRights from './pages/UserRights';
 import './index.css';
 
 function App() {
@@ -51,7 +52,7 @@ function App() {
         <Route path="/security/users" element={<Dashboard />} />
         <Route path="/security/user-profile" element={<UserProfile />} />
         <Route path="/security/user-menu" element={<UserMenu />} />
-        <Route path="/security/user-rights" element={<Dashboard />} />
+        <Route path="/security/user-rights" element={<UserRights />} />
         <Route path="/security/user-role-rights" element={<Dashboard />} />
         <Route path="/security/user-category" element={<Dashboard />} />
         <Route path="/master-data" element={<Dashboard />} />
