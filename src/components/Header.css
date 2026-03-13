@@ -53,7 +53,6 @@ body:has(.sidebar.collapsed) .dashboard-header {
     gap: 20px;
     flex: 1;
     position: relative;
-    z-index: 10;
 }
 
 .search-bar {
@@ -86,7 +85,6 @@ body:has(.sidebar.collapsed) .dashboard-header {
     align-items: center;
     gap: 20px;
     position: relative;
-    z-index: 10;
 }
 
 .dashboard-header.notifications-open .header-right {
@@ -94,13 +92,48 @@ body:has(.sidebar.collapsed) .dashboard-header {
 }
 
 .user-profile-container {
+    position: relative;
+    z-index: 10002;
+    background: transparent;
+}
+
+.user-profile-trigger {
     display: flex;
     align-items: center;
     gap: 12px;
+    padding: 6px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: transparent;
+    border: 1px solid transparent;
 }
 
-.dashboard-header.notifications-open .header-left,
-.dashboard-header.notifications-open .user-profile-container {
+.user-profile-trigger:hover {
+    background: #F8FAFC;
+    border-color: #F1F5F9;
+}
+
+.user-profile-trigger.active {
+    background: #00B0FA;
+    border-color: #00B0FA;
+    box-shadow: 0 4px 12px rgba(0, 176, 250, 0.2);
+}
+
+.user-profile-trigger.active .user-profile-name {
+    color: white;
+}
+
+.user-profile-trigger.active .user-profile-role {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.user-profile-trigger.active .user-profile-avatar {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.dashboard-header.notifications-open .header-left {
     pointer-events: none;
 }
 
@@ -108,6 +141,7 @@ body:has(.sidebar.collapsed) .dashboard-header {
     font-size: 14px;
     font-weight: 700;
     color: #1E293B;
+    transition: color 0.2s;
 }
 
 .user-profile-role {
@@ -116,14 +150,12 @@ body:has(.sidebar.collapsed) .dashboard-header {
     color: white;
     background: #00B0FA;
     padding: 2px 8px;
-    /* Slightly better padding for premium feel */
     border-radius: 4px;
     text-transform: uppercase;
     margin-top: 2px;
     width: fit-content;
-    /* THIS FIXES THE LENGTH ISSUE */
     display: block;
-    /* Keep as block to respects parent flex or margin-top */
+    transition: all 0.2s;
 }
 
 .user-profile-avatar {
@@ -134,6 +166,130 @@ body:has(.sidebar.collapsed) .dashboard-header {
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background 0.2s;
+}
+
+/* PROFILE DROPDOWN CARD */
+.profile-dropdown-card {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    width: 280px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.15);
+    border: 1px solid #F1F5F9;
+    overflow: hidden;
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.profile-dropdown-header {
+    background: #F8FAFC;
+    padding: 20px;
+    display: flex;
+    gap: 16px;
+    border-bottom: 1px solid #F1F5F9;
+}
+
+.user-big-avatar {
+    width: 52px;
+    height: 52px;
+    background: white;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.user-details-box {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-display-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1E293B;
+    margin: 0 0 2px 0;
+}
+
+.user-display-email {
+    font-size: 12px;
+    color: #94A3B8;
+    margin: 0 0 8px 0;
+}
+
+.user-badge-premium {
+    font-size: 9px;
+    font-weight: 800;
+    color: #00B0FA;
+    background: #E0F2FE;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    width: fit-content;
+}
+
+.profile-dropdown-menu {
+    padding: 8px;
+}
+
+.profile-menu-item {
+    width: 100%;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: none;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #64748B;
+}
+
+.profile-menu-item:hover {
+    background: #F1F5F9;
+    color: #1E293B;
+}
+
+.profile-menu-item span {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.profile-dropdown-footer {
+    padding: 8px;
+    border-top: 1px solid #F1F5F9;
+}
+
+.logout-button {
+    width: 100%;
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: none;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #EF4444;
+}
+
+.logout-button:hover {
+    background: #FEF2F2;
+}
+
+.logout-button span {
+    font-size: 13px;
+    font-weight: 700;
 }
 
 /* 
@@ -146,9 +302,7 @@ body:has(.sidebar.collapsed) .dashboard-header {
     left: -500px;
     width: 200vw;
     height: 100vh;
-    background: rgba(15, 23, 42, 0.2);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+    background: rgba(15, 23, 42, 0.05); /* Very light overlay instead of heavy blur */
     z-index: 9000;
 }
 

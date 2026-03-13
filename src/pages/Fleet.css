@@ -123,13 +123,13 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 /* Roomy Action Column and Equal Data Columns */
 .th-action,
 .action-column {
-    width: 140px;
-    min-width: 140px;
+    width: 180px;
+    min-width: 180px;
 }
 
 .audits-table th:not(.th-action),
 .audits-table td:not(.action-column) {
-    width: calc((100% - 140px) / 3);
+    width: calc((100% - 180px) / 3);
 }
 
 .audits-table th {

@@ -19,6 +19,7 @@ import OwnershipManager from './pages/OwnershipManager';
 import Supplier from './pages/Supplier';
 import Equipment from './pages/Equipment';
 import SuspectedKeyword from './pages/SuspectedKeyword';
+import UserProfile from './pages/UserProfile';
 import './index.css';
 
 function App() {
@@ -47,7 +48,7 @@ function App() {
         <Route path="/administration/upload-docs" element={<DocTab />} />
         <Route path="/security" element={<Dashboard />} />
         <Route path="/security/users" element={<Dashboard />} />
-        <Route path="/security/user-profile" element={<Dashboard />} />
+        <Route path="/security/user-profile" element={<UserProfile />} />
         <Route path="/security/user-menu" element={<Dashboard />} />
         <Route path="/security/user-rights" element={<Dashboard />} />
         <Route path="/security/user-role-rights" element={<Dashboard />} />

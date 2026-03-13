@@ -1,5 +1,6 @@
-import { Search, User, Bell, BellOff, FileText, AlertTriangle, Pin, Check, CheckCircle2 } from 'lucide-react';
+import { Search, User, Bell, BellOff, FileText, AlertTriangle, Pin, Check, CheckCircle2, LogOut, Settings, HelpCircle, Shield, UserCircle } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Header.css';
 
 interface HeaderProps {
@@ -17,7 +18,9 @@ export default function Header({
     userName = 'John Administrator',
     userRole = 'Admin'
 }: HeaderProps) {
+    const navigate = useNavigate();
     const [showNotifications, setShowNotifications] = useState(false);
+    const [showProfile, setShowProfile] = useState(false);
     const getIcon = (type: string) => {
         switch (type) {
             case 'PO IMPORT': return <CheckCircle2 size={18} />;
@@ -76,6 +79,20 @@ export default function Header({
 
     const unreadCount = notifications.filter(n => n.unread).length;
 
+    const handleMenuClick = (e: React.MouseEvent, path: string) => {
+        e.stopPropagation();
+        navigate(path);
+        setShowProfile(false);
+    };
+
+    const handleLogout = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        localStorage.clear();
+        sessionStorage.clear();
+        navigate('/', { replace: true });
+        setShowProfile(false);
+    };
+
     const handleMarkAsRead = (id: number) => {
         setNotifications(prev => prev.map(n =>
             n.id === id ? { ...n, unread: false } : n
@@ -87,14 +104,17 @@ export default function Header({
     };
 
     return (
-        <header className={`dashboard-header ${showNotifications ? 'notifications-open' : ''}`}>
+        <header className={`dashboard-header ${showNotifications || showProfile ? 'notifications-open' : ''}`}>
             <div className="header-background" />
 
             {/* Backdrop Overlay - Positions globally via CSS */}
-            {showNotifications && (
+            {(showNotifications || showProfile) && (
                 <div
                     className="notification-backdrop"
-                    onClick={() => setShowNotifications(false)}
+                    onClick={() => {
+                        setShowNotifications(false);
+                        setShowProfile(false);
+                    }}
                 />
             )}
 
@@ -193,13 +213,62 @@ export default function Header({
                 </div>
 
                 <div className="user-profile-container">
-                    <div className="user-profile-info">
-                        <div className="user-profile-name">{userName}</div>
-                        <div className="user-profile-role">{userRole}</div>
+                    <div 
+                        className={`user-profile-trigger ${showProfile ? 'active' : ''}`}
+                        onClick={() => {
+                            setShowProfile(!showProfile);
+                            setShowNotifications(false);
+                        }}
+                    >
+                        <div className="user-profile-info">
+                            <div className="user-profile-name">{userName}</div>
+                            <div className="user-profile-role">{userRole}</div>
+                        </div>
+                        <div className="user-profile-avatar">
+                            <User size={20} color={showProfile ? "#fff" : "#64748B"} />
+                        </div>
                     </div>
-                    <div className="user-profile-avatar">
-                        <User size={20} color="#64748B" />
-                    </div>
+
+                    {showProfile && (
+                        <div className="profile-dropdown-card">
+                            <div className="profile-dropdown-header">
+                                <div className="user-big-avatar">
+                                    <User size={32} color="#00B0FA" />
+                                </div>
+                                <div className="user-details-box">
+                                    <h4 className="user-display-name">{userName}</h4>
+                                    <p className="user-display-email">john.admin@enviguide.com</p>
+                                    <span className="user-badge-premium">{userRole}istrator</span>
+                                </div>
+                            </div>
+                            
+                            <div className="profile-dropdown-menu">
+                                <button className="profile-menu-item" onClick={(e) => handleMenuClick(e, '/security/user-profile')}>
+                                    <UserCircle size={18} />
+                                    <span>My Profile</span>
+                                </button>
+                                <button className="profile-menu-item" onClick={(e) => { e.stopPropagation(); setShowProfile(false); }}>
+                                    <Settings size={18} />
+                                    <span>Account Settings</span>
+                                </button>
+                                <button className="profile-menu-item" onClick={(e) => handleMenuClick(e, '/security/user-rights')}>
+                                    <Shield size={18} />
+                                    <span>Security & Privacy</span>
+                                </button>
+                                <button className="profile-menu-item" onClick={(e) => handleMenuClick(e, '/contact')}>
+                                    <HelpCircle size={18} />
+                                    <span>Help Center</span>
+                                </button>
+                            </div>
+
+                            <div className="profile-dropdown-footer">
+                                <button className="logout-button" onClick={(e) => handleLogout(e)}>
+                                    <LogOut size={18} />
+                                    <span>Sign Out</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </header>
