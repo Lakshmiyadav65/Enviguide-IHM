@@ -22,6 +22,9 @@ import SuspectedKeyword from './pages/SuspectedKeyword';
 import UserProfile from './pages/UserProfile';
 import UserMenu from './pages/UserMenu';
 import UserRights from './pages/UserRights';
+import Users from './pages/Users';
+import UserRoleRights from './pages/UserRoleRights';
+import UserCategory from './pages/UserCategory';
 import './index.css';
 
 function App() {
@@ -49,12 +52,12 @@ function App() {
         <Route path="/administration/document-audit/:imo" element={<DocumentAudit />} />
         <Route path="/administration/upload-docs" element={<DocTab />} />
         <Route path="/security" element={<Dashboard />} />
-        <Route path="/security/users" element={<Dashboard />} />
+        <Route path="/security/users" element={<Users />} />
         <Route path="/security/user-profile" element={<UserProfile />} />
         <Route path="/security/user-menu" element={<UserMenu />} />
         <Route path="/security/user-rights" element={<UserRights />} />
-        <Route path="/security/user-role-rights" element={<Dashboard />} />
-        <Route path="/security/user-category" element={<Dashboard />} />
+        <Route path="/security/user-role-rights" element={<UserRoleRights />} />
+        <Route path="/security/user-category" element={<UserCategory />} />
         <Route path="/master-data" element={<Dashboard />} />
         <Route path="/inventory" element={<Dashboard />} />
         <Route path="/menu/registered" element={<Registered />} />

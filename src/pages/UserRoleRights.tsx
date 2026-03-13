@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
-    ChevronDown, ChevronRight, Save, X, Shield, 
-    Check, Minus
+    ChevronDown, ChevronRight, Check, 
+    Minus, Shield, X, Save
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
-import './UserRights.css';
+import './UserRoleRights.css';
 
 interface PermissionNode {
     id: string;
@@ -93,23 +93,25 @@ const PERMISSIONS_DATA: PermissionNode[] = [
     }
 ];
 
-const USERS = [
-    { id: 1, name: 'John Administrator', role: 'Admin', email: 'john.admin@enviguide.com' },
-    { id: 2, name: 'Vishnu', role: 'Premium User', email: 'vishnu@example.com' },
-    { id: 3, name: 'Sarah Marine', role: 'Viewer', email: 'sarah.m@example.com' }
+const ROLES = [
+    { id: '1', name: 'Administrator' },
+    { id: '2', name: 'Ship Manager' },
+    { id: '3', name: 'Deck Officer' },
+    { id: '4', name: 'Surveyor' },
 ];
 
-export default function UserRights() {
-    const [selectedUser, setSelectedUser] = useState(USERS[0]);
+export default function UserRoleRights() {
+    const [selectedRole, setSelectedRole] = useState(ROLES[0]);
+    const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
     const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['vessel', 'administration', 'ship', 'fleet', 'sub_fleet', 'upload_po', 'pending_audits', 'pending_review']));
-    const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set(['vessel', 'administration', 'ship', 'fleet', 'sub_fleet']));
     const dropdownRef = useRef<HTMLDivElement>(null);
 
+    // Close dropdown on click outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                setIsUserDropdownOpen(false);
+                setIsRoleDropdownOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -189,7 +191,7 @@ export default function UserRights() {
                         ) : null}
                     </div>
                     
-                    <div className={`checkbox-custom ${isChecked ? 'checked' : ''} ${isSemi ? 'semi' : ''}`}>
+                    <div className={`checkbox-visual ${isChecked ? 'checked' : ''} ${isSemi ? 'semi' : ''}`}>
                         {isChecked && <Check size={12} />}
                         {isSemi && !isChecked && <Minus size={12} />}
                     </div>
@@ -217,110 +219,99 @@ export default function UserRights() {
     const isMasterAllSemi = checkedIds.size > 0 && checkedIds.size < allIdsList.length;
 
     return (
-        <div className="userrights-page-container">
+        <div className="user-role-rights-container">
             <Sidebar />
-            <div className="userrights-page-main">
+            <main className="user-role-rights-main">
                 <Header notificationCount={3} />
                 
-                <div className="userrights-content-wrapper">
-                    <div className="userrights-header">
-                        <div className="header-titles">
-                            <h1>User Rights</h1>
-                            <p>Configure granular access control and functional permissions for users.</p>
+                <div className="user-role-rights-wrapper">
+                    <div className="user-role-rights-header">
+                        <div className="header-info">
+                            <h1>User Role Rights</h1>
+                            <p>Configure and manage global permissions for specific system roles.</p>
                         </div>
                         <div className="header-actions">
-                            <button className="userrights-action-btn cancel">
-                                <X size={20} />
-                                <span>Cancel Changes</span>
-                            </button>
-                            <button className="userrights-action-btn save">
-                                <Save size={20} />
-                                <span>Save Permissions</span>
-                            </button>
+                            <button className="action-btn cancel"><X size={18} /> Cancel</button>
+                            <button className="action-btn save"><Save size={18} /> Save Changes</button>
                         </div>
                     </div>
 
-                    <div className="userrights-grid">
-                        {/* Left Card */}
-                        <div className="userrights-card">
-                            <label className="selector-label">SELECT USER</label>
+                    <div className="user-role-rights-grid">
+                        {/* Left Card: Role Input */}
+                        <div className="card-standard">
+                            <label className="selector-label">SELECT ROLE</label>
+                            
                             <div className="selector-group" ref={dropdownRef} style={{ position: 'relative' }}>
                                 <div 
-                                    className={`premium-user-dropdown ${isUserDropdownOpen ? 'active' : ''}`}
-                                    onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                                    className={`premium-user-dropdown ${isRoleDropdownOpen ? 'active' : ''}`}
+                                    onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
                                 >
                                     <div className="user-meta">
-                                        <span className="user-name-val-top">{selectedUser.name}</span>
-                                        <span className="user-role-val-mini">{selectedUser.role}</span>
+                                        <span className="user-name-val-top">{selectedRole.name}</span>
+                                        <span className="user-role-val-mini">System Role</span>
                                     </div>
-                                    <ChevronDown size={18} className={`select-chevron ${isUserDropdownOpen ? 'rotate' : ''}`} />
+                                    <ChevronDown size={18} className={`select-chevron ${isRoleDropdownOpen ? 'rotate' : ''}`} />
                                 </div>
 
-                                {isUserDropdownOpen && (
+                                {isRoleDropdownOpen && (
                                     <div className="user-dropdown-menu-absolute">
-                                        {USERS.map(user => (
+                                        {ROLES.map(role => (
                                             <div 
-                                                key={user.id} 
-                                                className={`user-dropdown-item-premium ${selectedUser.id === user.id ? 'active' : ''}`}
+                                                key={role.id} 
+                                                className={`user-dropdown-item-premium ${selectedRole.id === role.id ? 'active' : ''}`}
                                                 onClick={() => {
-                                                    setSelectedUser(user);
-                                                    setIsUserDropdownOpen(false);
+                                                    setSelectedRole(role);
+                                                    setIsRoleDropdownOpen(false);
                                                 }}
                                             >
                                                 <div className="item-details">
-                                                    <span className="item-name">{user.name}</span>
-                                                    <span className="item-role">{user.role}</span>
+                                                    <span className="item-name">{role.name}</span>
                                                 </div>
-                                                {selectedUser.id === user.id && <Check size={14} color="#00B2FF" />}
+                                                {selectedRole.id === role.id && <Check size={14} color="#00B2FF" />}
                                             </div>
                                         ))}
                                     </div>
                                 )}
                             </div>
 
-                            <div className="user-access-summary">
-                                <div className="summary-title">Access Status</div>
-                                <div className="status-badge-active">
-                                    <Shield size={20} color="#334E68" />
-                                    <span>Authenticated Account</span>
+                            <div className="role-description-card">
+                                <div className="role-status-title">Role Definition</div>
+                                <div className="role-status-badge">
+                                    <Shield size={20} />
+                                    <span>Global Access Policy</span>
                                 </div>
-                                <div className="summary-desc">
-                                    Granting permissions below will take effect immediately upon saving.
+                                <div className="role-status-desc">
+                                    Updating these permissions will apply to all users assigned to this specific role immediately.
                                 </div>
                             </div>
                         </div>
 
-                        {/* Right Card */}
-                        <div className="userrights-card">
+                        {/* Right Card: Hierarchy */}
+                        <div className="card-standard">
                             <div className="tree-header">
-                                <div className="tree-title-group">
-                                    <Shield size={20} color="#00B2FF" />
-                                    <h3>Permission Hierarchy</h3>
-                                </div>
+                                <h3>Permission Hierarchy</h3>
                                 <button className="select-all-btn" onClick={handleAllToggle}>
                                     Select All
                                 </button>
                             </div>
 
-                            <div className="permissions-tree-container">
-                                <div className="tree-scroll-area">
-                                    <div className="permission-node-wrapper level-0 master-all">
-                                        <div className="permission-node-row" onClick={handleAllToggle}>
-                                            <div className="node-expander"></div>
-                                            <div className={`checkbox-custom ${isMasterAllChecked ? 'checked' : (isMasterAllSemi ? 'semi' : '')}`}>
-                                                {isMasterAllChecked && <Check size={12} />}
-                                                {isMasterAllSemi && <Minus size={12} />}
-                                            </div>
-                                            <span className="node-label">All</span>
+                            <div className="tree-scroll-container">
+                                <div className="permission-node-wrapper level-0 master-all-row">
+                                    <div className="permission-node-row" onClick={handleAllToggle}>
+                                        <div className="node-expander"></div>
+                                        <div className={`checkbox-visual ${isMasterAllChecked ? 'checked' : (isMasterAllSemi ? 'semi' : '')}`}>
+                                            {isMasterAllChecked && <Check size={12} />}
+                                            {isMasterAllSemi && <Minus size={12} />}
                                         </div>
+                                        <span className="node-label">All Permissions</span>
                                     </div>
-                                    {PERMISSIONS_DATA.map(node => renderPermissionNode(node))}
                                 </div>
+                                {PERMISSIONS_DATA.map(node => renderPermissionNode(node))}
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            </main>
         </div>
     );
 }
