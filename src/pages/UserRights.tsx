@@ -129,14 +129,25 @@ export default function UserRights() {
     const togglePermission = (node: PermissionNode) => {
         const idsToToggle = getAllChildIds(node);
         const newCheckedIds = new Set(checkedIds);
-        const isCurrentlyChecked = checkedIds.has(node.id);
+        const allChecked = idsToToggle.every(id => checkedIds.has(id));
 
-        if (isCurrentlyChecked) {
+        if (allChecked) {
             idsToToggle.forEach(id => newCheckedIds.delete(id));
         } else {
             idsToToggle.forEach(id => newCheckedIds.add(id));
         }
 
+        setCheckedIds(newCheckedIds);
+    };
+
+    const toggleSingleId = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const newCheckedIds = new Set(checkedIds);
+        if (newCheckedIds.has(id)) {
+            newCheckedIds.delete(id);
+        } else {
+            newCheckedIds.add(id);
+        }
         setCheckedIds(newCheckedIds);
     };
 
@@ -178,37 +189,50 @@ export default function UserRights() {
     const renderPermissionNode = (node: PermissionNode, level: number = 0) => {
         const hasChildren = node.children && node.children.length > 0;
         const isExpanded = expandedIds.has(node.id);
-        const isChecked = checkedIds.has(node.id);
+        const isChecked = checkedIds.has(node.id) || (hasChildren && getAllChildIds(node).every(id => checkedIds.has(id)));
         const isSemi = isNodeSemiChecked(node);
 
+        // If it's a leaf node set (like View/Add/Edit/Delete), we render them horizontally
+        const isRecordSet = hasChildren && node.children!.every(c => c.label.includes('Record'));
+
         return (
-            <div key={node.id} className="permission-node-wrapper" style={{ marginLeft: `${level * 24}px` }}>
-                <div className="permission-node-row">
-                    <div className="node-expander" onClick={(e) => hasChildren && toggleExpansion(node.id, e)}>
+            <div key={node.id} className={`permission-node-wrapper level-${level} ${isRecordSet ? 'record-set' : ''}`}>
+                <div className="permission-node-row" onClick={() => togglePermission(node)}>
+                    <div className="node-expander" onClick={(e) => { e.stopPropagation(); hasChildren && toggleExpansion(node.id, e); }}>
                         {hasChildren ? (
-                            isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />
+                            isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
                         ) : null}
                     </div>
                     
-                    <label className="premium-checkbox-container">
-                        <div className="checkbox-box" onClick={() => togglePermission(node)}>
-                            <input 
-                                type="checkbox" 
-                                checked={isChecked} 
-                                readOnly 
-                            />
-                            <div className={`checkbox-custom ${isChecked ? 'checked' : ''} ${isSemi ? 'semi' : ''}`}>
-                                {isChecked && <Check size={14} />}
-                                {isSemi && !isChecked && <Minus size={14} />}
-                            </div>
+                    <div className="premium-checkbox-container">
+                        <div className={`checkbox-custom ${isChecked ? 'checked' : ''} ${isSemi ? 'semi' : ''}`}>
+                            {isChecked && <Check size={12} />}
+                            {isSemi && !isChecked && <Minus size={12} />}
                         </div>
-                        <span className="node-label" onClick={() => hasChildren && toggleExpansion(node.id, {} as any)}>{node.label}</span>
-                    </label>
+                        <span className="node-label">{node.label}</span>
+                    </div>
                 </div>
 
                 {hasChildren && isExpanded && (
-                    <div className="node-children">
-                        {node.children!.map(child => renderPermissionNode(child, 1))}
+                    <div className={`node-children ${isRecordSet ? 'grid-layout' : ''}`}>
+                        {node.children!.map(child => {
+                            if (isRecordSet) {
+                                const isChildChecked = checkedIds.has(child.id);
+                                return (
+                                    <div 
+                                        key={child.id} 
+                                        className={`record-chip ${isChildChecked ? 'active' : ''}`}
+                                        onClick={(e) => toggleSingleId(child.id, e)}
+                                    >
+                                        <div className={`mini-check ${isChildChecked ? 'checked' : ''}`}>
+                                            {isChildChecked && <Check size={10} />}
+                                        </div>
+                                        <span>{child.label.replace(' Record', '')}</span>
+                                    </div>
+                                );
+                            }
+                            return renderPermissionNode(child, level + 1);
+                        })}
                     </div>
                 )}
             </div>
@@ -312,22 +336,13 @@ export default function UserRights() {
                             </div>
 
                             <div className="permissions-tree-container">
-                                {/* All Checkbox */}
-                                <div className="permission-node-wrapper-all">
-                                    <label className="premium-checkbox-container global-all">
-                                        <div className="checkbox-box" onClick={handleAllToggle}>
-                                            <input 
-                                                type="checkbox" 
-                                                checked={checkedIds.size === 50} // Rough number of total nodes
-                                                readOnly 
-                                            />
-                                            <div className={`checkbox-custom global ${checkedIds.size > 0 ? (checkedIds.size < 50 ? 'semi' : 'checked') : ''}`}>
-                                                {checkedIds.size === 50 && <Check size={14} />}
-                                                {checkedIds.size > 0 && checkedIds.size < 50 && <Minus size={14} />}
-                                            </div>
-                                        </div>
-                                        <span className="node-label-global">All Permissions</span>
-                                    </label>
+                                {/* All Checkbox Banner - Compact Version */}
+                                <div className="all-permissions-banner" onClick={handleAllToggle}>
+                                    <div className={`checkbox-custom global ${checkedIds.size > 0 ? (checkedIds.size < 50 ? 'semi' : 'checked') : ''}`}>
+                                        {checkedIds.size === 50 && <Check size={12} />}
+                                        {checkedIds.size > 0 && checkedIds.size < 50 && <Minus size={12} />}
+                                    </div>
+                                    <span className="node-label-global">Enable All Platform Access</span>
                                 </div>
 
                                 <div className="tree-scroll-area">
