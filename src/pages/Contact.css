@@ -1,62 +1,72 @@
 .contact-premium-container {
     display: flex;
     background-color: #ffffff;
-    min-height: 100vh;
+    height: 100vh; /* Fixed height */
     color: #0F172A;
+    overflow: hidden; /* Prevent body scroll */
 }
 
 .contact-viewport {
     flex: 1;
     margin-left: var(--sidebar-width, 240px);
     width: calc(100% - var(--sidebar-width, 240px));
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .contact-frame {
-    padding: 140px 80px 60px 80px;
-    max-width: 1100px;
+    flex: 1;
+    padding: 0 80px;
+    max-width: 1200px;
     margin: 0 auto;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Center form vertically */
+    margin-top: 40px; /* Offset for fixed header */
 }
 
-/* Intro Section */
+/* Intro Section - More compact */
 .contact-intro {
-    margin-bottom: 64px;
+    margin-bottom: 40px;
 }
 
 .maritime-badge {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    padding: 6px 14px;
+    padding: 5px 12px;
     background: #F1F5F9;
     border-radius: 100px;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.12em;
     color: #64748B;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
 }
 
 .contact-intro h1 {
-    font-size: 48px;
+    font-size: 42px;
     font-weight: 900;
     letter-spacing: -0.04em;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     line-height: 1.1;
 }
 
 .contact-intro p {
-    font-size: 18px;
+    font-size: 16px;
     color: #475569;
-    max-width: 520px;
-    line-height: 1.6;
+    max-width: 500px;
+    line-height: 1.5;
 }
 
 /* Layout Grid */
 .contact-layout-grid {
     display: grid;
     grid-template-columns: 1.5fr 1fr;
-    gap: 100px;
+    gap: 80px;
     align-items: start;
 }
 
@@ -64,23 +74,23 @@
 .minimal-blueprint-form {
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: 24px;
 }
 
 .input-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 32px;
+    gap: 24px;
 }
 
 .minimal-group {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
 .minimal-group label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.12em;
@@ -90,9 +100,9 @@
 .minimal-group input,
 .minimal-group textarea {
     border: 1.5px solid #F1F5F9;
-    border-radius: 12px;
-    padding: 16px 20px;
-    font-size: 15px;
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 14px;
     font-weight: 500;
     color: #0F172A;
     background: #F8FAFC;
@@ -115,57 +125,58 @@
 
 .ship-command-btn {
     align-self: flex-start;
-    margin-top: 20px;
-    padding: 16px 44px;
-    background: #0F172A;
+    margin-top: 10px;
+    padding: 14px 40px;
+    background: #00B1FF; /* Vibrant Blue CTA */
     color: white;
     border: none;
-    border-radius: 100px; /* Sophisticated pill shape */
+    border-radius: 100px;
     font-weight: 700;
-    font-size: 14px;
+    font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
+    box-shadow: 0 8px 20px rgba(0, 177, 255, 0.25);
 }
 
 .ship-command-btn:hover {
-    background: #00B1FF;
-    transform: translateY(-3px);
-    box-shadow: 0 15px 35px rgba(0, 177, 255, 0.3);
+    background: #0099e0;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 25px rgba(0, 177, 255, 0.35);
 }
 
 .ship-command-btn:active {
-    transform: translateY(-1px);
+    transform: translateY(0);
 }
 
 /* Details Column */
 .contact-details-column {
     display: flex;
     flex-direction: column;
-    gap: 40px;
+    gap: 32px;
 }
 
 .detail-item {
     display: flex;
-    gap: 24px;
+    gap: 20px;
     align-items: flex-start;
 }
 
 .detail-icon {
-    width: 48px;
-    height: 48px;
+    width: 42px;
+    height: 42px;
     background: white;
     border: 1.5px solid #F1F5F9;
-    border-radius: 14px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #00B1FF;
+    flex-shrink: 0;
     transition: all 0.3s;
 }
 
@@ -176,26 +187,25 @@
 }
 
 .detail-content h3 {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     color: #94A3B8;
 }
 
 .detail-content p {
-    font-size: 16px;
+    font-size: 14px;
     color: #1E293B;
     font-weight: 600;
 }
 
 .nautical-seal {
-    margin-top: auto;
-    padding-top: 40px;
+    margin-top: 20px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     color: #E2E8F0;
 }
 
@@ -203,22 +213,22 @@
     opacity: 0.4;
 }
 
-/* Footer Design */
+/* Footer Design - Compact */
 .contact-footer {
     border-top: 1px solid #F1F5F9;
-    padding: 40px 0;
-    margin-top: 80px;
+    padding: 24px 0;
+    margin-top: 40px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 13px;
+    font-size: 11px;
     color: #94A3B8;
     font-weight: 500;
 }
 
 .footer-nav {
     display: flex;
-    gap: 32px;
+    gap: 24px;
 }
 
 .footer-nav a {
@@ -234,7 +244,7 @@
 .copyright {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 
