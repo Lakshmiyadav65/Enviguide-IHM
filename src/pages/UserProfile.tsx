@@ -245,6 +245,18 @@ export default function UserProfile() {
                             </div>
                         </div>
                     </div>
+
+                    <footer className="contact-footer">
+                        <div className="copyright">
+                            <ShieldCheck size={16} />
+                            <span>© 2026 IHM Platform. Corporate Fleet Security.</span>
+                        </div>
+                        <nav className="footer-nav">
+                            <a href="#">Privacy Policy</a>
+                            <a href="#">Security Terms</a>
+                            <a href="#">Audit Logs</a>
+                        </nav>
+                    </footer>
                 </div>
             </main>
         </div>
