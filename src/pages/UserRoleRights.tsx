@@ -310,6 +310,18 @@ export default function UserRoleRights() {
                             </div>
                         </div>
                     </div>
+
+                    <footer className="contact-footer">
+                        <div className="copyright">
+                            <Shield size={16} />
+                            <span>© 2026 IHM Platform. Access Governance Deck.</span>
+                        </div>
+                        <nav className="footer-nav">
+                            <a href="#">Compliance Policy</a>
+                            <a href="#">Security Protocols</a>
+                            <a href="#">Permission Logs</a>
+                        </nav>
+                    </footer>
                 </div>
             </main>
         </div>
