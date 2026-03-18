@@ -25,6 +25,7 @@ import UserRights from './pages/UserRights';
 import Users from './pages/Users';
 import UserRoleRights from './pages/UserRoleRights';
 import UserCategory from './pages/UserCategory';
+import Contact from './pages/Contact';
 import './index.css';
 
 function App() {
@@ -67,6 +68,7 @@ function App() {
         <Route path="/menu/equipment" element={<Equipment />} />
         <Route path="/menu/suspended" element={<Dashboard />} />
         <Route path="/menu/suspected-keyword" element={<SuspectedKeyword />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="*" element={<Login />} />
       </Routes>
     </Router>

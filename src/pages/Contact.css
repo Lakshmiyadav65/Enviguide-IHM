@@ -1,0 +1,240 @@
+.contact-premium-container {
+    display: flex;
+    background-color: #ffffff;
+    min-height: 100vh;
+    color: #0F172A;
+}
+
+.contact-viewport {
+    flex: 1;
+    margin-left: var(--sidebar-width, 240px);
+    width: calc(100% - var(--sidebar-width, 240px));
+}
+
+.contact-frame {
+    padding: 60px 80px;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+/* Intro Section */
+.contact-intro {
+    margin-bottom: 64px;
+}
+
+.maritime-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px;
+    background: #F1F5F9;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #64748B;
+    margin-bottom: 24px;
+}
+
+.contact-intro h1 {
+    font-size: 48px;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    margin-bottom: 16px;
+    line-height: 1.1;
+}
+
+.contact-intro p {
+    font-size: 18px;
+    color: #475569;
+    max-width: 520px;
+    line-height: 1.6;
+}
+
+/* Layout Grid */
+.contact-layout-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 100px;
+    align-items: start;
+}
+
+/* Minimalist Refined Form */
+.minimal-blueprint-form {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.input-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+}
+
+.minimal-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.minimal-group label {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #94A3B8;
+}
+
+.minimal-group input,
+.minimal-group textarea {
+    border: 1.5px solid #F1F5F9;
+    border-radius: 12px;
+    padding: 16px 20px;
+    font-size: 15px;
+    font-weight: 500;
+    color: #0F172A;
+    background: #F8FAFC;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+}
+
+.minimal-group input:focus,
+.minimal-group textarea:focus {
+    border-color: #00B1FF;
+    background: #FFFFFF;
+    box-shadow: 0 0 0 4px rgba(0, 177, 255, 0.08);
+}
+
+.minimal-group input::placeholder,
+.minimal-group textarea::placeholder {
+    color: #CBD5E1;
+    font-weight: 400;
+}
+
+.ship-command-btn {
+    align-self: flex-start;
+    margin-top: 20px;
+    padding: 16px 44px;
+    background: #0F172A;
+    color: white;
+    border: none;
+    border-radius: 100px; /* Sophisticated pill shape */
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.15);
+}
+
+.ship-command-btn:hover {
+    background: #00B1FF;
+    transform: translateY(-3px);
+    box-shadow: 0 15px 35px rgba(0, 177, 255, 0.3);
+}
+
+.ship-command-btn:active {
+    transform: translateY(-1px);
+}
+
+/* Details Column */
+.contact-details-column {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+}
+
+.detail-item {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+}
+
+.detail-icon {
+    width: 48px;
+    height: 48px;
+    background: white;
+    border: 1.5px solid #F1F5F9;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #00B1FF;
+    transition: all 0.3s;
+}
+
+.detail-item:hover .detail-icon {
+    border-color: #00B1FF;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 177, 255, 0.1);
+}
+
+.detail-content h3 {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+    color: #94A3B8;
+}
+
+.detail-content p {
+    font-size: 16px;
+    color: #1E293B;
+    font-weight: 600;
+}
+
+.nautical-seal {
+    margin-top: auto;
+    padding-top: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    color: #E2E8F0;
+}
+
+.seal-icon {
+    opacity: 0.4;
+}
+
+/* Footer Design */
+.contact-footer {
+    border-top: 1px solid #F1F5F9;
+    padding: 40px 0;
+    margin-top: 80px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #94A3B8;
+    font-weight: 500;
+}
+
+.footer-nav {
+    display: flex;
+    gap: 32px;
+}
+
+.footer-nav a {
+    color: #94A3B8;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.footer-nav a:hover {
+    color: #00B1FF;
+}
+
+.copyright {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+
