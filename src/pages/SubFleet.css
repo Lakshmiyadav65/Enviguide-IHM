@@ -33,33 +33,46 @@
     margin: 0;
 }
 
-/* Top Bar - Search and Add Button */
+/* Top Bar - Search and Add Button Redesign */
 .audits-top-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 20px;
+    gap: 24px;
+    margin-bottom: 24px;
     flex-shrink: 0;
+    height: 44px; /* Slightly more compact for premium feel */
 }
 
 .search-box {
     flex: 1;
-    height: 48px;
-    max-width: 500px;
-    background: white;
-    border-radius: 12px;
+    height: 100%;
+    max-width: 480px;
+    background: #ffffff;
+    border-radius: 100px; /* Pill shape */
     display: flex;
     align-items: center;
-    padding: 0 16px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    border: 1px solid #E2E8F0;
+    padding: 0 20px;
+    border: 1.5px solid #E2E8F0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-box:focus-within {
+    border-color: #00B0FA;
+    box-shadow: 0 4px 12px rgba(0, 176, 250, 0.12);
+    transform: translateY(-1px);
 }
 
 .search-icon {
-    color: #94a3b8;
-    margin-right: 12px;
+    color: #94A3B8;
+    margin-right: 14px;
     flex-shrink: 0;
+    transition: color 0.2s;
+}
+
+.search-box:focus-within .search-icon {
+    color: #00B0FA;
 }
 
 .search-box input {
@@ -67,28 +80,50 @@
     border: none;
     outline: none;
     font-size: 14px;
-    color: #1e293b;
+    color: #1E293B;
     font-weight: 500;
     background: transparent;
+    height: 100%;
+    padding-bottom: 1px; /* Optical center alignment */
+}
+
+.search-box input::placeholder {
+    color: #94A3B8;
+    font-weight: 400;
+}
+
+.top-bar-right {
+    height: 100%;
 }
 
 .add-fleet-btn {
-    height: 48px;
-    padding: 0 24px;
-    background: var(--primary-blue);
+    height: 100%;
+    padding: 0 28px;
+    background: #00B0FA;
     color: white;
     border: none;
-    border-radius: 12px;
+    border-radius: 100px; /* Pill shape matching search */
     font-weight: 700;
-    font-size: 13px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     display: flex;
     align-items: center;
     gap: 10px;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 176, 250, 0.2);
+    box-shadow: 0 4px 14px rgba(0, 176, 250, 0.3);
     white-space: nowrap;
-    transition: all 0.2s;
-    flex-shrink: 0;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.add-fleet-btn:hover {
+    background: #0099e0;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 176, 250, 0.4);
+}
+
+.add-fleet-btn:active {
+    transform: translateY(0);
 }
 
 .add-fleet-btn:hover {
