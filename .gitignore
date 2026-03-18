@@ -7,9 +7,14 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies & Build
 node_modules
 dist
 dist-ssr
+
+# Environment files (local config should never be committed)
+.env.local
+.env.*.local
 *.local
 
 # Editor directories and files
@@ -23,6 +28,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# Temporary lock fixes
+# Temporary/generated files
 public/ga_plan_illustration.png
 public/ga_plan_minimal.png
