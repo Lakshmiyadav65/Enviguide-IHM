@@ -1,36 +1,17 @@
 {
-  "name": "ihm-platform",
+  "name": "ihm-enviguide",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "description": "IHM EnviGuide Platform — Monorepo (Frontend + Backend)",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@tanstack/react-query": "^5.90.19",
-    "lucide-react": "^0.562.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-router-dom": "^7.12.0",
-    "uuid": "^13.0.0",
-    "xlsx": "^0.18.5"
+    "dev":              "concurrently \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
+    "dev:frontend":     "npm run dev --prefix frontend",
+    "dev:backend":      "npm run dev --prefix backend",
+    "build":            "npm run build --prefix frontend",
+    "install:all":      "npm install --prefix frontend && npm install --prefix backend",
+    "lint":             "npm run lint --prefix frontend && npm run lint --prefix backend"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.5",
-    "@types/react-dom": "^19.2.3",
-    "@types/uuid": "^10.0.0",
-    "@vitejs/plugin-react": "^5.1.1",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "typescript": "~5.9.3",
-    "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
+    "concurrently": "^8.2.2"
   }
 }

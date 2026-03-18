@@ -1,0 +1,15 @@
+# Backend — local files (never commit these)
+node_modules
+dist
+.env
+*.local
+
+# File uploads
+uploads/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store

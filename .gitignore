@@ -1,33 +1,31 @@
-# Logs
-logs
+# ── Root / Shared ─────────────────────────────────────────
+.DS_Store
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-# Dependencies & Build
-node_modules
-dist
-dist-ssr
-
-# Environment files (local config should never be committed)
-.env.local
-.env.*.local
 *.local
 
-# Editor directories and files
+# ── Frontend ──────────────────────────────────────────────
+frontend/node_modules
+frontend/dist
+frontend/dist-ssr
+frontend/.env.local
+frontend/.env.*.local
+
+# ── Backend ───────────────────────────────────────────────
+backend/node_modules
+backend/dist
+backend/.env
+backend/uploads/
+
+# ── Editor ────────────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# Temporary/generated files
-public/ga_plan_illustration.png
-public/ga_plan_minimal.png
+# ── Temp / Generated ──────────────────────────────────────
+frontend/public/ga_plan_illustration.png
+frontend/public/ga_plan_minimal.png
