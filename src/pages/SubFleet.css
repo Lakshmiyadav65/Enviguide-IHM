@@ -1,10 +1,11 @@
 /* Sub-Fleet Styles Standardized with Premium Fleet Layout */
 .pending-audits-content {
     padding: 24px 40px !important;
-    gap: 0 !important; /* Controlled gaps via margins */
+    gap: 0 !important;
     height: calc(100vh - 72px);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 /* Header Section matching Fleet.css */
@@ -16,6 +17,7 @@
     background: transparent;
     border-bottom: 2px solid #E2E8F0;
     margin-bottom: 24px;
+    flex-shrink: 0;
 }
 
 .md-title-area h1 {
@@ -37,7 +39,8 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
+    flex-shrink: 0;
 }
 
 .search-box {
@@ -56,6 +59,7 @@
 .search-icon {
     color: #94a3b8;
     margin-right: 12px;
+    flex-shrink: 0;
 }
 
 .search-box input {
@@ -65,6 +69,7 @@
     font-size: 14px;
     color: #1e293b;
     font-weight: 500;
+    background: transparent;
 }
 
 .add-fleet-btn {
@@ -83,6 +88,7 @@
     box-shadow: 0 4px 12px rgba(0, 176, 250, 0.2);
     white-space: nowrap;
     transition: all 0.2s;
+    flex-shrink: 0;
 }
 
 .add-fleet-btn:hover {
@@ -90,9 +96,9 @@
     transform: translateY(-1px);
 }
 
-/* Big Table Container */
+/* Table Container — scrollable area */
 .table-container {
-    flex: 1; /* Stretches to fill space */
+    flex: 1;
     background: white;
     border-radius: 16px;
     border: 1px solid #f1f5f9;
@@ -100,12 +106,13 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    min-height: 400px; /* Ensures it feels 'big' */
+    min-height: 0; /* critical: lets flex children shrink properly */
 }
 
 .table-scroll-wrapper {
     flex: 1;
     overflow-y: auto;
+    overflow-x: auto;
 }
 
 .audits-table {
@@ -114,29 +121,32 @@
     table-layout: fixed;
 }
 
+/* Base cell styles */
 .audits-table th,
 .audits-table td {
-    padding: 0 20px;
+    padding: 0 16px;
     text-align: left;
-    white-space: nowrap;
+    vertical-align: middle;
     overflow: hidden;
+}
+
+/* Action column — wide enough for 3 icons at 30px + 2 gaps at 6px = 102px; give 120px */
+.sf-th-action,
+.sf-action-column {
+    width: 120px;
+    padding: 0 12px;
+}
+
+/* Data columns: split remaining width evenly across 4 columns */
+.audits-table th:not(.sf-th-action),
+.audits-table td:not(.sf-action-column) {
+    width: calc((100% - 120px) / 4);
+    white-space: nowrap;
     text-overflow: ellipsis;
 }
 
-/* Roomy Action Column */
-.th-action,
-.action-column {
-    width: 140px;
-}
-
-/* data columns share space */
-.audits-table th:not(.th-action),
-.audits-table td:not(.action-column) {
-    width: calc((100% - 140px) / 4);
-}
-
 .audits-table th {
-    height: 52px;
+    height: 48px;
     background: #F8FAFC;
     color: #94a3b8;
     font-size: 11px;
@@ -146,53 +156,67 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 2px solid #f1f5f9;
 }
 
 .audits-table td {
-    height: 72px; /* Increased height so it feels 'big' and useful */
+    height: 64px;
     color: #1e293b;
     font-size: 14px;
-    font-weight: 600; /* Bolder text for visibility */
-    border-bottom: 1px solid #f8fafc;
+    font-weight: 600;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.audits-table tbody tr:last-child td {
+    border-bottom: none;
 }
 
 .audits-table tbody tr:hover {
     background-color: #f8fafc !important;
 }
 
-/* Refined Compact Action Icons */
-.action-buttons {
-    display: flex;
-    gap: 8px;
+/* Action icon buttons — properly centered inside the cell */
+.sf-action-column {
+    overflow: hidden;
 }
 
-.action-btn {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
+.sf-action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sf-action-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
     border: none;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.18s ease;
+    flex-shrink: 0;
+    padding: 0;
 }
 
-.edit-btn { background: #F1F5F9; color: #64748B; }
-.edit-btn:hover { background: #E2E8F0; color: #1E293B; }
+.sf-edit-btn { background: #F1F5F9; color: #475569; }
+.sf-edit-btn:hover { background: #E2E8F0; color: #1E293B; transform: scale(1.08); }
 
-.send-btn { background: transparent; color: #00B0FA; }
-.send-btn:hover { background: #f0f9ff; color: #0284c7; }
+.sf-send-btn { background: #EFF6FF; color: #3B82F6; }
+.sf-send-btn:hover { background: #DBEAFE; color: #1D4ED8; transform: scale(1.08); }
 
-.delete-btn { background: #FEF2F2; color: #EF4444; }
-.delete-btn:hover { background: #EF4444; color: white; }
+.sf-delete-btn { background: #FEF2F2; color: #EF4444; }
+.sf-delete-btn:hover { background: #EF4444; color: white; transform: scale(1.08); }
 
-/* Eliminate gaps between items below the table */
+/* Table footer */
 .table-footer {
-    padding: 12px 20px;
+    padding: 10px 20px;
     border-top: 1px solid #f1f5f9;
     background: #fcfdfe;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
 }
 
 .total-count {
@@ -200,19 +224,23 @@
     color: #94a3b8;
     font-weight: 700;
     text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
+/* Archived Section */
 .archived-section {
-    margin-top: 20px; /* Reduced to pull it closer */
-    padding-top: 10px;
+    margin-top: 16px;
+    padding-top: 12px;
     border-top: 1px solid #E2E8F0;
+    flex-shrink: 0;
 }
 
 .archived-section h3 {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 800;
     color: #94a3b8;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     margin: 0;
 }
+

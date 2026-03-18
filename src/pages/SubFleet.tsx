@@ -64,7 +64,7 @@ export default function SubFleet() {
                             <table className="audits-table">
                                 <thead>
                                     <tr>
-                                        <th className="th-action">Action</th>
+                                        <th className="sf-th-action">Action</th>
                                         <th>Name</th>
                                         <th>Parent Fleet</th>
                                         <th>Owner</th>
@@ -74,15 +74,15 @@ export default function SubFleet() {
                                 <tbody>
                                     {MOCK_SUB_FLEETS.map((item) => (
                                         <tr key={item.id}>
-                                            <td className="action-column">
-                                                <div className="action-buttons">
-                                                    <button className="action-btn edit-btn" title="Edit">
+                                            <td className="sf-action-column">
+                                                <div className="sf-action-buttons">
+                                                    <button className="sf-action-btn sf-edit-btn" title="Edit">
                                                         <Edit2 size={14} />
                                                     </button>
-                                                    <button className="action-btn send-btn" title="Send">
+                                                    <button className="sf-action-btn sf-send-btn" title="Send">
                                                         <Send size={14} />
                                                     </button>
-                                                    <button className="action-btn delete-btn" title="Delete">
+                                                    <button className="sf-action-btn sf-delete-btn" title="Delete">
                                                         <Trash2 size={14} />
                                                     </button>
                                                 </div>
