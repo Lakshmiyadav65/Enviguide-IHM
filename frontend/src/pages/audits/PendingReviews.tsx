@@ -1,0 +1,270 @@
+﻿import { useState, useEffect } from 'react';
+import './PendingReviews.css';
+import Sidebar from '../../components/Sidebar';
+import Header from '../../components/Header';
+import { Download, Eye, Edit2, Trash2, Ship, X, Search } from 'lucide-react';
+import ReviewWizard from './ReviewWizard';
+
+import type { AuditSummary } from '../../types';
+
+// ReviewEditor removed as per new multi-step wizard requirement
+
+export default function PendingReviews() {
+    const [currentPage, setCurrentPage] = useState(1);
+    const recordsPerPage = 10;
+    const [allRecords, setAllRecords] = useState<AuditSummary[]>([]);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [deletingImo, setDeletingImo] = useState<string | null>(null);
+    const [editingRecord, setEditingRecord] = useState<AuditSummary | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        const storedSent = localStorage.getItem('sentToReview');
+        if (storedSent) {
+            setAllRecords(JSON.parse(storedSent));
+        } else {
+            setAllRecords([]);
+        }
+    }, []);
+
+    const handleDelete = (imo: string) => {
+        setDeletingImo(imo);
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = () => {
+        if (deletingImo) {
+            const updated = allRecords.filter(r => r.imoNumber !== deletingImo);
+            setAllRecords(updated);
+            localStorage.setItem('sentToReview', JSON.stringify(updated));
+        }
+        setShowDeleteModal(false);
+        setDeletingImo(null);
+    };
+
+    const handleWizardComplete = () => {
+        setEditingRecord(null);
+        // Refresh or show success toast if needed
+    };
+
+    // Sorting and Filtering logic
+    const filteredRecords = [...allRecords]
+        .sort((a, b) => {
+            // Sort by createDate descending (newest first)
+            // If dates are available, otherwise fall back to array order
+            const dateA = a.createDate || '';
+            const dateB = b.createDate || '';
+            return dateB.localeCompare(dateA);
+        })
+        .filter(record =>
+            record.vesselName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            record.imoNumber.includes(searchQuery)
+        );
+
+    // Reset pagination on search
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchQuery]);
+
+    // Pagination logic
+    const totalPages = Math.ceil(filteredRecords.length / recordsPerPage);
+    const startIndex = (currentPage - 1) * recordsPerPage;
+    const currentRecords = filteredRecords.slice(startIndex, startIndex + recordsPerPage);
+
+    return (
+        <div className="pending-reviews-container">
+            <Sidebar />
+            <main className="pending-reviews-main">
+                <Header />
+
+                <div className="pending-reviews-content">
+                    {/* Header Section */}
+                    <div className="registry-header">
+                        <div className="header-title-area" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                            <div>
+                                <h1>Pending Reviews Registry</h1>
+                                <p>Audit submissions awaiting administrative verification and quality review.</p>
+                            </div>
+                        </div>
+                        <div className="header-actions">
+                            <div className="search-wrapper">
+                                <Search size={24} className="search-icon" />
+                                <input
+                                    type="text"
+                                    placeholder="Search Vessel Name or IMO..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                            <button className="export-btn">
+                                <Download size={18} />
+                                EXPORT LIST
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Registry Table Card - Full Width */}
+                    <div className="registry-table-card" style={{ width: '100%', maxWidth: 'none' }}>
+                        <div className="table-wrapper">
+                            <table className="registry-table">
+                                <thead>
+                                    <tr>
+                                        <th>IMO NUMBER</th>
+                                        <th>VESSEL NAME</th>
+                                        <th>TOTAL PO</th>
+                                        <th>TOTAL ITEMS</th>
+                                        <th>REVIEW STATUS</th>
+                                        <th>REVIEW ASSIGNED TO</th>
+                                        <th style={{ textAlign: 'center' }}>ACTION</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {currentRecords.map((record, idx) => (
+                                        <tr key={record.imoNumber + idx}>
+                                            <td className="imo-cell">{record.imoNumber}</td>
+                                            <td className="vessel-cell">
+                                                <div className="vessel-icon-wrapper">
+                                                    <Ship size={16} />
+                                                </div>
+                                                <span className="vessel-name">{record.vesselName}</span>
+                                            </td>
+                                            <td>{record.totalPO}</td>
+                                            <td>{record.totalItems.toLocaleString()}</td>
+                                            <td>
+                                                <span className={`status-badge ${record.reviewStatus?.toLowerCase().replace(' ', '-') || 'pending'}`}>
+                                                    {record.reviewStatus || 'Pending'}
+                                                </span>
+                                            </td>
+                                            <td className="assigned-cell">
+                                                <img src={record.assignedTo?.avatar || 'https://i.pravatar.cc/150?u=unassigned'} alt="" className="reviewer-avatar" />
+                                                <span className="reviewer-name">{record.assignedTo?.name || 'Unassigned'}</span>
+                                            </td>
+                                            <td className="action-cell">
+                                                <div className="action-group">
+                                                    <button
+                                                        className="action-btn"
+                                                        title="View"
+                                                        onClick={() => setEditingRecord(record)}
+                                                    >
+                                                        <Eye size={18} />
+                                                    </button>
+                                                    <button
+                                                        className="action-btn"
+                                                        title="Edit"
+                                                        onClick={() => setEditingRecord(record)}
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                    <button
+                                                        className="action-btn delete"
+                                                        title="Delete"
+                                                        onClick={() => handleDelete(record.imoNumber)}
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Card Pagination Footer - Unified Style with Labels */}
+                        <div className="table-footer">
+                            <span className="pagination-info">
+                                Showing {startIndex + 1} to {Math.min(startIndex + recordsPerPage, filteredRecords.length)} of {filteredRecords.length} pending reviews
+                            </span>
+                            <div className="pagination-buttons">
+                                <button className="page-btn" style={{ width: 'auto', padding: '0 12px' }} onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>Previous</button>
+                                {[...Array(totalPages)].map((_, idx) => {
+                                    const pageNum = idx + 1;
+                                    if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+                                        return (
+                                            <button
+                                                key={pageNum}
+                                                className={`page-btn ${currentPage === pageNum ? 'active' : ''}`}
+                                                onClick={() => setCurrentPage(pageNum)}
+                                            >
+                                                {pageNum}
+                                            </button>
+                                        );
+                                    }
+                                    if (pageNum === currentPage - 2 || pageNum === currentPage + 2) return <span key={pageNum} className="pagination-dots">...</span>;
+                                    return null;
+                                })}
+                                <button className="page-btn" style={{ width: 'auto', padding: '0 12px' }} onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Summary Footer Bar (Green bar at bottom) */}
+                <div className="summary-footer-bar">
+                    <div className="summary-items">
+                        <div className="summary-item">
+                            <span className="summary-label">TOTAL NUMBER OF POS:</span>
+                            <span className="summary-value">132</span>
+                        </div>
+                        <div className="summary-item">
+                            <span className="summary-label">MDS REQUESTED:</span>
+                            <span className="summary-value">482</span>
+                        </div>
+                        <div className="summary-item">
+                            <span className="summary-label">MDS RECEIVED:</span>
+                            <span className="summary-value">412</span>
+                        </div>
+                        <div className="summary-item">
+                            <span className="summary-label">MDS PENDING:</span>
+                            <span className="summary-value">70</span>
+                        </div>
+                        <div className="summary-item">
+                            <span className="summary-label">HM GREEN QTY:</span>
+                            <span className="summary-value highlight-green">386</span>
+                        </div>
+                        <div className="summary-item">
+                            <span className="summary-label">HM RED QTY:</span>
+                            <span className="summary-value highlight-red">24</span>
+                        </div>
+                        <div className="summary-item">
+                            <span className="summary-label">PCHM QTY:</span>
+                            <span className="summary-value">18</span>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            {/* Modals & Overlays */}
+            {editingRecord && (
+                <ReviewWizard
+                    imo={editingRecord.imoNumber}
+                    vesselName={editingRecord.vesselName}
+                    onClose={() => setEditingRecord(null)}
+                    onComplete={handleWizardComplete}
+                />
+            )}
+
+            {showDeleteModal && (
+                <>
+                    <div className="modal-backdrop-blur" onClick={() => setShowDeleteModal(false)} />
+                    <div className="send-review-modal">
+                        <div className="send-review-header" style={{ background: '#EF4444' }}>
+                            <h2>DELETE RECORD</h2>
+                            <button className="close-btn-white" onClick={() => setShowDeleteModal(false)}><X size={18} /></button>
+                        </div>
+                        <div className="send-review-body">
+                            <h3>Permanently delete this review record?</h3>
+                            <p>This action will remove all audit data for this vessel from the review registry. This cannot be undone.</p>
+                        </div>
+                        <div className="send-review-footer">
+                            <button className="btn-text-cancel" onClick={() => setShowDeleteModal(false)}>CANCEL</button>
+                            <button className="btn-primary-send" style={{ background: '#EF4444', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)' }} onClick={confirmDelete}>
+                                YES, DELETE
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}

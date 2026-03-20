@@ -1,50 +1,20 @@
+import type { Vessel } from '../types';
 import vesselDefault from '../assets/images/vessel_default.jpg';
 
-export interface VesselData {
-    name: string;
-    shipOwner: string;
-    fleet: string;
-    subFleet: string;
-    vesselClass: string;
-    imoNo: string;
-    registrationNumber: string;
-    deliveryDate: string;
-    deadweightTonnage: string;
-    portOfRegistry: string;
-    socExpiryDate: string;
-    type: string;
-    shipManager: string;
-    registeredOwner: string;
-    flagState: string;
-    vesselIhmClass: string;
-    classIdNo: string;
-    nameOfYard: string;
-    keelLaidDate: string;
-    grossTonnage: string;
-    teuUnits: string;
-    ihmReference: string;
-    signalLetters: string;
-    buildersUniqueId: string;
-    mdStandard: string;
-    ihmMethod: string;
-    socReference: string;
-    image: string;
-}
-
-export const INITIAL_VESSELS: VesselData[] = [
+export const INITIAL_VESSELS: Vessel[] = [
     {
         name: 'MV Ocean Pioneer',
         shipOwner: 'MARITIME SOLUTIONS',
         fleet: 'Blue Fleet',
         subFleet: 'Atlantic',
         vesselClass: 'DNV',
-        imoNo: '9876543',
+        imoNumber: '9876543',
         registrationNumber: 'REG-987',
         deliveryDate: '2020-01-01',
         deadweightTonnage: '50000',
         portOfRegistry: 'Panama',
         socExpiryDate: '2025-06-15',
-        type: 'Bulk Carrier',
+        vesselType: 'Bulk Carrier',
         shipManager: 'OCEAN MANAGERS',
         registeredOwner: 'PIONEER SHIPPING',
         flagState: 'Panama',
@@ -68,13 +38,13 @@ export const INITIAL_VESSELS: VesselData[] = [
         fleet: 'Fleet A',
         subFleet: 'Sub Fleet 1',
         vesselClass: 'Registro Italiano Navale',
-        imoNo: '9571648',
+        imoNumber: '9571648',
         registrationNumber: 'REG-123',
         deliveryDate: '2013-06-01',
         deadweightTonnage: '34236',
         portOfRegistry: 'Panama - 44761PEXT',
         socExpiryDate: '2028-06-29',
-        type: 'Bulk Carrier',
+        vesselType: 'Bulk Carrier',
         shipManager: 'AQUARIUS BULKCARRIER',
         registeredOwner: 'SCARLET STREET CORP',
         flagState: 'Panama',
@@ -98,13 +68,13 @@ export const INITIAL_VESSELS: VesselData[] = [
         fleet: 'Fleet B',
         subFleet: 'Sub Fleet 2',
         vesselClass: 'DNV',
-        imoNo: '9308642',
+        imoNumber: '9308642',
         registrationNumber: 'REG-456',
         deliveryDate: '2015-08-15',
         deadweightTonnage: '45000',
         portOfRegistry: 'Liberia',
         socExpiryDate: '2030-10-10',
-        type: 'Container Ship',
+        vesselType: 'Container Ship',
         shipManager: 'GLOBAL MANAGERS',
         registeredOwner: 'OCEAN BLUE INC',
         flagState: 'Liberia',
@@ -128,13 +98,13 @@ export const INITIAL_VESSELS: VesselData[] = [
         fleet: 'Pacific',
         subFleet: 'North',
         vesselClass: 'ABS',
-        imoNo: '9234567',
+        imoNumber: '9234567',
         registrationNumber: 'REG-567',
         deliveryDate: '2010-05-20',
         deadweightTonnage: '28000',
         portOfRegistry: 'Singapore',
         socExpiryDate: '2025-03-10',
-        type: 'Bulk Carrier',
+        vesselType: 'Bulk Carrier',
         shipManager: 'PACIFIC SHIP MGMT',
         registeredOwner: 'HORIZON MARITIME',
         flagState: 'Singapore',
@@ -158,13 +128,13 @@ export const INITIAL_VESSELS: VesselData[] = [
         fleet: 'Arctic',
         subFleet: 'North',
         vesselClass: 'DNV',
-        imoNo: '9876543',
+        imoNumber: '9876543',
         registrationNumber: 'REG-999',
         deliveryDate: '2022-11-30',
         deadweightTonnage: '35000',
         portOfRegistry: 'Oslo',
         socExpiryDate: '2032-11-30',
-        type: 'Ice Breaker',
+        vesselType: 'Ice Breaker',
         shipManager: 'ARCTIC MGMT',
         registeredOwner: 'NORTH STAR AS',
         flagState: 'Norway',

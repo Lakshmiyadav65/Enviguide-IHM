@@ -3,7 +3,7 @@
 // ========================================
 
 export interface Vessel {
-    id: string;
+    id?: string;
     name: string;
     imoNumber: string;
     vesselType: string;
@@ -14,34 +14,37 @@ export interface Vessel {
     teuUnits?: string;
 
     // Ownership
-    registeredOwner: string;
-    shipOwner: string;
-    shipManager: string;
+    registeredOwner?: string;
+    shipOwner?: string;
+    shipManager?: string;
     fleet?: string;
+    subFleet?: string;
 
     // Classification
     vesselClass?: string;
+    vesselIhmClass?: string;
+    classIdNo?: string;
     ihmClass?: string;
-    flagState: string;
+    flagState?: string;
     portOfRegistry?: string;
 
     // Construction
-    shipyardName?: string;
+    nameOfYard?: string;
     shipyardLocation?: string;
-    builderUniqueId?: string;
+    buildersUniqueId?: string;
     keelLaidDate?: string;
     deliveryDate?: string;
 
     // IHM & SOC
-    ihmMethod: 'EU' | 'HKC';
-    mdStandard: 'EU' | 'HKC';
-    initialIhmReference?: string;
+    ihmMethod?: string;
+    mdStandard?: string;
+    ihmReference?: string;
     socReference?: string;
-    socExpiryDate: string;
+    socExpiryDate?: string;
 
     // Status
-    complianceStatus: 'compliant' | 'warning' | 'expired';
-    imageUrl?: string;
+    complianceStatus?: 'compliant' | 'warning' | 'expired';
+    image?: string;
 }
 
 export interface PurchaseOrder {
@@ -154,14 +157,12 @@ export interface SOCAlert {
     status: 'expired' | 'expiring-soon';
 }
 
-export interface GlobalFilters {
-    shipOwner?: string;
-    shipManager?: string;
-    supplier?: string;
-    vessel?: string;
-    timePeriod?: 'today' | 'monthly' | 'yearly';
-    quarter?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
-    year?: number;
+export interface DashboardFilters {
+    yearly: string;
+    shipOwner: string;
+    shipManager: string;
+    supplier: string;
+    vessel: string;
 }
 
 export interface Project {
@@ -193,4 +194,23 @@ export interface Certificate {
     expiryDate: string;
     issuingAuthority: string;
     status: 'valid' | 'expired' | 'expiring-soon';
+}
+
+export interface AuditSummary {
+    id?: string;
+    vesselName: string;
+    imoNumber: string;
+    auditName?: string;
+    totalPO: number;
+    totalItems: number;
+    duplicatePO?: number;
+    duplicateSupplierCode?: number;
+    duplicateProduct?: number;
+    createDate: string;
+    status?: 'Pending Review' | 'Completed' | 'In Progress' | 'PENDING REVIEW';
+    reviewStatus?: 'In Review' | 'Pending';
+    assignedTo?: {
+        name: string;
+        avatar: string;
+    };
 }

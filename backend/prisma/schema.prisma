@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String
+  phone         String?
+  country       String?
+  status        String    @default("active")
+  category      String    @default("viewer")
+  password      String
+  lastActivity  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Vessel {
+  id                    String         @id @default(uuid())
+  name                  String
+  imoNumber             String         @unique
+  vesselType            String?
+  registrationNumber    String?
+  signalLetters         String?
+  grossTonnage          String?
+  deadweightTonnage     String?
+  teuUnits              String?
+  registeredOwner       String?
+  shipOwner             String?
+  shipManager           String?
+  fleet                 String?
+  subFleet              String?
+  vesselClass           String?
+  vesselIhmClass        String?
+  classIdNo             String?
+  ihmClass              String?
+  flagState             String?
+  portOfRegistry        String?
+  nameOfYard            String?
+  shipyardLocation      String?
+  buildersUniqueId      String?
+  keelLaidDate          String?
+  deliveryDate          String?
+  ihmMethod             String?
+  mdStandard            String?
+  ihmReference          String?
+  socReference          String?
+  socExpiryDate         String?
+  complianceStatus      String?        @default("compliant")
+  image                 String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+  auditSummaries        AuditSummary[]
+  decks                 Deck[]
+}
+
+model AuditSummary {
+  id                    String   @id @default(uuid())
+  vesselId              String
+  vessel                Vessel   @relation(fields: [vesselId], references: [id])
+  imoNumber             String
+  vesselName            String
+  totalPO               Int
+  totalItems            Int
+  duplicatePO           Int      @default(0)
+  duplicateSupplierCode Int      @default(0)
+  duplicateProduct      Int      @default(0)
+  status                String?  @default("In Progress")
+  lastActivity          DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Deck {
+  id          String   @id @default(uuid())
+  vesselId    String
+  vessel      Vessel   @relation(fields: [vesselId], references: [id])
+  name        String
+  level       Int
+  gaPlanUrl   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
