@@ -2,7 +2,7 @@
 import { Search, Plus, Edit2, Trash2, Send, Filter, AlertCircle, Tag } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
-import './Registered.css'; 
+import '../auth/Registered.css'; 
 
 interface KeywordItem {
     id: string;

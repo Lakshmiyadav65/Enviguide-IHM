@@ -1,5 +1,5 @@
 /* Reuse the standard management layout from Registered.css */
-@import url('./Registered.css');
+@import url('../auth/Registered.css');
 
 .email-cell {
     color: #4F46E5;
