@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // Global Error Handler Middleware
 // ============================================================
 
@@ -18,7 +18,7 @@ export function errorHandler(
   const statusCode = err.statusCode ?? 500;
   const message    = err.message || 'Internal Server Error';
 
-  console.error(`[ERROR] ${statusCode} — ${message}`, err.stack);
+  console.error(`[ERROR] ${statusCode} â€” ${message}`, err.stack);
 
   res.status(statusCode).json({
     success: false,

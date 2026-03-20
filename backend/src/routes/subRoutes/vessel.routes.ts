@@ -1,4 +1,4 @@
-// ── Vessel Routes ─────────────────────────────────────────
+﻿// â”€â”€ Vessel Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // GET    /api/v1/vessels
 // POST   /api/v1/vessels
 // GET    /api/v1/vessels/:id
@@ -13,8 +13,8 @@ import {
   listVessels, createVessel, getVessel,
   updateVessel, deleteVessel, getVesselDecks,
   getVesselMaterials, getVesselCertificates,
-} from '../controllers/vessel.controller.js';
-import { authenticate } from '../middleware/auth.middleware.js';
+} from '../../controller/vessel.controller.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 
 const router = Router();
 router.use(authenticate);

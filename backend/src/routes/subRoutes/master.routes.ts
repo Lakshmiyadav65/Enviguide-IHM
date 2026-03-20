@@ -1,4 +1,4 @@
-// ── Master Data Routes ────────────────────────────────────
+﻿// â”€â”€ Master Data Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Suppliers, Equipment, SuspectedKeywords, Registered, Ownership
 
 import { Router } from 'express';
@@ -8,8 +8,8 @@ import {
   listSuspectedKeywords, createSuspectedKeyword,
   listRegistered,
   listOwnership, updateOwnership,
-} from '../controllers/master.controller.js';
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
+} from '../../controller/master.controller.js';
+import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 
 const router = Router();
 router.use(authenticate);

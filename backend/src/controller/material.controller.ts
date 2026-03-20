@@ -1,4 +1,4 @@
-// ── Material Controller ───────────────────────────────────
+﻿// â”€â”€ Material Controller â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import type { Request, Response, NextFunction } from 'express';
 
 export async function listMaterials(_req: Request, res: Response, next: NextFunction): Promise<void> {

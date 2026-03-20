@@ -1,5 +1,5 @@
-// ============================================================
-// Backend Environment Config — Validates & Exports .env
+﻿// ============================================================
+// Backend Environment Config â€” Validates & Exports .env
 // ============================================================
 // Crashes at startup if a required variable is missing,
 // so you never get a mysterious runtime failure.

@@ -1,4 +1,4 @@
-// ── Purchase Order Controller ─────────────────────────────
+﻿// â”€â”€ Purchase Order Controller â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import type { Request, Response, NextFunction } from 'express';
 
 export async function listPurchaseOrders(_req: Request, res: Response, next: NextFunction): Promise<void> {

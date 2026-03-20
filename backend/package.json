@@ -5,7 +5,7 @@
   "description": "IHM EnviGuide Platform — REST API Backend",
   "type": "module",
   "scripts": {
-    "dev": "npx tsx watch src/index.ts",
+    "dev": "npx tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",

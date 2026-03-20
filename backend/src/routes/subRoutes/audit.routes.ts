@@ -1,4 +1,4 @@
-// ── Audit Routes ──────────────────────────────────────────
+﻿// â”€â”€ Audit Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // GET  /api/v1/audits/pending
 // GET  /api/v1/audits/:imo
 // GET  /api/v1/audits/reviews
@@ -13,8 +13,8 @@ import {
   getPendingAudits, getAuditDetail,
   getPendingReviews, getReviewDetail,
   getMdsDocAudit, getAuditDocuments, uploadAuditDocument,
-} from '../controllers/audit.controller.js';
-import { authenticate } from '../middleware/auth.middleware.js';
+} from '../../controller/audit.controller.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 
 const upload = multer({ dest: 'uploads/docs/' });
 const router = Router();

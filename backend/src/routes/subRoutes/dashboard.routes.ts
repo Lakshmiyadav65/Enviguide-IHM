@@ -1,0 +1,15 @@
+﻿// â”€â”€ Dashboard Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// GET /api/v1/dashboard/stats
+// GET /api/v1/dashboard/soc-alerts
+
+import { Router } from 'express';
+import { getDashboardStats, getSocAlerts } from '../../controller/dashboard.controller.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
+
+const router = Router();
+router.use(authenticate);
+
+router.get('/stats',      getDashboardStats);
+router.get('/soc-alerts', getSocAlerts);
+
+export default router;

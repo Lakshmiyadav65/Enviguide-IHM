@@ -1,5 +1,5 @@
-// ============================================================
-// Auth Middleware — JWT Verification
+﻿// ============================================================
+// Auth Middleware â€” JWT Verification
 // ============================================================
 
 import type { Request, Response, NextFunction } from 'express';
@@ -38,11 +38,11 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
   }
 }
 
-/** Role-based guard — use after authenticate() */
+/** Role-based guard â€” use after authenticate() */
 export function authorize(...roles: AuthPayload['role'][]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.user || !roles.includes(req.user.role)) {
-      return next(createError('Forbidden — insufficient permissions', 403));
+      return next(createError('Forbidden â€” insufficient permissions', 403));
     }
     next();
   };

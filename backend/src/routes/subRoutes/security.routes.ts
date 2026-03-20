@@ -1,4 +1,4 @@
-// ── Security Routes ───────────────────────────────────────
+﻿// â”€â”€ Security Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Users, rights, roles, categories, menus
 
 import { Router } from 'express';
@@ -8,8 +8,8 @@ import {
   getUserRoleRights, updateUserRoleRights,
   listUserCategories, createUserCategory,
   getUserMenu, updateUserMenu,
-} from '../controllers/security.controller.js';
-import { authenticate, authorize } from '../middleware/auth.middleware.js';
+} from '../../controller/security.controller.js';
+import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 
 const router = Router();
 router.use(authenticate);

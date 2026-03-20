@@ -1,4 +1,4 @@
-// ── Auth Controller ───────────────────────────────────────
+﻿// â”€â”€ Auth Controller â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import type { Request, Response, NextFunction } from 'express';
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {

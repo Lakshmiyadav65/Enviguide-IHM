@@ -1,4 +1,4 @@
-// ── Purchase Order Routes ─────────────────────────────────
+﻿// â”€â”€ Purchase Order Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // GET  /api/v1/purchase-orders
 // POST /api/v1/purchase-orders
 // GET  /api/v1/purchase-orders/:id
@@ -10,8 +10,8 @@ import multer from 'multer';
 import {
   listPurchaseOrders, createPurchaseOrder,
   getPurchaseOrder, updatePurchaseOrder, uploadPurchaseOrder,
-} from '../controllers/purchaseOrder.controller.js';
-import { authenticate } from '../middleware/auth.middleware.js';
+} from '../../controller/purchaseOrder.controller.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 
 const upload = multer({ dest: 'uploads/po/' });
 const router = Router();

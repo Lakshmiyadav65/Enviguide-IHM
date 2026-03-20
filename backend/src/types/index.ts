@@ -1,5 +1,5 @@
-// ============================================================
-// Backend Shared Types — mirrors frontend types/index.ts
+﻿// ============================================================
+// Backend Shared Types â€” mirrors frontend types/index.ts
 // These will be validated by Zod schemas at runtime.
 // ============================================================
 

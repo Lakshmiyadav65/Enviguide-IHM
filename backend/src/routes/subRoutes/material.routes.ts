@@ -1,4 +1,4 @@
-// ── Material / IHM Routes ─────────────────────────────────
+﻿// â”€â”€ Material / IHM Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // GET    /api/v1/materials
 // POST   /api/v1/materials
 // GET    /api/v1/materials/:id
@@ -10,8 +10,8 @@ import { Router } from 'express';
 import {
   listMaterials, createMaterial, getMaterial,
   updateMaterial, deleteMaterial, getMaterialMapping,
-} from '../controllers/material.controller.js';
-import { authenticate } from '../middleware/auth.middleware.js';
+} from '../../controller/material.controller.js';
+import { authenticate } from '../../middleware/auth.middleware.js';
 
 const router = Router();
 router.use(authenticate);
