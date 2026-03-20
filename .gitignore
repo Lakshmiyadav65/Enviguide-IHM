@@ -29,3 +29,4 @@ backend/uploads/
 # ── Temp / Generated ──────────────────────────────────────
 frontend/public/ga_plan_illustration.png
 frontend/public/ga_plan_minimal.png
+node_modules
