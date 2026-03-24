@@ -560,7 +560,7 @@ export default function HazardousMaterialMapping() {
                                                     <div className="v5-card-inner">
                                                         <div className="v5-selection-rail">
                                                             <div className={`v5-check-circle ${viewingMaterial?.id === item.id ? 'checked' : ''}`}>
-                                                                {viewingMaterial?.id === item.id && <div className="check-mark">âœ“</div>}
+                                                                {viewingMaterial?.id === item.id && <div className="check-mark">âœ"</div>}
                                                             </div>
                                                         </div>
                                                         <div className="v5-card-data">
@@ -904,7 +904,7 @@ export default function HazardousMaterialMapping() {
                                                 <ChevronDown size={14} />
                                                 {openDropdown === 'unit' && (
                                                     <div className="dropdown-v4">
-                                                        {['kg', 'mÂ²', 'pcs', 'ltr'].map(u => (
+                                                        {['kg', 'm\u00B2', 'pcs', 'ltr'].map(u => (
                                                             <div key={u} className="drop-item" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, unit: u }); setOpenDropdown(null); }}>{u}</div>
                                                         ))}
                                                     </div>

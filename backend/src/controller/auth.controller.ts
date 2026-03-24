@@ -13,6 +13,11 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       return next(createError('Email and password are required', 400));
     }
 
+    // Only @enviguide.com emails are allowed
+    if (!email.endsWith('@enviguide.com')) {
+      return next(createError('Access restricted to @enviguide.com accounts only', 403));
+    }
+
     const user = await AuthService.findUserByEmail(email);
     if (!user) {
       return next(createError('Invalid credentials', 401));

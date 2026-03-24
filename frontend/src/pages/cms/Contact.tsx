@@ -83,7 +83,7 @@ export default function Contact() {
                     <footer className="contact-footer">
                         <div className="copyright">
                             <Ship size={16} />
-                            <span>Â© 2026 IHM Platform. Maritime Safety Standard.</span>
+                            <span>&copy; 2026 IHM Platform. Maritime Safety Standard.</span>
                         </div>
                         <nav className="footer-nav">
                             <a href="#">Privacy Policy</a>

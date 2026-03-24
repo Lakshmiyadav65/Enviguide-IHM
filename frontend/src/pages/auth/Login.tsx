@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Ship, Mail, Lock, Eye, EyeOff, Info } from 'lucide-react';
+import { Ship, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import './Login.css';
 
@@ -16,6 +16,7 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showForgotMsg, setShowForgotMsg] = useState(false);
     const [currentSlide, setCurrentSlide] = useState(0);
 
     const slides = [slide1, slide2, slide3];
@@ -81,7 +82,7 @@ export default function Login() {
                                 <Mail size={16} className="icon-v2" />
                                 <input
                                     type="email"
-                                    placeholder="admin@maritime.com"
+                                    placeholder="name@enviguide.com"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
@@ -95,7 +96,7 @@ export default function Login() {
                                 <Lock size={16} className="icon-v2" />
                                 <input
                                     type={showPassword ? 'text' : 'password'}
-                                    placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                                    placeholder="********"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
@@ -116,8 +117,14 @@ export default function Login() {
                                 <span className="mark"></span>
                                 <span>Remember me</span>
                             </label>
-                            <a href="#" className="forgot-v2">Forgot Key?</a>
+                            <a href="#" className="forgot-v2" onClick={(e) => { e.preventDefault(); setShowForgotMsg(true); }}>Forgot Password?</a>
                         </div>
+
+                        {showForgotMsg && (
+                            <div style={{ color: '#3b82f6', fontSize: '0.85rem', marginBottom: '0.5rem', textAlign: 'center', background: '#eff6ff', padding: '8px 12px', borderRadius: '6px' }}>
+                                Please reach out to the Enviguide team for password assistance.
+                            </div>
+                        )}
 
                         {error && (
                             <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '0.5rem', textAlign: 'center' }}>
@@ -139,27 +146,11 @@ export default function Login() {
                             ) : "Sign In"}
                         </button>
 
-                        <button type="button" className="btn-google-v2">
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="16" height="16" />
-                            <span>Sign In with Enterprise ID</span>
-                        </button>
                     </form>
-
-                    {/* Prominent Demo Access */}
-                    <div className="demo-access-banner">
-                        <div className="banner-top">
-                            <Info size={12} />
-                            <span>Demo Access Credentials</span>
-                        </div>
-                        <div className="banner-details">
-                            <div className="item"><span>Email:</span> <strong>admin@maritime.com</strong></div>
-                            <div className="item"><span>Pass:</span> <strong>demo123</strong></div>
-                        </div>
-                    </div>
                 </div>
 
                 <footer className="auth-footer-v2">
-                    <p>Â© 2026 EnviGuide IHM â€¢ ISO 27001 Certified</p>
+                    <p>&copy; 2026 EnviGuide IHM &bull; ISO 27001 Certified</p>
                 </footer>
             </div>
         </div>

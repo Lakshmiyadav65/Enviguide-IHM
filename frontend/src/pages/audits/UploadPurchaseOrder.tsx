@@ -114,14 +114,14 @@ export default function UploadPurchaseOrder() {
             reader.onload = (e) => {
                 try {
                     const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                    // Do NOT use cellDates:true â€” it causes off-by-one timezone bugs.
+                    // Do NOT use cellDates:true - it causes off-by-one timezone bugs.
                     // Instead, use raw:false in sheet_to_json so SheetJS outputs the
                     // formatted string exactly as Excel displays it (e.g. "03-06-2026").
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
                     const worksheet = workbook.Sheets[sheetName];
-                    // raw:false â†’ SheetJS honours Excel's own cell format (dates, numbers, etc.)
-                    // header:1  â†’ first row becomes header array
+                    // raw:false → SheetJS honours Excel's own cell format (dates, numbers, etc.)
+                    // header:1  → first row becomes header array
                     const jsonData = XLSX.utils.sheet_to_json(worksheet, {
                         header: 1,
                         raw: false,
@@ -210,7 +210,7 @@ export default function UploadPurchaseOrder() {
             setShowMappingErrors(true);
             return;
         }
-        // All required fields mapped â€” run the full import immediately
+        // All required fields mapped - run the full import immediately
         finalizeImport();
     };
 
@@ -547,7 +547,7 @@ export default function UploadPurchaseOrder() {
                     {currentStep === 'mapping' && (() => {
                         return (
                             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', paddingTop: 'calc(var(--header-height) + 16px)', position: 'relative' }}>
-                                {/* Banner removed â€” CONFIRM MAPPING now calls finalizeImport directly */}
+                                {/* Banner removed - CONFIRM MAPPING now calls finalizeImport directly */}
                                 <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 40px 20px 0', borderBottom: '1px solid #E2E8F0' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
                                         <span style={{ color: '#94A3B8', fontWeight: 500 }}>Administration</span>
@@ -689,7 +689,7 @@ export default function UploadPurchaseOrder() {
                                                         <div style={{ fontSize: '11px', color: '#EF4444', fontWeight: 600 }}>REQUIRED FIELD</div>
                                                     </div>
                                                 </div>
-                                                <span style={{ color: '#F87171', fontSize: '18px' }}>â†’</span>
+                                                <span style={{ color: '#F87171', fontSize: '18px' }}>→</span>
                                             </div>
                                         ))}
                                     </div>

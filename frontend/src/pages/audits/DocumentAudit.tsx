@@ -269,7 +269,7 @@ export default function DocumentAudit() {
                                                             MD File Link
                                                         </div>
                                                     ) : (
-                                                        <span className="not-available">â€”</span>
+                                                        <span className="not-available">-</span>
                                                     )}
                                                 </td>
                                                 <td>
@@ -279,7 +279,7 @@ export default function DocumentAudit() {
                                                             SDoC File Link
                                                         </div>
                                                     ) : (
-                                                        <span className="not-available">â€”</span>
+                                                        <span className="not-available">-</span>
                                                     )}
                                                 </td>
                                                 <td>{item.dateReceived}</td>
@@ -367,7 +367,7 @@ export default function DocumentAudit() {
                                     </div>
                                     <div className="doc-meta">
                                         <h3>{selectedDoc.fileLink}</h3>
-                                        <p>Material Declaration â€¢ {selectedDoc.id}</p>
+                                        <p>Material Declaration &bull; {selectedDoc.id}</p>
                                     </div>
                                 </div>
                                 <button className="close-modal-btn" onClick={() => setSelectedDoc(null)}>

@@ -249,7 +249,7 @@ export default function UserProfile() {
                     <footer className="contact-footer">
                         <div className="copyright">
                             <ShieldCheck size={16} />
-                            <span>Â© 2026 IHM Platform. Corporate Fleet Security.</span>
+                            <span>&copy; 2026 IHM Platform. Corporate Fleet Security.</span>
                         </div>
                         <nav className="footer-nav">
                             <a href="#">Privacy Policy</a>

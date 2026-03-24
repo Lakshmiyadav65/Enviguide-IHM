@@ -450,7 +450,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                     <>
                         <div className="wizard-title-row">
                             <h1>Review & Audit Purchase Orders</h1>
-                            <p>{vesselName} â€¢ {imo}</p>
+                            <p>{vesselName} &bull; {imo}</p>
                         </div>
                         <div className="toolbar-container">
                             <div className="col-toggles">
@@ -677,7 +677,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                             </div>
                         </div>
 
-                        {/* To â€” Gmail chip-style recipient row */}
+                        {/* To - Gmail chip-style recipient row */}
                         <div className="gmail-row gmail-to-row" onClick={() => toInputRef.current?.focus()}>
                             <span className="gmail-label">To</span>
                             <div className="gmail-chips-area">

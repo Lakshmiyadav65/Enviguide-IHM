@@ -311,7 +311,7 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
                 <div className="editor-header">
                     <div className="editor-header-left">
                         <h2>Audit Editor</h2>
-                        <p>{vesselName} â€¢ {imo}</p>
+                        <p>{vesselName} &bull; {imo}</p>
                     </div>
                     <button className="close-editor-btn" onClick={onClose} title="Close Editor">
                         <X size={20} />
@@ -694,7 +694,7 @@ export default function PendingAudits() {
                                                 </span>
                                             </td>
                                             <td>{record.createDate}</td>
-                                            {/* â”€â”€ REVIEW STATUS â€” its own dedicated column â”€â”€ */}
+                                            {/* -- REVIEW STATUS - its own dedicated column -- */}
                                             <td>
                                                 {record.status === 'PENDING REVIEW' ? (
                                                     <div className="v3-status-badge pending">
@@ -702,10 +702,10 @@ export default function PendingAudits() {
                                                         PENDING REVIEW
                                                     </div>
                                                 ) : (
-                                                    <span className="status-dash">â€”</span>
+                                                    <span className="status-dash">-</span>
                                                 )}
                                             </td>
-                                            {/* â”€â”€ ACTION â€” icon buttons only â”€â”€ */}
+                                            {/* -- ACTION - icon buttons only -- */}
                                             <td className="action-column">
                                                 <div className="action-buttons">
                                                     {(record.duplicatePO ?? 0) > 0 ? (

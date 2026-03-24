@@ -224,7 +224,7 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                         name: 'Copper Tubing',
                         material: 'Copper',
                         desc: 'Standard marine grade copper tubing for hydraulic control lines.',
-                        loc: '0.05mÂ³ in W.T. SWITCH',
+                        loc: '0.05m\u00B3 in W.T. SWITCH',
                         hmPart: 'Part II'
                     },
                     {

@@ -1,4 +1,4 @@
-﻿// â”€â”€ Material / IHM Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+﻿// -- Material / IHM Routes --------------------------------
 // GET    /api/v1/materials
 // POST   /api/v1/materials
 // GET    /api/v1/materials/:id

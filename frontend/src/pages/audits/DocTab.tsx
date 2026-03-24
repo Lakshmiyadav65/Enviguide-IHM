@@ -139,7 +139,7 @@ export default function DocTab() {
                                     </div>
                                     <div className="meta-item">
                                         <label>TIMESTAMP</label>
-                                        <strong>Oct 24, 2023 â€¢ 14:32 UTC</strong>
+                                        <strong>Oct 24, 2023 &bull; 14:32 UTC</strong>
                                     </div>
                                 </div>
 

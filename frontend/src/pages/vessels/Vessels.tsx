@@ -1228,7 +1228,7 @@ export default function Vessels() {
                             <span>System Online</span>
                         </div>
                         <div className="status-right">
-                            <span>Â© 2024 Varuna Sentinels. All rights reserved.</span>
+                            <span>&copy; 2024 Varuna Sentinels. All rights reserved.</span>
                         </div>
                     </div>
                 </div>

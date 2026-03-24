@@ -362,7 +362,7 @@ export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
                                                         <tr key={item.id} className={item.selected ? 'row-is-selected' : ''}>
                                                             <td className="ch-col">
                                                                 <div className={`po-v4-row-action-checkbox-styled ${item.selected ? 'checked' : ''}`} onClick={(e) => toggleItemSelection(item.id, e)}>
-                                                                    {item.selected && <span className="check-icon-v4">âœ“</span>}
+                                                                    {item.selected && <span className="check-icon-v4">âœ"</span>}
                                                                 </div>
                                                             </td>
                                                             <td className="ac-col">

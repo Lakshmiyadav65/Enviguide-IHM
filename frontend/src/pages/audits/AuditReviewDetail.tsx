@@ -151,7 +151,7 @@ export default function AuditReviewDetail() {
                             </div>
                             <div className="vessel-text">
                                 <h1>{vesselInfo?.vesselName}</h1>
-                                <p>IMO: <strong>{imo}</strong> â€¢ Audit Initiated: {vesselInfo?.createDate || 'N/A'}</p>
+                                <p>IMO: <strong>{imo}</strong> &bull; Audit Initiated: {vesselInfo?.createDate || 'N/A'}</p>
                             </div>
                         </div>
                         <div className="vessel-stats-grid">
@@ -263,7 +263,7 @@ export default function AuditReviewDetail() {
                                 <div className="selected-item-info">
                                     <label>SELECTED ITEM</label>
                                     <h4>{selectedItem.description}</h4>
-                                    <p>PO: {selectedItem.id} â€¢ Qty: {selectedItem.quantity}</p>
+                                    <p>PO: {selectedItem.id} &bull; Qty: {selectedItem.quantity}</p>
                                 </div>
 
                                 <div className="hm-categorization-section">

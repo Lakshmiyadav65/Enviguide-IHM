@@ -1,4 +1,4 @@
-﻿// â”€â”€ Master Data Routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+﻿// -- Master Data Routes -----------------------------------
 // Suppliers, Equipment, SuspectedKeywords, Registered, Ownership
 
 import { Router } from 'express';

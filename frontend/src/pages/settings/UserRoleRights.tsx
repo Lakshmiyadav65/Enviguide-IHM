@@ -314,7 +314,7 @@ export default function UserRoleRights() {
                     <footer className="contact-footer">
                         <div className="copyright">
                             <Shield size={16} />
-                            <span>Â© 2026 IHM Platform. Access Governance Deck.</span>
+                            <span>&copy; 2026 IHM Platform. Access Governance Deck.</span>
                         </div>
                         <nav className="footer-nav">
                             <a href="#">Compliance Policy</a>

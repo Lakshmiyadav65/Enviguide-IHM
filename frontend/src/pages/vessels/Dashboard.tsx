@@ -292,7 +292,7 @@ export default function Dashboard() {
                                     )}
                                 </div>
                                 <div style={{ textAlign: 'center' }}>
-                                    <a href="#" className="view-all-link">View All Activity â†’</a>
+                                    <a href="#" className="view-all-link">View All Activity →</a>
                                 </div>
                             </div>
                         </div>
@@ -310,7 +310,7 @@ export default function Dashboard() {
                                     <div className="v-color-card v-green">
                                         <div className="v-top"><TrendingUp size={14} /> Total</div>
                                         <div className="v-count">{vesselList.length}</div>
-                                        <div className="v-sub">â€¢ Fleet</div>
+                                        <div className="v-sub">&bull; Fleet</div>
                                     </div>
                                     <div className="v-color-card v-red">
                                         <div className="v-top"><AlertTriangle size={14} /> In Audit</div>
