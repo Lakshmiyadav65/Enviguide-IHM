@@ -60,8 +60,11 @@ export async function httpClient<T>(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText })) as { message?: string };
-      throw new ApiError(response.status, error.message || 'Request failed', error);
+      const body = await response.json().catch(() => ({ message: response.statusText })) as Record<string, unknown>;
+      const message = (body.error as Record<string, unknown>)?.message as string
+        || body.message as string
+        || 'Request failed';
+      throw new ApiError(response.status, message, body);
     }
 
     // Handle 204 No Content

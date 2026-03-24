@@ -2,7 +2,6 @@
 // IHM EnviGuide â€” Backend Entry Point
 // ============================================================
 
-import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';

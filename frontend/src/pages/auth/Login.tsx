@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Ship, Mail, Lock, Eye, EyeOff, Info } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import './Login.css';
 
 // Import moody slide images
@@ -10,13 +11,21 @@ import slide3 from '../../assets/login-slide-3.png';
 
 export default function Login() {
     const navigate = useNavigate();
+    const auth = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [currentSlide, setCurrentSlide] = useState(0);
 
     const slides = [slide1, slide2, slide3];
+
+    // Redirect if already authenticated
+    useEffect(() => {
+        if (auth.isAuthenticated) {
+            navigate('/dashboard', { replace: true });
+        }
+    }, [auth.isAuthenticated, navigate]);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -27,12 +36,13 @@ export default function Login() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setIsLoading(true);
-
-        setTimeout(() => {
-            setIsLoading(false);
+        setError(null);
+        try {
+            await auth.login(email, password);
             navigate('/dashboard');
-        }, 1200);
+        } catch (err) {
+            setError((err as Error).message || 'Login failed');
+        }
     };
 
     return (
@@ -109,12 +119,18 @@ export default function Login() {
                             <a href="#" className="forgot-v2">Forgot Key?</a>
                         </div>
 
+                        {error && (
+                            <div style={{ color: '#ef4444', fontSize: '0.85rem', marginBottom: '0.5rem', textAlign: 'center' }}>
+                                {error}
+                            </div>
+                        )}
+
                         <button
                             type="submit"
                             className="btn-blocker"
-                            disabled={isLoading}
+                            disabled={auth.isLoading}
                         >
-                            {isLoading ? (
+                            {auth.isLoading ? (
                                 <div className="dot-loading-container">
                                     <div className="dot-v2"></div>
                                     <div className="dot-v2"></div>

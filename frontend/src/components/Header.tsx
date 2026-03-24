@@ -1,6 +1,7 @@
 import { Search, User, Bell, BellOff, FileText, AlertTriangle, Pin, Check, CheckCircle2, LogOut, Settings, HelpCircle, Shield, UserCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import './Header.css';
 
 interface HeaderProps {
@@ -15,10 +16,13 @@ interface HeaderProps {
 
 export default function Header({
     notificationCount,
-    userName = 'John Administrator',
-    userRole = 'Admin'
+    userName: userNameProp,
+    userRole: userRoleProp
 }: HeaderProps) {
     const navigate = useNavigate();
+    const auth = useAuth();
+    const userName = userNameProp || auth.user?.name || 'User';
+    const userRole = userRoleProp || auth.user?.role || '';
     const [showNotifications, setShowNotifications] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
     const getIcon = (type: string) => {
@@ -87,8 +91,7 @@ export default function Header({
 
     const handleLogout = (e: React.MouseEvent) => {
         e.stopPropagation();
-        localStorage.clear();
-        sessionStorage.clear();
+        auth.logout();
         navigate('/', { replace: true });
         setShowProfile(false);
     };
@@ -237,8 +240,8 @@ export default function Header({
                                 </div>
                                 <div className="user-details-box">
                                     <h4 className="user-display-name">{userName}</h4>
-                                    <p className="user-display-email">john.admin@enviguide.com</p>
-                                    <span className="user-badge-premium">{userRole}istrator</span>
+                                    <p className="user-display-email">{auth.user?.email || ''}</p>
+                                    <span className="user-badge-premium">{userRole}</span>
                                 </div>
                             </div>
                             
