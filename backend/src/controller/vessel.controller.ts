@@ -3,15 +3,17 @@ import type { Request, Response, NextFunction } from 'express';
 import { VesselService } from '../services/vessel.service.js';
 import { createError } from '../middleware/errorHandler.js';
 
-export async function listVessels(_req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function listVessels(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const vessels = await VesselService.getAllVessels();
+    const userId = req.user!.userId;
+    const vessels = await VesselService.getVesselsByUser(userId);
     res.json({ success: true, data: vessels });
   } catch (err) { next(err); }
 }
 
 export async function createVessel(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const userId = req.user!.userId;
     const { name, imoNumber, shipOwner } = req.body as Record<string, string>;
 
     if (!name || !imoNumber || !shipOwner) {
@@ -27,14 +29,15 @@ export async function createVessel(req: Request, res: Response, next: NextFuncti
       return next(createError(`Vessel with IMO ${imoNumber} already exists`, 409));
     }
 
-    const vessel = await VesselService.createVessel(req.body);
+    const vessel = await VesselService.createVessel(req.body, userId);
     res.status(201).json({ success: true, data: vessel });
   } catch (err) { next(err); }
 }
 
 export async function getVessel(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const vessel = await VesselService.getVesselById(req.params.id as string);
+    const userId = req.user!.userId;
+    const vessel = await VesselService.getVesselByIdForUser(req.params.id as string, userId);
     if (!vessel) {
       return next(createError('Vessel not found', 404));
     }
@@ -44,7 +47,8 @@ export async function getVessel(req: Request, res: Response, next: NextFunction)
 
 export async function updateVessel(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const existing = await VesselService.getVesselById(req.params.id as string);
+    const userId = req.user!.userId;
+    const existing = await VesselService.getVesselByIdForUser(req.params.id as string, userId);
     if (!existing) {
       return next(createError('Vessel not found', 404));
     }
@@ -68,7 +72,8 @@ export async function updateVessel(req: Request, res: Response, next: NextFuncti
 
 export async function deleteVessel(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const existing = await VesselService.getVesselById(req.params.id as string);
+    const userId = req.user!.userId;
+    const existing = await VesselService.getVesselByIdForUser(req.params.id as string, userId);
     if (!existing) {
       return next(createError('Vessel not found', 404));
     }
@@ -79,7 +84,8 @@ export async function deleteVessel(req: Request, res: Response, next: NextFuncti
 
 export async function uploadVesselImage(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const existing = await VesselService.getVesselById(req.params.id as string);
+    const userId = req.user!.userId;
+    const existing = await VesselService.getVesselByIdForUser(req.params.id as string, userId);
     if (!existing) {
       return next(createError('Vessel not found', 404));
     }
@@ -96,7 +102,8 @@ export async function uploadVesselImage(req: Request, res: Response, next: NextF
 
 export async function getVesselDecks(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const vessel = await VesselService.getVesselById(req.params.id as string);
+    const userId = req.user!.userId;
+    const vessel = await VesselService.getVesselByIdForUser(req.params.id as string, userId);
     if (!vessel) {
       return next(createError('Vessel not found', 404));
     }

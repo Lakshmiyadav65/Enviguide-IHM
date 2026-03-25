@@ -22,33 +22,40 @@ function stripUnknownFields(data: Record<string, unknown>): Record<string, unkno
 }
 
 export const VesselService = {
-  async getAllVessels() {
+  /** Get all vessels belonging to a specific user */
+  async getVesselsByUser(userId: string) {
     return prisma.vessel.findMany({
+      where: { createdById: userId },
       include: { auditSummaries: true, decks: true },
       orderBy: { createdAt: 'desc' },
     });
   },
 
-  async getVesselById(id: string) {
-    return prisma.vessel.findUnique({
-      where: { id },
+  /** Get a single vessel only if it belongs to the user */
+  async getVesselByIdForUser(id: string, userId: string) {
+    return prisma.vessel.findFirst({
+      where: { id, createdById: userId },
       include: { auditSummaries: true, decks: true },
     });
   },
 
+  /** Check if IMO already exists (globally unique) */
   async getVesselByImo(imoNumber: string) {
     return prisma.vessel.findUnique({
       where: { imoNumber },
     });
   },
 
-  async createVessel(data: Record<string, unknown>) {
+  /** Create a vessel owned by the user */
+  async createVessel(data: Record<string, unknown>, userId: string) {
+    const cleaned = stripUnknownFields(data);
     return prisma.vessel.create({
-      data: stripUnknownFields(data) as any,
+      data: { ...cleaned, createdById: userId } as any,
       include: { auditSummaries: true, decks: true },
     });
   },
 
+  /** Update a vessel (caller must verify ownership first) */
   async updateVessel(id: string, data: Record<string, unknown>) {
     return prisma.vessel.update({
       where: { id },
@@ -57,6 +64,7 @@ export const VesselService = {
     });
   },
 
+  /** Delete a vessel (caller must verify ownership first) */
   async deleteVessel(id: string) {
     return prisma.vessel.delete({ where: { id } });
   },
