@@ -14,6 +14,8 @@ import PurchaseOrderView from '../viewer/PurchaseOrderView';
 import MaterialsRecord from '../inventory/MaterialsRecord';
 import IHMCertificateView from '../viewer/IHMCertificateView';
 import { INITIAL_VESSELS } from '../../data/vesselData';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS, API_CONFIG } from '../../config/api.config';
 import type { Vessel } from '../../types';
 
 
@@ -32,20 +34,32 @@ const EMPTY_FORM: Vessel = {
 export default function Vessels() {
     const location = useLocation();
     const [notifCount, setNotifCount] = useState(3);
-    const [vesselList, setVesselList] = useState<Vessel[]>(() => {
-        const saved = localStorage.getItem('vessel_list_main');
-        return saved ? JSON.parse(saved) : [];
-    });
-    const [activeVesselName, setActiveVesselName] = useState('MV Ocean Pioneer');
+    const [vesselList, setVesselList] = useState<Vessel[]>([]);
+    const [activeVesselName, setActiveVesselName] = useState('');
     const [activeTab, setActiveTab] = useState(location.pathname === '/decks' ? 'decks' : 'project');
     const [searchTerm, setSearchTerm] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [apiLoading, setApiLoading] = useState(true);
 
-    // Persist vesselList whenever it changes
+    // Fetch vessels from API on mount
     useEffect(() => {
-        localStorage.setItem('vessel_list_main', JSON.stringify(vesselList));
-    }, [vesselList]);
+        setApiLoading(true);
+        api.get<{ success: boolean; data: Vessel[] }>(ENDPOINTS.VESSELS.LIST)
+            .then((res) => {
+                const vessels = res.data;
+                setVesselList(vessels);
+                if (vessels.length > 0 && !activeVesselName) {
+                    setActiveVesselName(vessels[0].name);
+                }
+            })
+            .catch(() => {
+                // Fallback to INITIAL_VESSELS if API fails
+                setVesselList(INITIAL_VESSELS);
+                if (INITIAL_VESSELS.length > 0) setActiveVesselName(INITIAL_VESSELS[0].name);
+            })
+            .finally(() => setApiLoading(false));
+    }, []);
 
     // Document & Form States
     const [docSearch, setDocSearch] = useState('');
@@ -57,7 +71,8 @@ export default function Vessels() {
     const docsPerPage = 10;
 
     const [isDraggingFile, setIsDraggingFile] = useState(false);
-    const [formData, setFormData] = useState<Vessel>(INITIAL_VESSELS[0]);
+    const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+    const [formData, setFormData] = useState<Vessel>(EMPTY_FORM);
     const [showModal, setShowModal] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
 
@@ -328,12 +343,13 @@ export default function Vessels() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            setPendingImageFile(file);
+            // Show local preview
             const reader = new FileReader();
             reader.onloadend = () => {
                 setFormData(prev => ({ ...prev, image: reader.result as string }));
             };
             reader.readAsDataURL(file);
-            // Clear input value so same file can be selected again if needed
             e.target.value = '';
         }
     };
@@ -359,6 +375,7 @@ export default function Vessels() {
 
         const file = e.dataTransfer.files?.[0];
         if (file && file.type.startsWith('image/')) {
+            setPendingImageFile(file);
             const reader = new FileReader();
             reader.onloadend = () => {
                 setFormData(prev => ({ ...prev, image: reader.result as string }));
@@ -367,28 +384,58 @@ export default function Vessels() {
         }
     };
 
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Manual validation check as a fallback if browser validation is bypassed
         if (!formData.name || !formData.shipOwner || !formData.imoNumber) {
             alert('Please fill all required fields (marked with *) before saving.');
             return;
         }
 
-        if (isAdding) {
-            setVesselList(prev => [...prev, formData]);
-            setIsAdding(false);
-            setIsEditing(false);
-            setActiveVesselName(formData.name);
-            setModalMessage('New vessel added successfully!');
-        } else {
-            setVesselList(prev => prev.map(v => v.name === activeVesselName ? formData : v));
-            setActiveVesselName(formData.name); // Ensure the new name is tracked if it changed
-            setIsEditing(false);
-            setModalMessage('Vessel data updated successfully!');
+        try {
+            if (isAdding) {
+                const res = await api.post<{ success: boolean; data: Vessel }>(ENDPOINTS.VESSELS.LIST, formData);
+                const newVessel = res.data;
+
+                // Upload image if one was selected (base64)
+                if (pendingImageFile) {
+                    const fd = new FormData();
+                    fd.append('image', pendingImageFile);
+                    const imgRes = await api.upload<{ success: boolean; data: Vessel }>(ENDPOINTS.VESSELS.IMAGE_UPLOAD(newVessel.id!), fd);
+                    newVessel.image = imgRes.data.image;
+                    setPendingImageFile(null);
+                }
+
+                setVesselList(prev => [newVessel, ...prev]);
+                setIsAdding(false);
+                setIsEditing(false);
+                setActiveVesselName(newVessel.name);
+                setModalMessage('New vessel added successfully!');
+            } else {
+                const vesselId = activeVesselData?.id;
+                if (!vesselId) return;
+
+                const res = await api.put<{ success: boolean; data: Vessel }>(ENDPOINTS.VESSELS.DETAIL(vesselId), formData);
+                const updated = res.data;
+
+                // Upload image if changed
+                if (pendingImageFile) {
+                    const fd = new FormData();
+                    fd.append('image', pendingImageFile);
+                    const imgRes = await api.upload<{ success: boolean; data: Vessel }>(ENDPOINTS.VESSELS.IMAGE_UPLOAD(vesselId), fd);
+                    updated.image = imgRes.data.image;
+                    setPendingImageFile(null);
+                }
+
+                setVesselList(prev => prev.map(v => v.id === vesselId ? updated : v));
+                setActiveVesselName(updated.name);
+                setIsEditing(false);
+                setModalMessage('Vessel data updated successfully!');
+            }
+            setShowModal(true);
+        } catch (err) {
+            alert((err as Error).message || 'Failed to save vessel');
         }
-        setShowModal(true);
     };
 
     // Documents Logic
@@ -1294,7 +1341,7 @@ export default function Vessels() {
                                             <>
                                                 <img
                                                     key={formData.image || 'empty'}
-                                                    src={formData.image}
+                                                    src={formData.image?.startsWith('/uploads') ? `${API_CONFIG.BASE_URL.replace('/api/v1', '')}${formData.image}` : formData.image}
                                                     alt="Vessel preview"
                                                 />
                                                 {isEditing && (

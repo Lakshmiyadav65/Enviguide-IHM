@@ -6,6 +6,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -14,6 +16,7 @@ import { notFound } from './middleware/notFound.js';
 // Route modules
 import rootRouter from './routes/routes.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 // -- Security & Parsing ------------------------------------
@@ -22,6 +25,9 @@ app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// -- Static Files (uploads) --------------------------------
+app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
 
 // -- Health Check ------------------------------------------
 app.get('/health', (_req, res) => {

@@ -23,6 +23,7 @@ export const ENDPOINTS = {
   VESSELS: {
     LIST: '/vessels',
     DETAIL: (id: string) => `/vessels/${id}`,
+    IMAGE_UPLOAD: (id: string) => `/vessels/${id}/image`,
     DECKS: (id: string) => `/vessels/${id}/decks`,
     MATERIALS: (id: string) => `/vessels/${id}/materials`,
     CERTIFICATES: (id: string) => `/vessels/${id}/certificates`,

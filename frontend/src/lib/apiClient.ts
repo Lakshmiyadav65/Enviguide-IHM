@@ -97,4 +97,28 @@ export const api = {
 
   delete: <T>(path: string) =>
     httpClient<T>(path, { method: 'DELETE' }),
+
+  upload: async <T>(path: string, formData: FormData): Promise<T> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
+    try {
+      const response = await fetch(`${API_CONFIG.BASE_URL}${path}`, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+        headers: getAuthHeaders(), // no Content-Type — browser sets multipart boundary
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({ message: response.statusText })) as Record<string, unknown>;
+        const message = (body.error as Record<string, unknown>)?.message as string || 'Upload failed';
+        throw new ApiError(response.status, message, body);
+      }
+      return response.json() as Promise<T>;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err instanceof ApiError) throw err;
+      throw new ApiError(0, 'Upload failed — check your connection');
+    }
+  },
 };
