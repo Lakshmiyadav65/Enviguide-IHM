@@ -7,7 +7,7 @@ import { createError } from '../middleware/errorHandler.js';
 export async function listGAPlans(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.userId;
-    const { vesselId } = req.params;
+    const vesselId = req.params.vesselId as string;
 
     // Verify vessel belongs to user
     const vessel = await VesselService.getVesselByIdForUser(vesselId, userId);
@@ -24,7 +24,7 @@ export async function listGAPlans(req: Request, res: Response, next: NextFunctio
 export async function uploadGAPlan(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.userId;
-    const { vesselId } = req.params;
+    const vesselId = req.params.vesselId as string;
 
     // Verify vessel belongs to user
     const vessel = await VesselService.getVesselByIdForUser(vesselId, userId);
@@ -55,7 +55,8 @@ export async function uploadGAPlan(req: Request, res: Response, next: NextFuncti
 export async function getGAPlan(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.userId;
-    const { vesselId, planId } = req.params;
+    const vesselId = req.params.vesselId as string;
+    const planId = req.params.planId as string;
 
     const vessel = await VesselService.getVesselByIdForUser(vesselId, userId);
     if (!vessel) return next(createError('Vessel not found', 404));
@@ -73,7 +74,8 @@ export async function getGAPlan(req: Request, res: Response, next: NextFunction)
 export async function updateGAPlan(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.userId;
-    const { vesselId, planId } = req.params;
+    const vesselId = req.params.vesselId as string;
+    const planId = req.params.planId as string;
     const { name } = req.body as { name?: string };
 
     const vessel = await VesselService.getVesselByIdForUser(vesselId, userId);
@@ -97,7 +99,8 @@ export async function updateGAPlan(req: Request, res: Response, next: NextFuncti
 export async function deleteGAPlan(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.userId;
-    const { vesselId, planId } = req.params;
+    const vesselId = req.params.vesselId as string;
+    const planId = req.params.planId as string;
 
     const vessel = await VesselService.getVesselByIdForUser(vesselId, userId);
     if (!vessel) return next(createError('Vessel not found', 404));

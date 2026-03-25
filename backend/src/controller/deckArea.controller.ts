@@ -18,7 +18,8 @@ async function verifyAccess(userId: string, vesselId: string, planId: string, ne
 /** GET /api/v1/vessels/:vesselId/ga-plans/:planId/deck-areas */
 export async function listDeckAreas(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { vesselId, planId } = req.params;
+    const vesselId = req.params.vesselId as string;
+    const planId = req.params.planId as string;
     const plan = await verifyAccess(req.user!.userId, vesselId, planId, next);
     if (!plan) return;
 
@@ -32,7 +33,8 @@ export async function listDeckAreas(req: Request, res: Response, next: NextFunct
 /** POST /api/v1/vessels/:vesselId/ga-plans/:planId/deck-areas */
 export async function createDeckArea(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { vesselId, planId } = req.params;
+    const vesselId = req.params.vesselId as string;
+    const planId = req.params.planId as string;
     const plan = await verifyAccess(req.user!.userId, vesselId, planId, next);
     if (!plan) return;
 
@@ -79,7 +81,9 @@ export async function createDeckArea(req: Request, res: Response, next: NextFunc
 /** GET /api/v1/vessels/:vesselId/ga-plans/:planId/deck-areas/:areaId */
 export async function getDeckArea(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { vesselId, planId, areaId } = req.params;
+    const vesselId = req.params.vesselId as string;
+    const planId = req.params.planId as string;
+    const areaId = req.params.areaId as string;
     const plan = await verifyAccess(req.user!.userId, vesselId, planId, next);
     if (!plan) return;
 
@@ -95,7 +99,9 @@ export async function getDeckArea(req: Request, res: Response, next: NextFunctio
 /** PUT /api/v1/vessels/:vesselId/ga-plans/:planId/deck-areas/:areaId */
 export async function updateDeckArea(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { vesselId, planId, areaId } = req.params;
+    const vesselId = req.params.vesselId as string;
+    const planId = req.params.planId as string;
+    const areaId = req.params.areaId as string;
     const plan = await verifyAccess(req.user!.userId, vesselId, planId, next);
     if (!plan) return;
 
@@ -149,7 +155,9 @@ export async function updateDeckArea(req: Request, res: Response, next: NextFunc
 /** DELETE /api/v1/vessels/:vesselId/ga-plans/:planId/deck-areas/:areaId */
 export async function deleteDeckArea(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { vesselId, planId, areaId } = req.params;
+    const vesselId = req.params.vesselId as string;
+    const planId = req.params.planId as string;
+    const areaId = req.params.areaId as string;
     const plan = await verifyAccess(req.user!.userId, vesselId, planId, next);
     if (!plan) return;
 
@@ -166,7 +174,8 @@ export async function deleteDeckArea(req: Request, res: Response, next: NextFunc
 /** DELETE /api/v1/vessels/:vesselId/ga-plans/:planId/deck-areas (reset all) */
 export async function deleteAllDeckAreas(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { vesselId, planId } = req.params;
+    const vesselId = req.params.vesselId as string;
+    const planId = req.params.planId as string;
     const plan = await verifyAccess(req.user!.userId, vesselId, planId, next);
     if (!plan) return;
 

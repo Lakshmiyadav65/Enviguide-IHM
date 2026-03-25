@@ -39,10 +39,12 @@ export const AuthService = {
   },
 
   generateToken(user: { id: string; email: string; category: string }): string {
+    const secret: jwt.Secret = env.JWT_SECRET;
+    const options: jwt.SignOptions = { expiresIn: env.JWT_EXPIRES_IN as unknown as number };
     return jwt.sign(
       { userId: user.id, email: user.email, role: user.category },
-      env.JWT_SECRET,
-      { expiresIn: env.JWT_EXPIRES_IN },
+      secret,
+      options,
     );
   },
 
