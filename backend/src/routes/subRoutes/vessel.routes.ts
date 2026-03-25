@@ -19,6 +19,7 @@ import {
   getVesselDecks, getVesselMaterials, getVesselCertificates,
 } from '../../controller/vessel.controller.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
+import gaPlanRouter from './gaPlan.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.resolve(__dirname, '..', '..', '..', 'uploads', 'vessels');
@@ -62,5 +63,8 @@ router.post('/:id/image', upload.single('image'), uploadVesselImage);
 router.get('/:id/decks',        getVesselDecks);
 router.get('/:id/materials',    getVesselMaterials);
 router.get('/:id/certificates', getVesselCertificates);
+
+// GA Plan routes (nested: /vessels/:vesselId/ga-plans/...)
+router.use('/:vesselId/ga-plans', gaPlanRouter);
 
 export default router;

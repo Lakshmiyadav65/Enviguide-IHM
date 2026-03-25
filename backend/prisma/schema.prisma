@@ -61,6 +61,7 @@ model Vessel {
   updatedAt             DateTime       @updatedAt
   auditSummaries        AuditSummary[]
   decks                 Deck[]
+  gaPlans               GAPlan[]
 }
 
 model AuditSummary {
@@ -83,10 +84,41 @@ model AuditSummary {
 model Deck {
   id          String   @id @default(uuid())
   vesselId    String
-  vessel      Vessel   @relation(fields: [vesselId], references: [id])
+  vessel      Vessel   @relation(fields: [vesselId], references: [id], onDelete: Cascade)
   name        String
   level       Int
   gaPlanUrl   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model GAPlan {
+  id          String     @id @default(uuid())
+  vesselId    String
+  vessel      Vessel     @relation(fields: [vesselId], references: [id], onDelete: Cascade)
+  name        String
+  fileName    String
+  filePath    String
+  fileSize    Int
+  mimeType    String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deckAreas   DeckArea[]
+}
+
+model DeckArea {
+  id          String   @id @default(uuid())
+  gaPlanId    String
+  gaPlan      GAPlan   @relation(fields: [gaPlanId], references: [id], onDelete: Cascade)
+  name        String
+  x           Float
+  y           Float
+  width       Float
+  height      Float
+  thumbnail   String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([gaPlanId, name])
 }

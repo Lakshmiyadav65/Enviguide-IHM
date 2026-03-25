@@ -1,15 +1,37 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import prisma from '../config/prisma.js';
+import { query } from '../config/database.js';
 import { env } from '../config/env.js';
+
+interface UserRow {
+  id: string;
+  email: string;
+  name: string;
+  phone: string | null;
+  country: string | null;
+  status: string;
+  category: string;
+  password: string;
+  last_activity: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
 
 export const AuthService = {
   async findUserByEmail(email: string) {
-    return prisma.user.findUnique({ where: { email } });
+    const result = await query<UserRow>(
+      'SELECT * FROM users WHERE email = $1',
+      [email],
+    );
+    return result.rows[0] || null;
   },
 
   async findUserById(id: string) {
-    return prisma.user.findUnique({ where: { id } });
+    const result = await query<UserRow>(
+      'SELECT * FROM users WHERE id = $1',
+      [id],
+    );
+    return result.rows[0] || null;
   },
 
   async verifyPassword(plain: string, hash: string): Promise<boolean> {
@@ -24,10 +46,10 @@ export const AuthService = {
     );
   },
 
-  updateLastActivity(userId: string) {
-    return prisma.user.update({
-      where: { id: userId },
-      data: { lastActivity: new Date() },
-    });
+  async updateLastActivity(userId: string) {
+    await query(
+      'UPDATE users SET last_activity = NOW(), updated_at = NOW() WHERE id = $1',
+      [userId],
+    );
   },
 };

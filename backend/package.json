@@ -2,20 +2,17 @@
   "name": "ihm-enviguide-backend",
   "version": "0.0.0",
   "private": true,
-  "description": "IHM EnviGuide Platform — REST API Backend",
+  "description": "IHM EnviGuide Platform - REST API Backend",
   "type": "module",
   "scripts": {
     "dev": "npx tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
-    "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate",
-    "db:studio": "prisma studio",
+    "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "6.4.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -27,9 +24,6 @@
     "pg": "^8.20.0",
     "zod": "^3.23.8"
   },
-  "prisma": {
-    "seed": "tsx src/db/seed.ts"
-  },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
@@ -38,8 +32,7 @@
     "@types/morgan": "^1.9.9",
     "@types/multer": "^1.4.13",
     "@types/node": "^20.14.0",
-    "@types/pg": "^8.18.0",
-    "prisma": "6.4.1",
+    "@types/pg": "^8.20.0",
     "tsx": "^4.15.6",
     "typescript": "~5.5.3"
   }

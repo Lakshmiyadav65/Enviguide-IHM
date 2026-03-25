@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import prisma from '../config/prisma.js';
+import { query, closePool } from '../config/database.js';
 
 const DEFAULT_PASSWORD = 'Envi123';
 
@@ -15,36 +15,23 @@ const users = [
 async function seed() {
   const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 12);
 
-  // Seed user accounts only — no dummy vessels
-  // Vessels are created by users through the platform after they log in
+  // Seed user accounts only - no dummy vessels
   for (const u of users) {
-    const user = await prisma.user.upsert({
-      where: { email: u.email },
-      update: { password: hashedPassword },
-      create: {
-        email: u.email,
-        name: u.name,
-        password: hashedPassword,
-        category: u.category,
-        status: 'active',
-        country: u.country,
-      },
-    });
-    console.log(`Seeded user: ${user.email} (${user.category})`);
-  }
-
-  // Clean up any dummy vessels that were previously seeded
-  const deleted = await prisma.vessel.deleteMany();
-  if (deleted.count > 0) {
-    console.log(`Removed ${deleted.count} dummy vessel(s)`);
+    const result = await query(
+      `INSERT INTO users (email, name, password, category, status, country)
+       VALUES ($1, $2, $3, $4, 'active', $5)
+       ON CONFLICT (email) DO UPDATE SET password = $3, updated_at = NOW()
+       RETURNING email, category`,
+      [u.email, u.name, hashedPassword, u.category, u.country],
+    );
+    console.log(`Seeded user: ${result.rows[0].email} (${result.rows[0].category})`);
   }
 
   console.log('\nDone! Only user accounts created. Vessels will be added by users through the platform.');
+  await closePool();
 }
 
-seed()
-  .catch((e) => {
-    console.error('Seed failed:', e);
-    process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+seed().catch((e) => {
+  console.error('Seed failed:', e);
+  process.exit(1);
+});
