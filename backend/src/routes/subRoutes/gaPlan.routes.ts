@@ -46,11 +46,11 @@ const upload = multer({
   storage,
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB for GA Plans (technical drawings can be large)
   fileFilter: (_req, file, cb) => {
-    const allowed = /\.(jpg|jpeg|png|webp|gif|bmp|tiff|tif)$/i;
+    const allowed = /\.(jpg|jpeg|png)$/i;
     if (allowed.test(path.extname(file.originalname))) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files (jpg, png, webp, gif, bmp, tiff) are allowed'));
+      cb(new Error('Only PNG and JPG image files are allowed'));
     }
   },
 });

@@ -5,6 +5,7 @@
 // PUT    /api/v1/vessels/:id
 // DELETE /api/v1/vessels/:id
 // POST   /api/v1/vessels/:id/image
+// GET    /api/v1/vessels/:id/project-status
 // GET    /api/v1/vessels/:id/decks
 // GET    /api/v1/vessels/:id/materials
 // GET    /api/v1/vessels/:id/certificates
@@ -16,10 +17,12 @@ import { fileURLToPath } from 'url';
 import {
   listVessels, createVessel, getVessel,
   updateVessel, deleteVessel, uploadVesselImage,
-  getVesselDecks, getVesselMaterials, getVesselCertificates,
+  getProjectStatus, getVesselCertificates,
 } from '../../controller/vessel.controller.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 import gaPlanRouter from './gaPlan.routes.js';
+import deckRouter from './deck.routes.js';
+import materialRouter from './material.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.resolve(__dirname, '..', '..', '..', 'uploads', 'vessels');
@@ -60,9 +63,14 @@ router.route('/:id')
 
 router.post('/:id/image', upload.single('image'), uploadVesselImage);
 
-router.get('/:id/decks',        getVesselDecks);
-router.get('/:id/materials',    getVesselMaterials);
+router.get('/:id/project-status', getProjectStatus);
 router.get('/:id/certificates', getVesselCertificates);
+
+// Deck routes (nested: /vessels/:vesselId/decks/...)
+router.use('/:vesselId/decks', deckRouter);
+
+// Material routes (nested: /vessels/:vesselId/materials/...)
+router.use('/:vesselId/materials', materialRouter);
 
 // GA Plan routes (nested: /vessels/:vesselId/ga-plans/...)
 router.use('/:vesselId/ga-plans', gaPlanRouter);

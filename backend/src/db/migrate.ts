@@ -81,13 +81,17 @@ CREATE TABLE IF NOT EXISTS "audit_summaries" (
 
 -- Decks table
 CREATE TABLE IF NOT EXISTS "decks" (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  vessel_id   UUID NOT NULL REFERENCES "vessels"(id) ON DELETE CASCADE,
-  name        VARCHAR(255) NOT NULL,
-  level       INTEGER NOT NULL,
-  ga_plan_url VARCHAR(500),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vessel_id     UUID NOT NULL REFERENCES "vessels"(id) ON DELETE CASCADE,
+  ga_plan_id    UUID REFERENCES "ga_plans"(id) ON DELETE SET NULL,
+  deck_area_id  UUID REFERENCES "deck_areas"(id) ON DELETE SET NULL,
+  name          VARCHAR(255) NOT NULL,
+  level         INTEGER NOT NULL DEFAULT 0,
+  ga_plan_url   VARCHAR(500),
+  thumbnail     TEXT,
+  status        VARCHAR(20) NOT NULL DEFAULT 'active',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- GA Plans table
@@ -119,12 +123,48 @@ CREATE TABLE IF NOT EXISTS "deck_areas" (
   UNIQUE(ga_plan_id, name)
 );
 
+-- Materials table (hazardous material entries mapped to decks)
+CREATE TABLE IF NOT EXISTS "materials" (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vessel_id         UUID NOT NULL REFERENCES "vessels"(id) ON DELETE CASCADE,
+  deck_id           UUID REFERENCES "decks"(id) ON DELETE SET NULL,
+  deck_area_id      UUID REFERENCES "deck_areas"(id) ON DELETE SET NULL,
+  name              VARCHAR(255) NOT NULL,
+  ihm_part          VARCHAR(50) NOT NULL,
+  category          VARCHAR(20) NOT NULL DEFAULT 'warning',
+  hazard_type       VARCHAR(255),
+  equipment_class   VARCHAR(255),
+  hm_status         VARCHAR(20) DEFAULT 'CHM',
+  quantity          VARCHAR(50),
+  unit              VARCHAR(50),
+  no_of_pieces      VARCHAR(50),
+  total_quantity    VARCHAR(50),
+  compartment       VARCHAR(255),
+  equipment         VARCHAR(255),
+  position          VARCHAR(255),
+  component         VARCHAR(255),
+  material_name     VARCHAR(255),
+  ship_po           VARCHAR(100),
+  movement_type     VARCHAR(100),
+  manufacturer      VARCHAR(255),
+  ihm_part_number   VARCHAR(100),
+  description       TEXT,
+  remarks           TEXT,
+  avoid_updation    BOOLEAN NOT NULL DEFAULT false,
+  pin_x             DOUBLE PRECISION,
+  pin_y             DOUBLE PRECISION,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_vessels_created_by ON "vessels"(created_by_id);
 CREATE INDEX IF NOT EXISTS idx_ga_plans_vessel ON "ga_plans"(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_deck_areas_ga_plan ON "deck_areas"(ga_plan_id);
 CREATE INDEX IF NOT EXISTS idx_audit_summaries_vessel ON "audit_summaries"(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_decks_vessel ON "decks"(vessel_id);
+CREATE INDEX IF NOT EXISTS idx_materials_vessel ON "materials"(vessel_id);
+CREATE INDEX IF NOT EXISTS idx_materials_deck ON "materials"(deck_id);
 `;
 
 async function migrate() {

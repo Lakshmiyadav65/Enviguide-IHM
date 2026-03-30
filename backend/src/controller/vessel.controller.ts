@@ -100,6 +100,50 @@ export async function uploadVesselImage(req: Request, res: Response, next: NextF
   } catch (err) { next(err); }
 }
 
+/** GET /api/v1/vessels/:id/project-status — Check if project section is complete */
+export async function getProjectStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.userId;
+    const vessel = await VesselService.getVesselByIdForUser(req.params.id as string, userId);
+    if (!vessel) {
+      return next(createError('Vessel not found', 404));
+    }
+
+    const v = vessel as Record<string, unknown>;
+
+    // Required project fields that must be filled before accessing Decks
+    const requiredFields: { key: string; label: string }[] = [
+      { key: 'name', label: 'Vessel Name' },
+      { key: 'imoNumber', label: 'IMO Number' },
+      { key: 'shipOwner', label: 'Ship Owner' },
+      { key: 'vesselType', label: 'Vessel Type' },
+      { key: 'flagState', label: 'Flag State' },
+      { key: 'grossTonnage', label: 'Gross Tonnage' },
+    ];
+
+    const missingFields: string[] = [];
+    for (const field of requiredFields) {
+      const value = v[field.key];
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        missingFields.push(field.label);
+      }
+    }
+
+    const isComplete = missingFields.length === 0;
+
+    res.json({
+      success: true,
+      data: {
+        isComplete,
+        missingFields,
+        message: isComplete
+          ? 'Project section is complete. You can proceed to Decks.'
+          : `Please complete the following fields in the Project section first: ${missingFields.join(', ')}`,
+      },
+    });
+  } catch (err) { next(err); }
+}
+
 export async function getVesselDecks(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const userId = req.user!.userId;
