@@ -149,7 +149,10 @@ export async function getMaterialSummary(req: Request, res: Response, next: Next
   } catch (err) { next(err); }
 }
 
-/** PATCH /api/v1/vessels/:vesselId/materials/:id/transfer */
+/** PATCH /api/v1/vessels/:vesselId/materials/:id/transfer
+ *  Moves material to a new deck. Clears the pin coordinates so user must re-map.
+ *  Returns the material with pre-filled details + requiresRemap flag.
+ */
 export async function transferMaterial(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const vesselId = req.params.vesselId as string;
@@ -164,7 +167,51 @@ export async function transferMaterial(req: Request, res: Response, next: NextFu
       return next(createError('Target deckId is required', 400));
     }
 
+    const sourceDeckId = (existing as Record<string, unknown>).deckId;
     const material = await MaterialService.transferMaterial(req.params.id as string, deckId);
+
+    res.json({
+      success: true,
+      data: material,
+      meta: {
+        requiresRemap: true,
+        sourceDeckId,
+        targetDeckId: deckId,
+        message: 'Technical details have been pre-filled. Please click on the plan to set the new location.',
+      },
+    });
+  } catch (err) { next(err); }
+}
+
+/** PATCH /api/v1/vessels/:vesselId/materials/:id/remap
+ *  Completes re-mapping after deck transfer: sets new pin + updates location details.
+ */
+export async function remapMaterial(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const vesselId = req.params.vesselId as string;
+    const vessel = await VesselService.getVesselByIdForUser(vesselId, req.user!.userId);
+    if (!vessel) return next(createError('Vessel not found', 404));
+
+    const existing = await MaterialService.getMaterialById(req.params.id as string, vesselId);
+    if (!existing) return next(createError('Material not found', 404));
+
+    const body = req.body as Record<string, unknown>;
+
+    // Pin is required for re-mapping
+    if (!body.pin || typeof body.pin !== 'object') {
+      return next(createError('New pin location (pin: {x, y}) is required for re-mapping', 400));
+    }
+
+    const pin = body.pin as { x?: number; y?: number };
+    if (pin.x === undefined || pin.y === undefined) {
+      return next(createError('Pin must include both x and y coordinates', 400));
+    }
+
+    body.pinX = pin.x;
+    body.pinY = pin.y;
+    delete body.pin;
+
+    const material = await MaterialService.remapMaterial(req.params.id as string, body);
     res.json({ success: true, data: material });
   } catch (err) { next(err); }
 }

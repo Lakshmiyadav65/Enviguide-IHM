@@ -9,12 +9,13 @@
 // PUT    /api/v1/vessels/:vesselId/materials/:id           (update material)
 // DELETE /api/v1/vessels/:vesselId/materials/:id           (delete material)
 // PATCH  /api/v1/vessels/:vesselId/materials/:id/transfer  (transfer to different deck)
+// PATCH  /api/v1/vessels/:vesselId/materials/:id/remap     (complete re-mapping after transfer)
 
 import { Router } from 'express';
 import {
   listMaterials, createMaterial, getMaterial,
   updateMaterial, deleteMaterial, getMaterialMapping,
-  getMaterialSummary, transferMaterial,
+  getMaterialSummary, transferMaterial, remapMaterial,
 } from '../../controller/material.controller.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 
@@ -35,5 +36,6 @@ router.route('/:id')
   .delete(deleteMaterial);
 
 router.patch('/:id/transfer', transferMaterial);
+router.patch('/:id/remap', remapMaterial);
 
 export default router;

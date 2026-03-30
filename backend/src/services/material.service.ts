@@ -190,11 +190,38 @@ export const MaterialService = {
     await query('DELETE FROM materials WHERE id = $1', [id]);
   },
 
-  /** Transfer a material to a different deck */
+  /** Transfer a material to a different deck (clears pin — needs re-mapping) */
   async transferMaterial(id: string, newDeckId: string) {
     const result = await query(
-      `UPDATE materials SET deck_id = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+      `UPDATE materials SET deck_id = $1, pin_x = NULL, pin_y = NULL, updated_at = NOW()
+       WHERE id = $2 RETURNING *`,
       [newDeckId, id],
+    );
+    return result.rows[0] ? toApi(result.rows[0] as Record<string, unknown>) : null;
+  },
+
+  /** Complete a re-mapping after transfer: set new pin + update fields */
+  async remapMaterial(id: string, data: Record<string, unknown>) {
+    const { columns, values } = extractFields(data);
+
+    if ('deckId' in data) {
+      columns.push('deck_id');
+      values.push(data.deckId || null);
+    }
+    if ('deckAreaId' in data) {
+      columns.push('deck_area_id');
+      values.push(data.deckAreaId || null);
+    }
+
+    if (columns.length === 0) return null;
+
+    const setClauses = columns.map((col, i) => `${col} = $${i + 1}`);
+    setClauses.push('updated_at = NOW()');
+    values.push(id);
+
+    const result = await query(
+      `UPDATE materials SET ${setClauses.join(', ')} WHERE id = $${values.length} RETURNING *`,
+      values,
     );
     return result.rows[0] ? toApi(result.rows[0] as Record<string, unknown>) : null;
   },
