@@ -704,10 +704,8 @@ export default function PendingAudits() {
                                             {/* -- ACTION - icon buttons only -- */}
                                             <td className="action-column">
                                                 <div className="action-buttons">
-                                                    {(record.duplicatePO ?? 0) > 0 ? (
+                                                    {(record.duplicatePO ?? 0) > 0 && (
                                                         <button className="action-btn edit-btn" onClick={() => handleEdit(record.imoNumber)} title="Edit"><Edit2 size={16} /></button>
-                                                    ) : (
-                                                        <span className="na-status-text">NA</span>
                                                     )}
                                                     <button className="action-btn send-btn" onClick={() => handleSend(record.imoNumber)} title="Send to Review"><Send size={16} /></button>
                                                     <button className="action-btn delete-btn" onClick={() => handleDelete(record.imoNumber)} title="Delete"><Trash2 size={16} /></button>

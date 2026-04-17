@@ -177,7 +177,7 @@ body:has(.sidebar.collapsed) .pending-reviews-main {
     border-bottom: 1px solid #E2E8F0;
 }
 
-/* Column Widths */
+/* Column Widths — table has 7 columns */
 /* IMO Number */
 .registry-table th:nth-child(1) {
     width: 10%;
@@ -185,45 +185,35 @@ body:has(.sidebar.collapsed) .pending-reviews-main {
 
 /* Vessel Name */
 .registry-table th:nth-child(2) {
-    width: 18%;
+    width: 22%;
 }
 
-/* Name */
+/* Total PO */
 .registry-table th:nth-child(3) {
-    width: 12%;
-}
-
-/* Total PO */
-/* Total PO */
-.registry-table th:nth-child(4) {
-    width: 8%;
-}
-
-/* Total Items */
-/* Total Items */
-.registry-table th:nth-child(5) {
     width: 10%;
 }
 
-/* Review Status */
-.registry-table th:nth-child(6) {
+/* Total Items */
+.registry-table th:nth-child(4) {
     width: 12%;
 }
 
+/* Review Status */
+.registry-table th:nth-child(5) {
+    width: 15%;
+}
+
 /* Review Assigned To */
-/* Review Assigned To */
-.registry-table th:nth-child(7) {
+.registry-table th:nth-child(6) {
     width: 16%;
 }
 
 /* Action */
-/* Action */
-.registry-table th:nth-child(8) {
-    width: 14%;
+.registry-table th:nth-child(7) {
+    width: 15%;
+    min-width: 140px;
     text-align: center;
 }
-
-/* Action */
 
 .registry-table td {
     padding: 16px 16px;

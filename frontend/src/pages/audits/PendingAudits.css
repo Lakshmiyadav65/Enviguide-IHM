@@ -202,13 +202,13 @@ body:has(.sidebar.collapsed) .pending-audits-main {
 
 /* Column Widths Distribution - 8 Data Columns + 1 Action Column */
 .audits-table th:not(.action-column) {
-    width: calc((100% - 140px) / 8);
+    width: calc((100% - 180px) / 8);
 }
 
 .th-action,
 .action-column {
-    width: 140px !important;
-    min-width: 140px !important;
+    width: 180px !important;
+    min-width: 180px !important;
     text-align: center;
 }
 
@@ -260,6 +260,7 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     right: 0;
     background: white;
     text-align: center;
+    overflow: visible;
     box-shadow: -4px 0 8px rgba(0, 0, 0, 0.05);
 }
 
