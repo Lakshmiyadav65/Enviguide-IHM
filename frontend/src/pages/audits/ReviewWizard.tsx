@@ -598,7 +598,38 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                                             ) : (
                                                                 data[0][ci] === 'Is Suspected' ? (
                                                                     <select className="suspicious-select" value={cell} onChange={e => {
-                                                                        const nd = [...data]; nd[originalIdx][ci] = e.target.value; setData(nd);
+                                                                        const newValue = e.target.value;
+                                                                        pushToHistory();
+                                                                        const nd = JSON.parse(JSON.stringify(data));
+
+                                                                        // If there's a drag selection spanning multiple cells in this column, apply to all
+                                                                        if (dragStart && dragEnd) {
+                                                                            const startR = Math.min(dragStart.r, dragEnd.r);
+                                                                            const endR = Math.max(dragStart.r, dragEnd.r);
+                                                                            const startC = Math.min(dragStart.c, dragEnd.c);
+                                                                            const endC = Math.max(dragStart.c, dragEnd.c);
+                                                                            const visibleIndices = new Set(filteredRows.map((f: any) => f.originalIdx));
+                                                                            const cellInSelection = originalIdx >= startR && originalIdx <= endR && ci >= startC && ci <= endC;
+                                                                            if (cellInSelection && ci >= startC && ci <= endC) {
+                                                                                for (let r = startR; r <= endR; r++) {
+                                                                                    if (!visibleIndices.has(r)) continue;
+                                                                                    nd[r][ci] = newValue;
+                                                                                }
+                                                                                setData(nd);
+                                                                                return;
+                                                                            }
+                                                                        }
+
+                                                                        // If row-level checkboxes selected (multiple rows), apply to all selected rows in this column
+                                                                        if (selectedRows.size > 1 && selectedRows.has(originalIdx)) {
+                                                                            selectedRows.forEach(rowIdx => { nd[rowIdx][ci] = newValue; });
+                                                                            setData(nd);
+                                                                            return;
+                                                                        }
+
+                                                                        // Default: change only this cell
+                                                                        nd[originalIdx][ci] = newValue;
+                                                                        setData(nd);
                                                                     }}>
                                                                         <option value="No">No</option>
                                                                         <option value="Yes">Yes</option>
