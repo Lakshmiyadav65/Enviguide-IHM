@@ -185,33 +185,33 @@ body:has(.sidebar.collapsed) .pending-reviews-main {
 
 /* Vessel Name */
 .registry-table th:nth-child(2) {
-    width: 22%;
+    width: 20%;
 }
 
 /* Total PO */
 .registry-table th:nth-child(3) {
-    width: 10%;
+    width: 9%;
 }
 
 /* Total Items */
 .registry-table th:nth-child(4) {
-    width: 12%;
+    width: 11%;
 }
 
 /* Review Status */
 .registry-table th:nth-child(5) {
-    width: 15%;
+    width: 14%;
 }
 
 /* Review Assigned To */
 .registry-table th:nth-child(6) {
-    width: 16%;
+    width: 18%;
 }
 
 /* Action */
 .registry-table th:nth-child(7) {
-    width: 15%;
-    min-width: 140px;
+    width: 18%;
+    min-width: 160px;
     text-align: center;
 }
 
@@ -317,44 +317,51 @@ body:has(.sidebar.collapsed) .pending-reviews-main {
     text-overflow: ellipsis;
 }
 
-/* Action Buttons */
-.action-cell {
+/* Action Buttons — scoped to registry-table to avoid clash with PendingAudits.css */
+.registry-table .action-cell {
     text-align: center;
+    overflow: visible;
+    padding: 12px 8px !important;
 }
 
-.action-group {
+.registry-table .action-group {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 8px;
     white-space: nowrap;
+    min-width: 0;
 }
 
-.action-btn {
-    background: none;
+.registry-table .action-btn {
+    width: 32px !important;
+    height: 32px !important;
+    background: #F0F9FF !important;
     border: none;
     cursor: pointer;
-    color: #0088CC;
-    padding: 6px;
+    color: #0088CC !important;
+    padding: 0;
     transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 6px;
+    flex-shrink: 0;
 }
 
-.action-btn:hover {
-    color: #0056D2;
-    background: #F0F9FF;
+.registry-table .action-btn:hover {
+    color: #0056D2 !important;
+    background: #E0F2FE !important;
 }
 
-.action-btn.delete {
-    color: #EF4444;
+.registry-table .action-btn.delete {
+    color: #EF4444 !important;
+    background: #FEF2F2 !important;
 }
 
-.action-btn.delete:hover {
-    color: #DC2626;
-    background: #FEF2F2;
+.registry-table .action-btn.delete:hover {
+    color: white !important;
+    background: #EF4444 !important;
 }
 
 /* Pagination Footer */
