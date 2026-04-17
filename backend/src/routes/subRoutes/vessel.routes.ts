@@ -23,6 +23,8 @@ import { authenticate } from '../../middleware/auth.middleware.js';
 import gaPlanRouter from './gaPlan.routes.js';
 import deckRouter from './deck.routes.js';
 import materialRouter from './material.routes.js';
+import documentRouter from './document.routes.js';
+import mdsdocRouter from './mdsdoc.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.resolve(__dirname, '..', '..', '..', 'uploads', 'vessels');
@@ -71,6 +73,12 @@ router.use('/:vesselId/decks', deckRouter);
 
 // Material routes (nested: /vessels/:vesselId/materials/...)
 router.use('/:vesselId/materials', materialRouter);
+
+// Document routes (nested: /vessels/:vesselId/documents/...)
+router.use('/:vesselId/documents', documentRouter);
+
+// MD/SDoC request routes (nested: /vessels/:vesselId/md-sdoc/...)
+router.use('/:vesselId/md-sdoc', mdsdocRouter);
 
 // GA Plan routes (nested: /vessels/:vesselId/ga-plans/...)
 router.use('/:vesselId/ga-plans', gaPlanRouter);

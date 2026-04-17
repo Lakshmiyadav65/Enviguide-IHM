@@ -1,21 +1,38 @@
-﻿// -- Purchase Order Routes --------------------------------
-// GET  /api/v1/purchase-orders
-// POST /api/v1/purchase-orders
-// GET  /api/v1/purchase-orders/:id
-// PUT  /api/v1/purchase-orders/:id
-// POST /api/v1/purchase-orders/upload
+// -- Purchase Order Routes --------------------------------
+// GET    /api/v1/purchase-orders                       (?vesselId= ?status= ?supplier=)
+// POST   /api/v1/purchase-orders                       (create with body)
+// POST   /api/v1/purchase-orders/upload                (file upload + auto-create audit)
+// GET    /api/v1/purchase-orders/by-supplier/:vesselId (grouped by supplier)
+// GET    /api/v1/purchase-orders/:id
+// PUT    /api/v1/purchase-orders/:id
+// DELETE /api/v1/purchase-orders/:id
 
 import { Router } from 'express';
 import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import {
-  listPurchaseOrders, createPurchaseOrder,
-  getPurchaseOrder, updatePurchaseOrder, uploadPurchaseOrder,
+  listPurchaseOrders, createPurchaseOrder, getPurchaseOrder,
+  updatePurchaseOrder, deletePurchaseOrder, uploadPurchaseOrder,
+  getPurchaseOrdersBySupplier,
 } from '../../controller/purchaseOrder.controller.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 
-const upload = multer({ dest: 'uploads/po/' });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadsDir = path.resolve(__dirname, '..', '..', '..', 'uploads', 'po');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const upload = multer({
+  dest: uploadsDir,
+  limits: { fileSize: 25 * 1024 * 1024 },
+});
+
 const router = Router();
 router.use(authenticate);
+
+router.get('/by-supplier/:vesselId', getPurchaseOrdersBySupplier);
+router.post('/upload', upload.single('file'), uploadPurchaseOrder);
 
 router.route('/')
   .get(listPurchaseOrders)
@@ -23,8 +40,7 @@ router.route('/')
 
 router.route('/:id')
   .get(getPurchaseOrder)
-  .put(updatePurchaseOrder);
-
-router.post('/upload', upload.single('file'), uploadPurchaseOrder);
+  .put(updatePurchaseOrder)
+  .delete(deletePurchaseOrder);
 
 export default router;

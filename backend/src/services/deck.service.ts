@@ -17,18 +17,26 @@ function toApi(row: Record<string, unknown>) {
 }
 
 export const DeckService = {
-  /** List all decks for a vessel */
+  /** List all decks for a vessel — includes mapped material count per deck */
   async getDecksForVessel(vesselId: string) {
     const result = await query(
-      `SELECT d.*, da.x, da.y, da.width, da.height
+      `SELECT d.*, da.x, da.y, da.width, da.height,
+              COALESCE(mc.material_count, 0)::int AS material_count
        FROM decks d
        LEFT JOIN deck_areas da ON d.deck_area_id = da.id
+       LEFT JOIN (
+         SELECT deck_id, COUNT(*) AS material_count
+         FROM materials
+         WHERE deck_id IS NOT NULL
+         GROUP BY deck_id
+       ) mc ON mc.deck_id = d.id
        WHERE d.vessel_id = $1
        ORDER BY d.level ASC, d.created_at ASC`,
       [vesselId],
     );
     return result.rows.map((row: Record<string, unknown>) => ({
       ...toApi(row),
+      mappedItemsCount: row.material_count,
       cropCoordinates: row.deck_area_id
         ? { x: row.x, y: row.y, width: row.width, height: row.height }
         : null,

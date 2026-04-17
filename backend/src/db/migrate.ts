@@ -74,10 +74,18 @@ CREATE TABLE IF NOT EXISTS "audit_summaries" (
   duplicate_supplier_code INTEGER NOT NULL DEFAULT 0,
   duplicate_product       INTEGER NOT NULL DEFAULT 0,
   status                  VARCHAR(50) DEFAULT 'In Progress',
+  review_assigned_to      VARCHAR(255),
+  reviewed_by             VARCHAR(255),
+  reviewed_at             TIMESTAMPTZ,
   last_activity           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Backfill columns on existing audit_summaries (safe to re-run)
+ALTER TABLE "audit_summaries" ADD COLUMN IF NOT EXISTS review_assigned_to VARCHAR(255);
+ALTER TABLE "audit_summaries" ADD COLUMN IF NOT EXISTS reviewed_by VARCHAR(255);
+ALTER TABLE "audit_summaries" ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 
 -- Decks table
 CREATE TABLE IF NOT EXISTS "decks" (
@@ -157,14 +165,78 @@ CREATE TABLE IF NOT EXISTS "materials" (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Documents table (IHM Report, SOC, Ship Particulars, MD, SDoC, etc.)
+CREATE TABLE IF NOT EXISTS "documents" (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vessel_id       UUID NOT NULL REFERENCES "vessels"(id) ON DELETE CASCADE,
+  name            VARCHAR(255) NOT NULL,
+  document_type   VARCHAR(100) NOT NULL,
+  category        VARCHAR(100) DEFAULT 'general',
+  status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+  file_name       VARCHAR(255) NOT NULL,
+  file_path       VARCHAR(500) NOT NULL,
+  file_size       INTEGER NOT NULL,
+  mime_type       VARCHAR(100) NOT NULL,
+  uploaded_by     VARCHAR(255),
+  description     TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Purchase Orders table
+CREATE TABLE IF NOT EXISTS "purchase_orders" (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vessel_id       UUID NOT NULL REFERENCES "vessels"(id) ON DELETE CASCADE,
+  po_number       VARCHAR(100) NOT NULL,
+  supplier_name   VARCHAR(255) NOT NULL,
+  supplier_code   VARCHAR(100),
+  status          VARCHAR(50) NOT NULL DEFAULT 'pending',
+  total_items     INTEGER NOT NULL DEFAULT 0,
+  total_amount    DECIMAL(14, 2),
+  currency        VARCHAR(10) DEFAULT 'USD',
+  po_date         VARCHAR(50),
+  description     TEXT,
+  file_name       VARCHAR(255),
+  file_path       VARCHAR(500),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- MD/SDoC Requests table (suspected hazmat tracking per supplier)
+CREATE TABLE IF NOT EXISTS "md_sdoc_requests" (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vessel_id         UUID NOT NULL REFERENCES "vessels"(id) ON DELETE CASCADE,
+  po_id             UUID REFERENCES "purchase_orders"(id) ON DELETE SET NULL,
+  material_id       UUID REFERENCES "materials"(id) ON DELETE SET NULL,
+  supplier_name     VARCHAR(255) NOT NULL,
+  supplier_code     VARCHAR(100),
+  item_name         VARCHAR(255) NOT NULL,
+  ihm_part          VARCHAR(50),
+  hazard_type       VARCHAR(255),
+  status            VARCHAR(50) NOT NULL DEFAULT 'Pending',
+  reminder_count    INTEGER NOT NULL DEFAULT 0,
+  last_reminder_at  TIMESTAMPTZ,
+  received_at       TIMESTAMPTZ,
+  notes             TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_vessels_created_by ON "vessels"(created_by_id);
 CREATE INDEX IF NOT EXISTS idx_ga_plans_vessel ON "ga_plans"(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_deck_areas_ga_plan ON "deck_areas"(ga_plan_id);
 CREATE INDEX IF NOT EXISTS idx_audit_summaries_vessel ON "audit_summaries"(vessel_id);
+CREATE INDEX IF NOT EXISTS idx_audit_summaries_status ON "audit_summaries"(status);
 CREATE INDEX IF NOT EXISTS idx_decks_vessel ON "decks"(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_materials_vessel ON "materials"(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_materials_deck ON "materials"(deck_id);
+CREATE INDEX IF NOT EXISTS idx_documents_vessel ON "documents"(vessel_id);
+CREATE INDEX IF NOT EXISTS idx_documents_type ON "documents"(document_type);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_vessel ON "purchase_orders"(vessel_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier ON "purchase_orders"(supplier_name);
+CREATE INDEX IF NOT EXISTS idx_md_sdoc_vessel ON "md_sdoc_requests"(vessel_id);
+CREATE INDEX IF NOT EXISTS idx_md_sdoc_status ON "md_sdoc_requests"(status);
 `;
 
 async function migrate() {
