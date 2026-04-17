@@ -590,7 +590,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                                 </td>
                                                 {(row as any[]).map((cell: any, ci: number) => visibleCols[ci] && (
                                                     <td key={ci} onMouseDown={() => handleMouseDown(originalIdx, ci)} onMouseEnter={() => handleMouseEnter(originalIdx, ci)} onDoubleClick={() => handleCellDoubleClick(originalIdx, ci)}>
-                                                        <div className={`cell - inner ${getSelectionClass(originalIdx, ci)} `}>
+                                                        <div className={`cell-inner ${getSelectionClass(originalIdx, ci)}`}>
                                                             {editingCell?.r === originalIdx && editingCell?.c === ci ? (
                                                                 <input className="cell-input" autoFocus value={cell} onChange={e => {
                                                                     const nd = [...data]; nd[originalIdx][ci] = e.target.value; setData(nd);

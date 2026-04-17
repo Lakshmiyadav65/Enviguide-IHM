@@ -477,12 +477,8 @@ export default function PendingAudits() {
         const scrubRegistry = (records: AuditSummary[]) => {
             const sentToReview = JSON.parse(localStorage.getItem('sentToReview') || '[]');
             const reviewImos = new Set(sentToReview.map((r: any) => r.imoNumber));
-            return records.map(r => {
-                if (r.status === 'PENDING REVIEW' && !reviewImos.has(r.imoNumber)) {
-                    return { ...r, status: undefined };
-                }
-                return r;
-            });
+            // Hide records that have been sent to review from the pending audits list
+            return records.filter(r => !reviewImos.has(r.imoNumber));
         };
 
         const persistedRegistry = localStorage.getItem('audit_registry_main');
@@ -490,7 +486,7 @@ export default function PendingAudits() {
             const parsed = JSON.parse(persistedRegistry);
             const scrubbed = scrubRegistry(parsed);
             setAllRecords(scrubbed);
-            localStorage.setItem('audit_registry_main', JSON.stringify(scrubbed));
+            // Note: don't overwrite audit_registry_main — keep full list there so records can be restored if review is rejected
         }
         // If no registry yet, nothing to show (upload will create it)
     }, []);
