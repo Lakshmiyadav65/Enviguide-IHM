@@ -1,4 +1,36 @@
 import { query } from '../config/database.js';
+import { SuspectedKeywordService } from './suspectedKeyword.service.js';
+
+const SEVERITY_TO_CATEGORY: Record<string, string> = {
+  Critical: 'hazard',
+  High: 'hazard',
+  Medium: 'warning',
+  Low: 'warning',
+};
+
+/**
+ * Mutates `data` in place: if any scanned field matches an active suspected keyword,
+ * escalate category and fill hazard_type/hm_status. Explicit user input wins —
+ * we only overwrite unset fields.
+ */
+async function applyKeywordAutoFlag(data: Record<string, unknown>): Promise<void> {
+  const match = await SuspectedKeywordService.findMatch([
+    data.name as string | undefined,
+    data.materialName as string | undefined,
+    data.description as string | undefined,
+    data.component as string | undefined,
+    data.equipment as string | undefined,
+  ]);
+  if (!match) return;
+
+  if (!data.hazardType) data.hazardType = match.hazardType;
+  if (!data.category || data.category === 'warning') {
+    data.category = SEVERITY_TO_CATEGORY[match.severity] || 'warning';
+  }
+  if (!data.hmStatus && SEVERITY_TO_CATEGORY[match.severity] === 'hazard') {
+    data.hmStatus = 'PHM'; // Potentially Hazardous Material
+  }
+}
 
 // Column mapping: camelCase (API) -> snake_case (DB)
 const FIELD_MAP: Record<string, string> = {
@@ -137,6 +169,7 @@ export const MaterialService = {
 
   /** Create a material entry */
   async createMaterial(data: Record<string, unknown>, vesselId: string, deckId?: string, deckAreaId?: string) {
+    await applyKeywordAutoFlag(data);
     const { columns, values } = extractFields(data);
     columns.push('vessel_id');
     values.push(vesselId);
@@ -160,6 +193,7 @@ export const MaterialService = {
 
   /** Update a material entry */
   async updateMaterial(id: string, data: Record<string, unknown>) {
+    await applyKeywordAutoFlag(data);
     const { columns, values } = extractFields(data);
 
     // Handle deck transfer

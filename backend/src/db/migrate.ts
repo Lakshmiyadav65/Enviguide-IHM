@@ -222,6 +222,119 @@ CREATE TABLE IF NOT EXISTS "md_sdoc_requests" (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- User additional profile columns (for UserProfile page)
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS company_name   VARCHAR(255);
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS avatar         VARCHAR(500);
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS system_message TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) DEFAULT 'unpaid';
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS is_limited_ships BOOLEAN DEFAULT false;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS role_name      VARCHAR(100);
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS origin         VARCHAR(50) DEFAULT 'Direct';
+
+-- User Categories master table
+CREATE TABLE IF NOT EXISTS "user_categories" (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name        VARCHAR(255) UNIQUE NOT NULL,
+  description TEXT,
+  status      VARCHAR(20) NOT NULL DEFAULT 'Active',
+  archived    BOOLEAN NOT NULL DEFAULT false,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Menu Items (dynamic navigation)
+CREATE TABLE IF NOT EXISTS "menu_items" (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  title       VARCHAR(255) NOT NULL,
+  description TEXT,
+  path        VARCHAR(255) NOT NULL,
+  icon        VARCHAR(100),
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  archived    BOOLEAN NOT NULL DEFAULT false,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Permission Nodes (tree of available permissions)
+CREATE TABLE IF NOT EXISTS "permission_nodes" (
+  id          VARCHAR(100) PRIMARY KEY,
+  label       VARCHAR(255) NOT NULL,
+  parent_id   VARCHAR(100) REFERENCES "permission_nodes"(id) ON DELETE CASCADE,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Per-user permissions
+CREATE TABLE IF NOT EXISTS "user_permissions" (
+  user_id     UUID NOT NULL REFERENCES "users"(id) ON DELETE CASCADE,
+  node_id     VARCHAR(100) NOT NULL REFERENCES "permission_nodes"(id) ON DELETE CASCADE,
+  granted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, node_id)
+);
+
+-- Per-role permissions (Administrator / Ship Manager / Deck Officer / Surveyor)
+CREATE TABLE IF NOT EXISTS "role_permissions" (
+  role_name   VARCHAR(100) NOT NULL,
+  node_id     VARCHAR(100) NOT NULL REFERENCES "permission_nodes"(id) ON DELETE CASCADE,
+  granted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (role_name, node_id)
+);
+
+-- Suppliers master table
+CREATE TABLE IF NOT EXISTS "suppliers" (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name          VARCHAR(255) NOT NULL,
+  category      VARCHAR(255),
+  location      VARCHAR(255),
+  contact_email VARCHAR(255),
+  phone         VARCHAR(50),
+  rating        VARCHAR(10),
+  status        VARCHAR(20) NOT NULL DEFAULT 'Active',
+  notes         TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Equipment master table
+CREATE TABLE IF NOT EXISTS "equipment_master" (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name              VARCHAR(255) NOT NULL,
+  model_code        VARCHAR(100),
+  manufacturer      VARCHAR(255),
+  system_type       VARCHAR(100),
+  next_service_date VARCHAR(50),
+  description       TEXT,
+  status            VARCHAR(20) NOT NULL DEFAULT 'Active',
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Suspected Keywords (auto-flag hazmat)
+CREATE TABLE IF NOT EXISTS "suspected_keywords" (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  keyword       VARCHAR(255) UNIQUE NOT NULL,
+  hazard_type   VARCHAR(255),
+  severity      VARCHAR(20) NOT NULL DEFAULT 'Medium',
+  status        VARCHAR(20) NOT NULL DEFAULT 'Active',
+  notes         TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Contact / CMS inbound messages
+CREATE TABLE IF NOT EXISTS "contact_messages" (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  full_name   VARCHAR(255) NOT NULL,
+  company     VARCHAR(255),
+  email       VARCHAR(255) NOT NULL,
+  phone       VARCHAR(50),
+  message     TEXT NOT NULL,
+  status      VARCHAR(20) NOT NULL DEFAULT 'new',
+  handled_by  UUID REFERENCES "users"(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_vessels_created_by ON "vessels"(created_by_id);
 CREATE INDEX IF NOT EXISTS idx_ga_plans_vessel ON "ga_plans"(vessel_id);
@@ -237,6 +350,13 @@ CREATE INDEX IF NOT EXISTS idx_purchase_orders_vessel ON "purchase_orders"(vesse
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_supplier ON "purchase_orders"(supplier_name);
 CREATE INDEX IF NOT EXISTS idx_md_sdoc_vessel ON "md_sdoc_requests"(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_md_sdoc_status ON "md_sdoc_requests"(status);
+CREATE INDEX IF NOT EXISTS idx_suppliers_name    ON "suppliers"(name);
+CREATE INDEX IF NOT EXISTS idx_equipment_name    ON "equipment_master"(name);
+CREATE INDEX IF NOT EXISTS idx_suspected_keyword ON "suspected_keywords"(keyword);
+CREATE INDEX IF NOT EXISTS idx_contact_status    ON "contact_messages"(status);
+CREATE INDEX IF NOT EXISTS idx_menu_items_archived ON "menu_items"(archived);
+CREATE INDEX IF NOT EXISTS idx_user_perm_user    ON "user_permissions"(user_id);
+CREATE INDEX IF NOT EXISTS idx_role_perm_role    ON "role_permissions"(role_name);
 `;
 
 async function migrate() {
