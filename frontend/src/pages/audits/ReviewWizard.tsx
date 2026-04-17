@@ -597,7 +597,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                                                 }} onBlur={() => setEditingCell(null)} onKeyDown={e => handleKeyDown(e, originalIdx, ci)} />
                                                             ) : (
                                                                 data[0][ci] === 'Is Suspected' ? (
-                                                                    <select className="suspicious-select" value={cell} onChange={e => {
+                                                                    <select className={`suspicious-select ${cell === 'Yes' ? 'is-yes' : 'is-no'}`} value={cell} onChange={e => {
                                                                         const newValue = e.target.value;
                                                                         pushToHistory();
                                                                         const nd = JSON.parse(JSON.stringify(data));
