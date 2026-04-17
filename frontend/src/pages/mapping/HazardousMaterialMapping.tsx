@@ -840,7 +840,65 @@ export default function HazardousMaterialMapping() {
                                             <ChevronDown size={14} />
                                             {openDropdown === 'suspected_hm' && (
                                                 <div className="dropdown-v4">
-                                                    {['Asbestos', 'Ozone Depleting Substances', 'Organotin Compounds', 'Cuibutryne', 'Radioactive materials', 'Polychloronaphthalenes', 'Certain Shortchain Chlorinated Paraffins', 'Perfluorooctane Sulfonate (PFOS)', 'Hexabromocyclododecane (HBCDD)'].map(mat => (
+                                                    {(() => {
+                                                        // Comprehensive IHM hazardous materials, filtered by selected IHM Part
+                                                        const HAZMAT_BY_PART: Record<string, string[]> = {
+                                                            'I': [
+                                                                'Asbestos',
+                                                                'Polychlorinated Biphenyls (PCBs)',
+                                                                'Ozone Depleting Substances (ODS)',
+                                                                'Anti-fouling compounds (Organotin - TBT)',
+                                                                'Cybutryne',
+                                                                'Cadmium and its compounds',
+                                                                'Hexavalent Chromium and its compounds',
+                                                                'Lead and its compounds',
+                                                                'Mercury and its compounds',
+                                                                'Polybrominated Biphenyls (PBBs)',
+                                                                'Polybrominated Diphenyl Ethers (PBDEs)',
+                                                                'Polychlorinated Naphthalenes',
+                                                                'Radioactive substances',
+                                                                'Certain Short-chain Chlorinated Paraffins (SCCPs)',
+                                                                'Perfluorooctane Sulfonate (PFOS)',
+                                                                'Hexabromocyclododecane (HBCDD)',
+                                                                'Brominated Flame Retardants (HBCDD)',
+                                                                'Perfluorooctanoic Acid (PFOA)',
+                                                            ],
+                                                            'II': [
+                                                                'Operational wastes - Sludges',
+                                                                'Oily waste / Bilge water residue',
+                                                                'Sewage',
+                                                                'Garbage (Plastics)',
+                                                                'Incinerator ash',
+                                                                'Medical waste',
+                                                                'Quarantine waste',
+                                                                'Cargo residues',
+                                                                'Cargo hold wash water',
+                                                                'Exhaust gas cleaning residues',
+                                                                'Cleaning chemical residues',
+                                                            ],
+                                                            'III': [
+                                                                'Paints and coatings',
+                                                                'Cleaning chemicals',
+                                                                'Lubricating oils and greases',
+                                                                'Batteries (Lead-acid, NiCd, Li-ion)',
+                                                                'Fuel additives',
+                                                                'Refrigerants / Halons',
+                                                                'Fire-fighting foam (AFFF / PFOS-based)',
+                                                                'Compressed gases',
+                                                                'Welding gases',
+                                                                'Solvents and thinners',
+                                                                'Fluorescent tubes / Mercury lamps',
+                                                                'Electronic components',
+                                                                'Pesticides / Fumigants',
+                                                            ],
+                                                        };
+                                                        const partKey = formData.ihmPart?.includes('Part III') ? 'III'
+                                                            : formData.ihmPart?.includes('Part II') ? 'II'
+                                                            : formData.ihmPart?.includes('Part I') ? 'I'
+                                                            : null;
+                                                        const list = partKey ? HAZMAT_BY_PART[partKey] : Object.values(HAZMAT_BY_PART).flat();
+                                                        return list;
+                                                    })().map(mat => (
                                                         <div key={mat} className="drop-item" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, hazMaterials: [mat] }); setOpenDropdown(null); }}>{mat}</div>
                                                     ))}
                                                 </div>

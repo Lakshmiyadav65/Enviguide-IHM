@@ -286,7 +286,14 @@ export default function GAPlanViewer({
     };
 
     const addSelection = () => {
-        if (!currentSelection || !newSelectionTitle) return;
+        if (!currentSelection) {
+            showToast("No Selection", "Please draw a rectangle on the plan first.", "error");
+            return;
+        }
+        if (!newSelectionTitle || !newSelectionTitle.trim()) {
+            showToast("Title Required", "Please enter a deck name before saving.", "error");
+            return;
+        }
 
         // Check for overlap with existing sections
         if (checkOverlap(currentSelection)) {
@@ -303,24 +310,25 @@ export default function GAPlanViewer({
             return;
         }
 
+        const trimmedTitle = newSelectionTitle.trim();
         const newId = Date.now().toString();
         const sectionId = `DECK-${newId.slice(-4)}`;
         const newSection: MappedSection = {
             id: newId,
-            title: newSelectionTitle,
+            title: trimmedTitle,
             sectionId: sectionId,
             rect: currentSelection,
             itemsCount: 0,
             isVisible: true
         };
         // Initialize empty inventory for this deck
-        localStorage.setItem(`inventory_${vesselName}_${newSelectionTitle}`, JSON.stringify([]));
+        localStorage.setItem(`inventory_${vesselName}_${trimmedTitle}`, JSON.stringify([]));
 
         const newSections = [...mappedSections, newSection];
         executeUpdate(newSections);
 
 
-        showToast("Deck Saved Successfully", `${newSelectionTitle} has been added to the vessel project`);
+        showToast("Deck Saved Successfully", `${trimmedTitle} has been added to the vessel project`);
 
         // Clear selection to avoid duplication in UI
         setCurrentSelection(null);

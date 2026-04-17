@@ -104,11 +104,28 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
         };
     }, []);
 
-    // Logic: The "Big 4" demo vessels get full data. Others get the empty state.
-    const demoVessels = ['MV Ocean Pioneer', 'ACOSTA', 'AFIF', 'PACIFIC HORIZON'];
-    const isEmpty = !demoVessels.includes(vesselName);
+    // Determine if the current vessel has ANY materials (mock, vessel inventory, or deck inventories)
+    const hasAnyMaterials = useMemo(() => {
+        // Check vessel-wide inventory
+        const raw = localStorage.getItem(`vessel_inventory_${vesselName}`);
+        if (raw) {
+            try { if ((JSON.parse(raw) || []).length > 0) return true; } catch { /* ignore */ }
+        }
+        // Check any deck-specific inventory
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.startsWith(`inventory_${vesselName}_`)) {
+                try {
+                    if ((JSON.parse(localStorage.getItem(key) || '[]') || []).length > 0) return true;
+                } catch { /* ignore */ }
+            }
+        }
+        // Demo mock vessels always have materials
+        const demoVessels = ['MV Ocean Pioneer', 'ACOSTA', 'AFIF', 'PACIFIC HORIZON'];
+        return demoVessels.includes(vesselName);
+    }, [vesselName, refreshTrigger]);
 
-    if (isEmpty) {
+    if (!hasAnyMaterials) {
         return (
             <div className="empty-state-card-full">
                 {/* Header Section */}
@@ -218,20 +235,29 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                 try {
                     const data = JSON.parse(localStorage.getItem(key) || '[]');
                     const sectionName = key.replace(`inventory_${vesselName}_`, '');
-                    deckInventories.push(...data.map((m: any) => ({
-                        id: m.id,
-                        name: m.name,
-                        vesselId: vesselIdMap[vesselName] || '1',
-                        ihmPart: m.ihmPart || 'PART I',
-                        category: (m.hmStatus && m.hmStatus.toLowerCase() === 'chm') ? 'hazard' : 'warning',
-                        completion: 100,
-                        status: 'Mapped',
-                        poNo: m.shipPO || '',
-                        zone: sectionName,
-                        materialName: m.material,
-                        equipment: m.equipment,
-                        compartment: m.compartment
-                    })));
+                    deckInventories.push(...data.map((m: any) => {
+                        // Normalize IHM part value to PART I / PART II / PART III
+                        const partRaw = (m.ihmPart || '').toUpperCase();
+                        const ihmPart = partRaw.includes('PART III') ? 'PART III'
+                            : partRaw.includes('PART II') ? 'PART II'
+                            : partRaw.includes('PART I') ? 'PART I'
+                            : 'PART I';
+                        return {
+                            id: m.id,
+                            name: m.name,
+                            vesselId: vesselIdMap[vesselName] || vesselName, // fallback to vessel name for non-demo vessels
+                            fromCurrentVessel: true, // marker so the filter includes these
+                            ihmPart,
+                            category: (m.hmStatus && m.hmStatus.toLowerCase() === 'chm') ? 'hazard' : 'warning',
+                            completion: 100,
+                            status: 'Mapped',
+                            poNo: m.shipPO || '',
+                            zone: sectionName,
+                            materialName: m.material,
+                            equipment: m.equipment,
+                            compartment: m.compartment
+                        };
+                    }));
                 } catch (e) {
                     console.error("Failed to parse deck inventory:", e);
                 }
@@ -252,10 +278,13 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
 
     // Calculate Dynamic Counts based on current vessel
     const vesselSpecificMaterials = useMemo(() => {
-        return allAvailableMaterials.filter(m => {
-            // If it's from localStorage, it might already be filtered by vesselName in the key.
-            // If it's mock data, we check vesselIdMap or just use vesselName if available.
-            return vesselIdMap[vesselName] === m.vesselId || m.id.startsWith('MAPPED-');
+        return allAvailableMaterials.filter((m: any) => {
+            // Include materials tagged from current vessel (from localStorage / mapping page)
+            if (m.fromCurrentVessel) return true;
+            // Include mapped items explicitly
+            if (m.id && typeof m.id === 'string' && m.id.startsWith('MAPPED-')) return true;
+            // Include demo mock data for the 4 demo vessels
+            return vesselIdMap[vesselName] === m.vesselId;
         });
     }, [allAvailableMaterials, vesselName]);
 

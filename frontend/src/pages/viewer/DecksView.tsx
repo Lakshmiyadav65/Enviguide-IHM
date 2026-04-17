@@ -337,15 +337,13 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
         }
     }, [vesselName, uploadedPlans.length, activePlanId]);
 
-    // Sync from localStorage cross-tab and on mount
+    // Sync from localStorage cross-tab, on mount, and on tab focus/visibility
     useEffect(() => {
         const syncData = () => {
-            // Sync sections
             const savedSections = localStorage.getItem(`vessel_sections_${vesselName}`);
             if (savedSections) {
                 try {
                     const sections = JSON.parse(savedSections);
-                    // Update counts for each section from its specific inventory
                     const updatedSections = sections.map((s: MappedSection) => {
                         const invValue = localStorage.getItem(`inventory_${vesselName}_${s.title}`);
                         const count = invValue ? JSON.parse(invValue).length : 0;
@@ -365,12 +363,29 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                 syncData();
             }
         };
+        const handleFocus = () => syncData();
+        const handleVisibility = () => { if (document.visibilityState === 'visible') syncData(); };
 
         window.addEventListener('storage', handleStorage);
-        // Initial sync
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibility);
         syncData();
-        return () => window.removeEventListener('storage', handleStorage);
+        return () => {
+            window.removeEventListener('storage', handleStorage);
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
     }, [vesselName]);
+
+    // Read fresh mapped items count directly from localStorage (fallback if state is stale)
+    const getFreshItemCount = (deckTitle: string): number => {
+        try {
+            const inv = localStorage.getItem(`inventory_${vesselName}_${deckTitle}`);
+            return inv ? JSON.parse(inv).length : 0;
+        } catch {
+            return 0;
+        }
+    };
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -807,7 +822,7 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                                                     </div>
                                                     <div className="deck-meta-row">
                                                         <Compass size={12} />
-                                                        <span>{deck.itemsCount} Mapped Items</span>
+                                                        <span>{Math.max(deck.itemsCount || 0, getFreshItemCount(deck.title))} Mapped Items</span>
                                                         <span className="meta-dot"></span>
                                                         <span>Ready for Inspection</span>
                                                     </div>
