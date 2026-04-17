@@ -36,6 +36,7 @@ export default function Vessels() {
     const [notifCount, setNotifCount] = useState(3);
     const [vesselList, setVesselList] = useState<Vessel[]>([]);
     const [activeVesselName, setActiveVesselName] = useState('');
+    const [activeVesselImo, setActiveVesselImo] = useState('');
     const [activeTab, setActiveTab] = useState(location.pathname === '/decks' ? 'decks' : 'project');
     const [searchTerm, setSearchTerm] = useState('');
     const [isAdding, setIsAdding] = useState(false);
@@ -51,12 +52,16 @@ export default function Vessels() {
                 setVesselList(vessels);
                 if (vessels.length > 0 && !activeVesselName) {
                     setActiveVesselName(vessels[0].name);
+                    setActiveVesselImo(vessels[0].imoNumber);
                 }
             })
             .catch(() => {
                 // Fallback to INITIAL_VESSELS if API fails
                 setVesselList(INITIAL_VESSELS);
-                if (INITIAL_VESSELS.length > 0) setActiveVesselName(INITIAL_VESSELS[0].name);
+                if (INITIAL_VESSELS.length > 0) {
+                    setActiveVesselName(INITIAL_VESSELS[0].name);
+                    setActiveVesselImo(INITIAL_VESSELS[0].imoNumber);
+                }
             })
             .finally(() => setApiLoading(false));
     }, []);
@@ -294,8 +299,13 @@ export default function Vessels() {
 
 
     const activeVesselData = useMemo(() => {
+        // Prefer IMO match (unique), fall back to name for legacy flows
+        if (activeVesselImo) {
+            const byImo = vesselList.find(v => v.imoNumber === activeVesselImo);
+            if (byImo) return byImo;
+        }
         return vesselList.find(v => v.name === activeVesselName);
-    }, [vesselList, activeVesselName]);
+    }, [vesselList, activeVesselName, activeVesselImo]);
 
     // Sync formData with selected vessel when not editing/adding
     useEffect(() => {
@@ -312,6 +322,7 @@ export default function Vessels() {
             }
         }
         setActiveVesselName(vessel.name);
+        setActiveVesselImo(vessel.imoNumber);
         setFormData(vessel);
         setIsAdding(false);
         setIsEditing(false);
@@ -331,6 +342,7 @@ export default function Vessels() {
         setIsAdding(true);
         setIsEditing(true);
         setActiveVesselName('');
+        setActiveVesselImo('');
         setFormData(EMPTY_FORM);
         setActiveTab('project');
     };
@@ -410,6 +422,7 @@ export default function Vessels() {
                 setIsAdding(false);
                 setIsEditing(false);
                 setActiveVesselName(newVessel.name);
+                setActiveVesselImo(newVessel.imoNumber);
                 setModalMessage('New vessel added successfully!');
             } else {
                 const vesselId = activeVesselData?.id;
@@ -429,6 +442,7 @@ export default function Vessels() {
 
                 setVesselList(prev => prev.map(v => v.id === vesselId ? updated : v));
                 setActiveVesselName(updated.name);
+                setActiveVesselImo(updated.imoNumber);
                 setIsEditing(false);
                 setModalMessage('Vessel data updated successfully!');
             }
@@ -1474,7 +1488,7 @@ export default function Vessels() {
                                     ).map((vessel) => (
                                         <div
                                             key={`${vessel.name}-${vessel.imoNumber}`}
-                                            className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
+                                            className={`vessel-item light ${activeVesselImo === vessel.imoNumber ? 'active' : ''}`}
                                             onClick={() => handleVesselSelect(vessel)}
                                         >
                                             <div className="vessel-status-dot v-active"></div>
