@@ -87,21 +87,6 @@ ALTER TABLE "audit_summaries" ADD COLUMN IF NOT EXISTS review_assigned_to VARCHA
 ALTER TABLE "audit_summaries" ADD COLUMN IF NOT EXISTS reviewed_by VARCHAR(255);
 ALTER TABLE "audit_summaries" ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 
--- Decks table
-CREATE TABLE IF NOT EXISTS "decks" (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  vessel_id     UUID NOT NULL REFERENCES "vessels"(id) ON DELETE CASCADE,
-  ga_plan_id    UUID REFERENCES "ga_plans"(id) ON DELETE SET NULL,
-  deck_area_id  UUID REFERENCES "deck_areas"(id) ON DELETE SET NULL,
-  name          VARCHAR(255) NOT NULL,
-  level         INTEGER NOT NULL DEFAULT 0,
-  ga_plan_url   VARCHAR(500),
-  thumbnail     TEXT,
-  status        VARCHAR(20) NOT NULL DEFAULT 'active',
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 -- GA Plans table
 CREATE TABLE IF NOT EXISTS "ga_plans" (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -111,6 +96,7 @@ CREATE TABLE IF NOT EXISTS "ga_plans" (
   file_path   VARCHAR(500) NOT NULL,
   file_size   INTEGER NOT NULL,
   mime_type   VARCHAR(100) NOT NULL,
+  
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -129,6 +115,21 @@ CREATE TABLE IF NOT EXISTS "deck_areas" (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(ga_plan_id, name)
+);
+
+-- Decks table
+CREATE TABLE IF NOT EXISTS "decks" (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vessel_id     UUID NOT NULL REFERENCES "vessels"(id) ON DELETE CASCADE,
+  ga_plan_id    UUID REFERENCES "ga_plans"(id) ON DELETE SET NULL,
+  deck_area_id  UUID REFERENCES "deck_areas"(id) ON DELETE SET NULL,
+  name          VARCHAR(255) NOT NULL,
+  level         INTEGER NOT NULL DEFAULT 0,
+  ga_plan_url   VARCHAR(500),
+  thumbnail     TEXT,
+  status        VARCHAR(20) NOT NULL DEFAULT 'active',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Materials table (hazardous material entries mapped to decks)
