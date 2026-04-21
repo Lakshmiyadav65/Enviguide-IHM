@@ -41,7 +41,7 @@ export default function Vessels() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isAdding, setIsAdding] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
-    const [apiLoading, setApiLoading] = useState(true);
+    const [_apiLoading, setApiLoading] = useState(true);
 
     // Fetch vessels from API on mount
     useEffect(() => {
