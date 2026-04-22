@@ -39,22 +39,12 @@ const FILTER_TAGS = [
 // Real items now come from GET /audits/:imo/clarifications. Mock data removed.
 const initializeData = (): PurchaseOrderItem[] => [];
 
-const getSupplierMeta = (filter: string) => {
-    const suffix = filter === 'All' ? 'GEN' : filter.substring(0, 3).toUpperCase();
-    return [
-        { id: 's1', name: `${filter} - Henry Marine A/S`, ref: `( IHM|0${suffix}|ALP )` },
-        { id: 's2', name: `${filter} - Varuna Sentinels BV`, ref: `( IHM|1${suffix}|BET )` },
-        { id: 's3', name: `${filter} - Pole Star Space Applications Ltd`, ref: `( IHM|2${suffix}|GAM )` },
-        { id: 's4', name: `${filter} - Martek Marine Ltd`, ref: `( IHM|3${suffix}|DEL )` },
-        { id: 's5', name: `${filter} - Survitec Safety Solutions Norway AS`, ref: `( IHM|4${suffix}|EPS )` },
-    ];
-};
-
 interface PurchaseOrderViewProps {
     imo: string;
+    vesselName?: string;
 }
 
-export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
+export default function PurchaseOrderView({ imo, vesselName }: PurchaseOrderViewProps) {
     const [activeFilter, setActiveFilter] = useState('All');
     const [openSuppliers, setOpenSuppliers] = useState<string[]>(['s1']);
     const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData);
@@ -169,34 +159,64 @@ export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
             return true;
         });
 
-        const meta = getSupplierMeta(activeFilter);
-        return meta.map((s, idx) => {
-            const supplierItems = filteredItems.filter(item => {
-                // If it's a suspected item, match by vendor name if we have it
-                if (item.isSuspected) {
-                    return s.name.toLowerCase().includes((item as any).vendorName?.toLowerCase() || '');
-                }
-                return true;
-            }).slice(idx * 10, (idx + 1) * 10);
+        // Group by real vendor name. If there are no items yet, show a single
+        // placeholder group named after the vessel so the column template stays
+        // on screen with an empty state.
+        type Supplier = {
+            id: string;
+            name: string;
+            ref: string;
+            totalItems: string;
+            mds: string;
+            hm: string;
+            items: PurchaseOrderItem[];
+        };
 
-            return {
-                ...s,
-                totalItems: `${supplierItems.length * 2}(${supplierItems.length})`,
-                mds: `${supplierItems.filter(i => i.mdsRec).length} / ${supplierItems.length}`,
-                hm: `0 | ${supplierItems.length > 2 ? 4 : 0}`,
-                items: supplierItems.map(item => {
-                    // Dynamic email status based on filter
-                    if (item.isSuspected) {
-                        if (activeFilter === 'Reminder 1') return { ...item, emailStatus: 'SENT (Reminder 1)' };
-                        if (activeFilter === 'Reminder 2') return { ...item, emailStatus: 'SENT (Reminder 2)' };
-                    }
-                    return item;
-                })
-            };
-        });
-        // Keep empty supplier groups visible so the template (group headers + column
-        // labels) stays on screen even before any real items arrive.
-    }, [activeFilter, searchTerm, allItems]);
+        const byVendor = new Map<string, PurchaseOrderItem[]>();
+        for (const item of filteredItems) {
+            const vendor = ((item as unknown as { vendorName?: string }).vendorName || '').trim() || 'Unknown Supplier';
+            if (!byVendor.has(vendor)) byVendor.set(vendor, []);
+            byVendor.get(vendor)!.push(item);
+        }
+
+        const decorate = (item: PurchaseOrderItem): PurchaseOrderItem => {
+            if (item.isSuspected) {
+                if (activeFilter === 'Reminder 1') return { ...item, emailStatus: 'SENT (Reminder 1)' };
+                if (activeFilter === 'Reminder 2') return { ...item, emailStatus: 'SENT (Reminder 2)' };
+            }
+            return item;
+        };
+
+        const suppliers: Supplier[] = [];
+        let idx = 0;
+        for (const [vendor, items] of byVendor.entries()) {
+            suppliers.push({
+                id: `v-${idx++}`,
+                name: vendor,
+                ref: imo ? `( IMO ${imo} )` : '',
+                totalItems: `${items.length}`,
+                mds: `${items.filter(i => i.mdsRec).length} / ${items.length}`,
+                hm: `0 | 0`,
+                items: items.map(decorate),
+            });
+        }
+
+        // No real items yet — emit a single empty group so the column template
+        // is still visible. Use the vessel name as the group label.
+        if (suppliers.length === 0) {
+            suppliers.push({
+                id: 'placeholder',
+                name: vesselName || 'Purchase Orders',
+                ref: imo ? `( IMO ${imo} )` : '',
+                totalItems: '0',
+                mds: '0 / 0',
+                hm: '0 | 0',
+                items: [],
+            });
+        }
+
+        return suppliers;
+    }, [activeFilter, searchTerm, allItems, imo, vesselName]);
 
     const selectedCount = allItems.filter(i => i.selected).length;
 

@@ -862,7 +862,11 @@ export default function Vessels() {
 
         if (activeTab === 'purchase') {
             return (
-                <PurchaseOrderView key={activeVesselName} imo={activeVesselData?.imoNumber || ''} />
+                <PurchaseOrderView
+                    key={activeVesselName}
+                    imo={activeVesselData?.imoNumber || ''}
+                    vesselName={activeVesselName}
+                />
             );
         }
 
