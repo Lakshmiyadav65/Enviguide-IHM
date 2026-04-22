@@ -243,39 +243,6 @@ export default function PendingReviews() {
                     </div>
                 </div>
 
-                {/* Summary Footer Bar (Green bar at bottom) */}
-                <div className="summary-footer-bar">
-                    <div className="summary-items">
-                        <div className="summary-item">
-                            <span className="summary-label">TOTAL NUMBER OF POS:</span>
-                            <span className="summary-value">132</span>
-                        </div>
-                        <div className="summary-item">
-                            <span className="summary-label">MDS REQUESTED:</span>
-                            <span className="summary-value">482</span>
-                        </div>
-                        <div className="summary-item">
-                            <span className="summary-label">MDS RECEIVED:</span>
-                            <span className="summary-value">412</span>
-                        </div>
-                        <div className="summary-item">
-                            <span className="summary-label">MDS PENDING:</span>
-                            <span className="summary-value">70</span>
-                        </div>
-                        <div className="summary-item">
-                            <span className="summary-label">HM GREEN QTY:</span>
-                            <span className="summary-value highlight-green">386</span>
-                        </div>
-                        <div className="summary-item">
-                            <span className="summary-label">HM RED QTY:</span>
-                            <span className="summary-value highlight-red">24</span>
-                        </div>
-                        <div className="summary-item">
-                            <span className="summary-label">PCHM QTY:</span>
-                            <span className="summary-value">18</span>
-                        </div>
-                    </div>
-                </div>
             </main>
 
             {/* Modals & Overlays */}
