@@ -19,6 +19,7 @@ import {
   sendAuditForReview, completeReview, rejectReview,
   sendClarificationEmail,
   getAuditLineItems, replaceAuditLineItems, getAuditClarifications,
+  deleteAudit,
 } from '../../controller/audit.controller.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 
@@ -36,6 +37,7 @@ router.post('/clarification-email',          sendClarificationEmail);
 router.patch('/:id/send-for-review',         sendAuditForReview);
 router.patch('/reviews/:id/complete',        completeReview);
 router.patch('/reviews/:id/reject',          rejectReview);
+router.delete('/:id',                        deleteAudit);
 
 router.get('/:imo/line-items',               getAuditLineItems);
 router.patch('/:imo/line-items',             replaceAuditLineItems);

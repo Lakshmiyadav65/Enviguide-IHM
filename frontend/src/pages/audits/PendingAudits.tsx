@@ -616,8 +616,16 @@ export default function PendingAudits() {
         setShowDeleteModal(true);
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (deletingImo) {
+            const record = allRecords.find(r => r.imoNumber === deletingImo);
+            if (record?.id) {
+                try {
+                    await api.delete(ENDPOINTS.AUDITS.DELETE(record.id));
+                } catch (err) {
+                    console.error('Delete audit failed:', err);
+                }
+            }
             setAllRecords(prev => prev.filter(r => r.imoNumber !== deletingImo));
         }
         setShowDeleteModal(false);

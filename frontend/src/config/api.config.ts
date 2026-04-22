@@ -55,6 +55,7 @@ export const ENDPOINTS = {
     CLARIFICATION_EMAIL: '/audits/clarification-email',
     LINE_ITEMS: (imo: string) => `/audits/${imo}/line-items`,
     CLARIFICATIONS: (imo: string) => `/audits/${imo}/clarifications`,
+    DELETE: (id: string) => `/audits/${id}`,
   },
 
   // Security / Users

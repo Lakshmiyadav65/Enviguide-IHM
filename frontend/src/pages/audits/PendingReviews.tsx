@@ -69,16 +69,12 @@ export default function PendingReviews() {
         if (deletingImo) {
             const record = allRecords.find(r => r.imoNumber === deletingImo);
             if (record?.id) {
-                // "Delete" from Pending Reviews = reject the review (moves audit back
-                // to Pending Audits as 'In Progress'). The backend has no hard-delete
-                // endpoint for audits, and this matches the existing reject flow.
                 try {
-                    await api.patch(`/audits/reviews/${record.id}/reject`, {});
+                    await api.delete(ENDPOINTS.AUDITS.DELETE(record.id));
                 } catch (err) {
-                    console.error('Reject review failed:', err);
+                    console.error('Delete audit failed:', err);
                 }
             }
-            // Drop from UI regardless; next focus event re-syncs with backend.
             setAllRecords(prev => prev.filter(r => r.imoNumber !== deletingImo));
         }
         setShowDeleteModal(false);

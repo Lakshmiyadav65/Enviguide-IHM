@@ -178,28 +178,62 @@ export async function uploadPurchaseOrderBulk(req: Request, res: Response, next:
     }
 
     const v = vessel as Record<string, unknown>;
-
-    // 1. Create the audit summary.
-    const audit = await AuditService.createAudit({
-      imoNumber: v.imoNumber,
-      vesselName: v.name,
-      totalPO: Number(stats.totalPO ?? 0),
-      totalItems: Number(stats.totalItems ?? lineItems.length),
-      duplicatePO: Number(stats.duplicatePO ?? 0),
-      duplicateSupplierCode: Number(stats.duplicateSupplierCode ?? 0),
-      duplicateProduct: Number(stats.duplicateProduct ?? 0),
-      status: 'In Progress',
-    }, vesselId);
-
-    const auditId = (audit as Record<string, string>).id;
     const filePath = `/uploads/po/${req.file.filename}`;
 
-    await query(
-      `UPDATE audit_summaries
-         SET uploaded_file_path = $1, uploaded_file_name = $2
-       WHERE id = $3`,
-      [filePath, req.file.originalname, auditId],
+    // 1. Upsert the audit summary. If an 'In Progress' audit already exists for
+    //    this vessel, re-uploading replaces it (stats + file + line items).
+    //    Audits that have already moved to 'Pending Review' or 'Completed' are
+    //    preserved — the new upload becomes a separate audit.
+    const existingInProgress = await query(
+      `SELECT id FROM audit_summaries
+         WHERE vessel_id = $1 AND status = 'In Progress'
+         ORDER BY created_at DESC LIMIT 1`,
+      [vesselId],
     );
+
+    let auditId: string;
+    if (existingInProgress.rows.length > 0) {
+      auditId = String((existingInProgress.rows[0] as Record<string, unknown>).id);
+      await query(
+        `UPDATE audit_summaries
+            SET total_po = $1, total_items = $2,
+                duplicate_po = $3, duplicate_supplier_code = $4, duplicate_product = $5,
+                uploaded_file_path = $6, uploaded_file_name = $7,
+                last_activity = NOW(), updated_at = NOW()
+          WHERE id = $8`,
+        [
+          Number(stats.totalPO ?? 0),
+          Number(stats.totalItems ?? lineItems.length),
+          Number(stats.duplicatePO ?? 0),
+          Number(stats.duplicateSupplierCode ?? 0),
+          Number(stats.duplicateProduct ?? 0),
+          filePath,
+          req.file.originalname,
+          auditId,
+        ],
+      );
+      // Wipe the previous line items — they're being replaced by the new upload.
+      await query('DELETE FROM audit_line_items WHERE audit_id = $1', [auditId]);
+    } else {
+      const audit = await AuditService.createAudit({
+        imoNumber: v.imoNumber,
+        vesselName: v.name,
+        totalPO: Number(stats.totalPO ?? 0),
+        totalItems: Number(stats.totalItems ?? lineItems.length),
+        duplicatePO: Number(stats.duplicatePO ?? 0),
+        duplicateSupplierCode: Number(stats.duplicateSupplierCode ?? 0),
+        duplicateProduct: Number(stats.duplicateProduct ?? 0),
+        status: 'In Progress',
+      }, vesselId);
+
+      auditId = String((audit as Record<string, unknown>).id);
+      await query(
+        `UPDATE audit_summaries
+           SET uploaded_file_path = $1, uploaded_file_name = $2
+         WHERE id = $3`,
+        [filePath, req.file.originalname, auditId],
+      );
+    }
 
     // 2. Bulk-insert line items in chunks (Postgres parameter limit is 65,535).
     //    With 24 columns/row, 2000 rows = 48,000 params — safe.

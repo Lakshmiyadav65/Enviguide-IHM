@@ -280,3 +280,16 @@ export async function getAuditClarifications(req: Request, res: Response, next: 
     res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 }
+
+/** DELETE /api/v1/audits/:id — hard-delete an audit and its line items */
+export async function deleteAudit(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const existing = await AuditService.getAuditById(id, req.user!.userId);
+    if (!existing) return next(createError('Audit not found', 404));
+
+    // FK on audit_line_items has ON DELETE CASCADE, so they go with the audit.
+    await AuditService.deleteAudit(id);
+    res.json({ success: true, data: { id } });
+  } catch (err) { next(err); }
+}
