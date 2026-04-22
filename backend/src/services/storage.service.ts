@@ -1,7 +1,7 @@
-// -- File Storage (Cloudflare R2 / S3-compatible) --------------------
-// If R2 env vars are configured, uploads go to R2 and we return a public
-// URL. Otherwise uploads stay on local disk (dev fallback; ephemeral on
-// Render free tier, which is why we want R2 in production).
+// -- File Storage (S3-compatible: Supabase, R2, AWS S3, MinIO, etc.) --
+// If S3_* env vars are configured, uploads go to that bucket and we
+// return a public URL. Otherwise uploads stay on local disk (dev
+// fallback; ephemeral on Render free tier).
 
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import fs from 'fs';
@@ -9,19 +9,21 @@ import path from 'path';
 import crypto from 'crypto';
 import { env } from '../config/env.js';
 
-const r2Configured = Boolean(
-  env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_BUCKET,
+const s3Configured = Boolean(
+  env.S3_ENDPOINT && env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY && env.S3_BUCKET,
 );
 
 let client: S3Client | null = null;
 function getClient(): S3Client {
   if (!client) {
     client = new S3Client({
-      region: 'auto',
-      endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      region: env.S3_REGION,
+      endpoint: env.S3_ENDPOINT,
+      // Supabase + MinIO need path-style. R2 + AWS S3 are fine either way.
+      forcePathStyle: env.S3_FORCE_PATH_STYLE,
       credentials: {
-        accessKeyId: env.R2_ACCESS_KEY_ID!,
-        secretAccessKey: env.R2_SECRET_ACCESS_KEY!,
+        accessKeyId: env.S3_ACCESS_KEY_ID!,
+        secretAccessKey: env.S3_SECRET_ACCESS_KEY!,
       },
     });
   }
@@ -29,7 +31,7 @@ function getClient(): S3Client {
 }
 
 export function isCloudStorageConfigured(): boolean {
-  return r2Configured;
+  return s3Configured;
 }
 
 function randomSuffix(): string {
@@ -37,7 +39,7 @@ function randomSuffix(): string {
 }
 
 export interface StoredFile {
-  /** URL the frontend/supplier can fetch the file at. Full https:// in prod. */
+  /** URL the frontend/supplier can fetch the file at. */
   url: string;
   /** Original filename the user uploaded. */
   name: string;
@@ -46,25 +48,20 @@ export interface StoredFile {
 }
 
 /**
- * Persist an uploaded file. If R2 is configured, streams the file to R2
- * and deletes the local temp file. Otherwise leaves the file on disk and
- * returns a /uploads/<localPath> URL for the local express static handler.
- *
- * @param localPath Full filesystem path where multer wrote the file.
- * @param originalName Original uploaded filename (for Content-Disposition).
- * @param folder Sub-folder inside the bucket / inside /uploads. e.g. "mds", "po".
+ * Persist an uploaded file. If S3 is configured, streams the file to the
+ * bucket and deletes the local temp file. Otherwise leaves the file on disk
+ * and returns a /uploads/<...> URL for the local express static handler.
  */
 export async function persistUploadedFile(
   localPath: string,
   originalName: string,
   folder: string,
 ): Promise<StoredFile> {
-  if (!r2Configured) {
-    // Dev fallback: keep file on local disk and return a /uploads/... URL.
-    // Expect localPath under the project's uploads/ directory; compute the
-    // relative path for the static handler.
+  if (!s3Configured) {
     const idx = localPath.replace(/\\/g, '/').lastIndexOf('/uploads/');
-    const relUrl = idx >= 0 ? localPath.replace(/\\/g, '/').substring(idx) : `/uploads/${folder}/${path.basename(localPath)}`;
+    const relUrl = idx >= 0
+      ? localPath.replace(/\\/g, '/').substring(idx)
+      : `/uploads/${folder}/${path.basename(localPath)}`;
     return { url: relUrl, name: originalName };
   }
 
@@ -74,17 +71,19 @@ export async function persistUploadedFile(
 
   await getClient().send(
     new PutObjectCommand({
-      Bucket: env.R2_BUCKET!,
+      Bucket: env.S3_BUCKET!,
       Key: key,
       Body: body,
       ContentDisposition: `inline; filename="${originalName.replace(/"/g, '')}"`,
     }),
   );
 
-  // Clean up the local temp file — we don't need it once R2 has the object.
   try { fs.unlinkSync(localPath); } catch { /* ignore */ }
 
-  const base = env.R2_PUBLIC_BASE_URL ?? `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${env.R2_BUCKET}`;
+  // If a public base URL is configured, use it; otherwise fall back to the
+  // endpoint + bucket (works when the bucket is public and path-style).
+  const base = env.S3_PUBLIC_BASE_URL
+    ?? `${env.S3_ENDPOINT!.replace(/\/$/, '')}/${env.S3_BUCKET}`;
   return {
     url: `${base.replace(/\/$/, '')}/${key}`,
     name: originalName,
@@ -92,10 +91,10 @@ export async function persistUploadedFile(
   };
 }
 
-/** Delete a stored file by its R2 key. No-op for local files. */
+/** Delete a stored file by its S3 key. No-op for local files. */
 export async function deleteStoredFile(key: string | null | undefined): Promise<void> {
-  if (!key || !r2Configured) return;
+  if (!key || !s3Configured) return;
   try {
-    await getClient().send(new DeleteObjectCommand({ Bucket: env.R2_BUCKET!, Key: key }));
-  } catch { /* swallow — delete is best-effort */ }
+    await getClient().send(new DeleteObjectCommand({ Bucket: env.S3_BUCKET!, Key: key }));
+  } catch { /* best-effort */ }
 }
