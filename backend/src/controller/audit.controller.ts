@@ -6,6 +6,29 @@ import { sendMail } from '../services/email.service.js';
 import { query } from '../config/database.js';
 import { createError } from '../middleware/errorHandler.js';
 
+// Canonical 20-column header used by the upload + review screens. If you add a
+// column here, also update audit_line_items columns and the upload controller.
+const LINE_ITEM_HEADER = [
+  'Name', 'Vessel Name', 'PO Number', 'IMO Number',
+  'PO Sent Date', 'MD Requested Date', 'Item Description', 'Is Suspected',
+  'IMPA Code', 'ISSA Code', 'Equipment Code', 'Equipment Name',
+  'Maker', 'Model', 'Part Number', 'Unit', 'Quantity',
+  'Vendor Remark', 'Vendor Email', 'Vendor Name',
+];
+
+function lineItemRowToArray(row: Record<string, unknown>): unknown[] {
+  const arr = [
+    row.name, row.vessel_name, row.po_number, row.imo_number,
+    row.po_sent_date, row.md_requested_date, row.item_description, row.is_suspected,
+    row.impa_code, row.issa_code, row.equipment_code, row.equipment_name,
+    row.maker, row.model, row.part_number, row.unit, row.quantity,
+    row.vendor_remark, row.vendor_email, row.vendor_name,
+  ].map((v) => (v == null ? '' : String(v)));
+  const extra = (row.extra_data as unknown[]) ?? [];
+  if (Array.isArray(extra)) arr.push(...extra.map((v) => (v == null ? '' : String(v))));
+  return arr;
+}
+
 /** GET /api/v1/audits/pending — Audits with status In Progress / Pending */
 export async function getPendingAudits(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -191,5 +214,69 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
     }
 
     res.json({ success: true, data: inserted.rows[0] });
+  } catch (err) { next(err); }
+}
+
+/** GET /api/v1/audits/:imo/line-items — rows for the review/edit grid */
+export async function getAuditLineItems(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const audit = await AuditService.getAuditByImo(req.params.imo as string, req.user!.userId);
+    if (!audit) return next(createError('Audit not found', 404));
+
+    const auditId = String((audit as Record<string, unknown>).id);
+    const dbRows = await AuditService.getLineItems(auditId);
+    const rows = dbRows.map(lineItemRowToArray);
+
+    res.json({
+      success: true,
+      data: {
+        auditId,
+        imo: req.params.imo,
+        header: LINE_ITEM_HEADER,
+        rows,
+      },
+    });
+  } catch (err) { next(err); }
+}
+
+/**
+ * PATCH /api/v1/audits/:imo/line-items — replace all rows for an audit.
+ * Body: { rows: any[][] }   where each row is aligned to LINE_ITEM_HEADER (extras after col 20 go to extra_data).
+ * Used by the editor grid (manual edits) and by the review wizard after sending a clarification email
+ * (which removes suspected rows).
+ */
+export async function replaceAuditLineItems(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const audit = await AuditService.getAuditByImo(req.params.imo as string, req.user!.userId);
+    if (!audit) return next(createError('Audit not found', 404));
+
+    const { rows } = req.body as { rows?: unknown[][] };
+    if (!Array.isArray(rows)) {
+      return next(createError('rows must be an array of row arrays', 400));
+    }
+
+    const auditRow = audit as Record<string, unknown>;
+    const auditId = String(auditRow.id);
+    const vesselId = auditRow.vesselId ? String(auditRow.vesselId) : null;
+
+    await AuditService.replaceLineItems(auditId, vesselId, rows);
+    // Keep totalItems in sync so list pages show correct counts.
+    await query(
+      `UPDATE audit_summaries SET total_items = $1, last_activity = NOW(), updated_at = NOW() WHERE id = $2`,
+      [rows.length, auditId],
+    );
+
+    res.json({ success: true, data: { auditId, rowsWritten: rows.length } });
+  } catch (err) { next(err); }
+}
+
+/** GET /api/v1/audits/:imo/clarifications — clarifications sent for an audit */
+export async function getAuditClarifications(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const audit = await AuditService.getAuditByImo(req.params.imo as string, req.user!.userId);
+    if (!audit) return next(createError('Audit not found', 404));
+
+    const rows = await AuditService.getClarificationsForImo(req.params.imo as string);
+    res.json({ success: true, data: rows });
   } catch (err) { next(err); }
 }

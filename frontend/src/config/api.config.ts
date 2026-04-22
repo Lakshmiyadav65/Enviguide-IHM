@@ -53,6 +53,8 @@ export const ENDPOINTS = {
     MDS_DOC: '/audits/mds-doc',
     DOCUMENTS: (imo: string) => `/audits/${imo}/documents`,
     CLARIFICATION_EMAIL: '/audits/clarification-email',
+    LINE_ITEMS: (imo: string) => `/audits/${imo}/line-items`,
+    CLARIFICATIONS: (imo: string) => `/audits/${imo}/clarifications`,
   },
 
   // Security / Users

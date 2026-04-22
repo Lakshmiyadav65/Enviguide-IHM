@@ -184,4 +184,105 @@ export const AuditService = {
   async deleteAudit(id: string) {
     await query('DELETE FROM audit_summaries WHERE id = $1', [id]);
   },
+
+  /** Fetch all line items for an audit, ordered by row_index. */
+  async getLineItems(auditId: string) {
+    const r = await query(
+      `SELECT row_index, name, vessel_name, po_number, imo_number,
+              po_sent_date, md_requested_date, item_description, is_suspected,
+              impa_code, issa_code, equipment_code, equipment_name,
+              maker, model, part_number, unit, quantity,
+              vendor_remark, vendor_email, vendor_name, extra_data
+         FROM audit_line_items
+        WHERE audit_id = $1
+        ORDER BY row_index ASC`,
+      [auditId],
+    );
+    return r.rows as Array<Record<string, unknown>>;
+  },
+
+  /** Replace all line items for an audit with the given rows (array of array-of-strings). */
+  async replaceLineItems(auditId: string, vesselId: string | null, rows: unknown[][]) {
+    // Transaction: delete all, then bulk insert new rows in chunks.
+    await query('BEGIN');
+    try {
+      await query('DELETE FROM audit_line_items WHERE audit_id = $1', [auditId]);
+
+      const CHUNK = 1000;
+      for (let offset = 0; offset < rows.length; offset += CHUNK) {
+        const batch = rows.slice(offset, offset + CHUNK);
+        if (batch.length === 0) continue;
+
+        const vals: unknown[] = [];
+        const placeholders: string[] = [];
+
+        batch.forEach((row, i) => {
+          const rowIndex = offset + i;
+          const r = Array.isArray(row) ? row : [];
+          const extra = r.slice(20);
+          const base = [
+            auditId,
+            vesselId,
+            rowIndex,
+            r[0] ?? null,
+            r[1] ?? null,
+            r[2] ?? null,
+            r[3] ?? null,
+            r[4] ?? null,
+            r[5] ?? null,
+            r[6] ?? null,
+            r[7] === 'Yes' ? 'Yes' : 'No',
+            r[8] ?? null,
+            r[9] ?? null,
+            r[10] ?? null,
+            r[11] ?? null,
+            r[12] ?? null,
+            r[13] ?? null,
+            r[14] ?? null,
+            r[15] ?? null,
+            r[16] ?? null,
+            r[17] ?? null,
+            r[18] ?? null,
+            r[19] ?? null,
+            JSON.stringify(extra),
+          ];
+          const start = vals.length;
+          const phs = base.map((_, j) => `$${start + j + 1}`);
+          phs[phs.length - 1] = `${phs[phs.length - 1]}::jsonb`;
+          placeholders.push(`(${phs.join(', ')})`);
+          vals.push(...base);
+        });
+
+        await query(
+          `INSERT INTO audit_line_items (
+             audit_id, vessel_id, row_index,
+             name, vessel_name, po_number, imo_number,
+             po_sent_date, md_requested_date, item_description, is_suspected,
+             impa_code, issa_code, equipment_code, equipment_name,
+             maker, model, part_number, unit, quantity,
+             vendor_remark, vendor_email, vendor_name, extra_data
+           ) VALUES ${placeholders.join(', ')}`,
+          vals,
+        );
+      }
+
+      await query('COMMIT');
+    } catch (err) {
+      await query('ROLLBACK');
+      throw err;
+    }
+  },
+
+  /** Fetch clarifications for an IMO (most recent first). */
+  async getClarificationsForImo(imoNumber: string) {
+    const r = await query(
+      `SELECT id, vessel_id, imo_number, vessel_name, recipient_emails, cc_emails,
+              subject, body, suspected_items, status, error_message, sent_by, created_at
+         FROM clarification_requests
+        WHERE imo_number = $1
+        ORDER BY created_at DESC`,
+      [imoNumber],
+    );
+    return r.rows as Array<Record<string, unknown>>;
+  },
 };
