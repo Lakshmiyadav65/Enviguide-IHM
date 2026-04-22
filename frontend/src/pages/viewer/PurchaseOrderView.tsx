@@ -30,36 +30,8 @@ const FILTER_TAGS = [
     'HM Red', 'HM Green', 'PCHM', 'Non HM', 'Review Repeated Items', 'Suspected Items', 'All'
 ];
 
-const initializeData = () => {
-    let allItems: PurchaseOrderItem[] = [];
-    const UNITS = ['Piece', 'Kg', 'Litre', 'Set', 'Box', 'Roll', 'Unit', 'Pair', 'Metre'];
-    FILTER_TAGS.forEach((tag, tagIdx) => {
-        if (tag === 'All') return;
-        for (let sIdx = 0; sIdx < 5; sIdx++) {
-            const sid = `${tag.replace(/\s+/g, '-').toLowerCase()}-s-${sIdx}`;
-            for (let i = 0; i < 5; i++) {
-                const ordered = Math.floor(Math.random() * 50) + 5;
-                const received = tag === 'Received Mds' ? ordered : Math.floor(Math.random() * ordered);
-                const pending = ordered - received;
-                allItems.push({
-                    id: `${sid}-item-${i}`,
-                    emailStatus: ['Pending Mds', 'Request Pending', 'Reminder 1', 'Reminder 2'].includes(tag) ? 'SENT' : 'NOT SENT',
-                    ihmProductCode: `IHM|00${tagIdx}${sIdx}|${i}`,
-                    poNumber: `PO-${tagIdx}-${100 + i}`,
-                    mdsReq: tag === 'Pending Mds' ? '01/01/2024' : '',
-                    mdsRec: tag === 'Received Mds' ? '05/01/2024' : '',
-                    itemDescription: `Component ${tag} type ${i}`,
-                    orderDate: `2024-01-${10 + i}`,
-                    quantityTotal: `${ordered} | ${received} | ${pending}`,
-                    unit: UNITS[(tagIdx + sIdx + i) % UNITS.length],
-                    category: tag,
-                    selected: false
-                });
-            }
-        }
-    });
-    return allItems;
-};
+// Real items now come from GET /audits/:imo/clarifications. Mock data removed.
+const initializeData = (): PurchaseOrderItem[] => [];
 
 const getSupplierMeta = (filter: string) => {
     const suffix = filter === 'All' ? 'GEN' : filter.substring(0, 3).toUpperCase();
@@ -81,9 +53,8 @@ export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
     const [openSuppliers, setOpenSuppliers] = useState<string[]>(['s1']);
     const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData);
 
-    // Fetch clarification history for this IMO from the backend and append each
-    // suspected row as a "SENT" line item so it shows in the viewer grid. One
-    // clarification email may reference many suspected POs — we flatten.
+    // Fetch clarification history for this IMO from the backend. Each clarification
+    // email may reference many suspected POs; we flatten them into one row per item.
     useEffect(() => {
         if (!imo) return;
         api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(ENDPOINTS.AUDITS.CLARIFICATIONS(imo))
@@ -118,11 +89,9 @@ export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
                         } as PurchaseOrderItem);
                     });
                 }
-                if (items.length > 0) {
-                    setAllItems((prev) => [...prev, ...items]);
-                }
+                setAllItems(items);
             })
-            .catch(() => { /* endpoint unavailable — keep base data only */ });
+            .catch(() => setAllItems([]));
     }, [imo]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isFilterBarOpen, setIsFilterBarOpen] = useState(false);
