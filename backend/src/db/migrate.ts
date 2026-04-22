@@ -390,10 +390,6 @@ CREATE TABLE IF NOT EXISTS "clarification_requests" (
 ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS public_token VARCHAR(64) UNIQUE;
 ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS public_token_expires_at TIMESTAMPTZ;
 
--- Track who uploaded (captured on the supplier portal before upload).
-ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS uploaded_by_email VARCHAR(255);
-ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS uploaded_by_ip VARCHAR(64);
-
 -- Per-item state for a clarification request. Mirrors one row per entry in
 -- clarification_requests.suspected_items (JSONB), tracking MDS document upload,
 -- reminder count, HM classification etc. over time.
@@ -412,6 +408,10 @@ CREATE TABLE IF NOT EXISTS "clarification_items" (
   updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(clarification_id, item_index)
 );
+
+-- Track who uploaded (captured on the supplier portal before upload).
+ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS uploaded_by_email VARCHAR(255);
+ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS uploaded_by_ip VARCHAR(64);
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_vessels_created_by ON "vessels"(created_by_id);
