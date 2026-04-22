@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom';
 import './AuditReviewDetail.css';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
 import {
     Search,
     Filter,
@@ -34,63 +36,43 @@ export default function AuditReviewDetail() {
     const [showCategorizationPanel, setShowCategorizationPanel] = useState(false);
 
     useEffect(() => {
-        // Load data from localStorage
-        const rowsRaw = localStorage.getItem(`audit_rows_${imo}`);
-        const mappingRaw = localStorage.getItem(`audit_mapping_${imo}`);
-        const registryRaw = localStorage.getItem('audit_registry_main');
+        if (!imo) return;
 
-        if (rowsRaw && mappingRaw) {
-            const rows = JSON.parse(rowsRaw);
-            const mapping = JSON.parse(mappingRaw);
+        // Standard 20-column header indices (set by the upload flow on the backend):
+        // 2 = PO Number, 6 = Item Description, 16 = Quantity
+        const PO_IDX = 2, DESC_IDX = 6, QTY_IDX = 16;
 
-            // Convert raw rows to object format based on mapping
-            const poIdx = parseInt(mapping.poNumber);
-            const descIdx = parseInt(mapping.itemDescription);
-            const qtyIdx = parseInt(mapping.quantity);
+        Promise.all([
+            api.get<{ success: boolean; data: { rows: unknown[][] } }>(ENDPOINTS.AUDITS.LINE_ITEMS(imo)),
+            api.get<{ success: boolean; data: Record<string, unknown> }>(ENDPOINTS.AUDITS.REVIEW_DETAIL(imo))
+                .catch(() => ({ data: null as unknown as Record<string, unknown> })),
+        ])
+            .then(([lineRes, auditRes]) => {
+                const rows = lineRes.data.rows || [];
+                const items: ItemReview[] = rows.map((row, index) => ({
+                    id: String(row[PO_IDX] || `ITEM-${index}`),
+                    description: String(row[DESC_IDX] || 'No Description'),
+                    quantity: String(row[QTY_IDX] || '0'),
+                    hmStatus: 'Unassigned',
+                    mdStatus: 'Pending',
+                    sdocStatus: 'Pending',
+                }));
+                setReviewItems(items);
 
-            const items: ItemReview[] = rows.slice(1).map((row: any[], index: number) => ({
-                id: String(row[poIdx] || `ITEM-${index}`),
-                description: String(row[descIdx] || 'No Description'),
-                quantity: String(row[qtyIdx] || '0'),
-                hmStatus: 'Unassigned',
-                mdStatus: 'Pending',
-                sdocStatus: 'Pending'
-            }));
-            setReviewItems(items);
-        } else {
-            // Dummy items if no data found in localStorage
-            const dummyItems: ItemReview[] = [
-                { id: 'PO-88291', description: 'Centrifugal Pump Main Engine', quantity: '2', hmStatus: 'Unassigned', mdStatus: 'Pending', sdocStatus: 'Pending' },
-                { id: 'PO-88292', description: 'Asbestos Gaskets (Replacement)', quantity: '50', hmStatus: 'Unassigned', mdStatus: 'Pending', sdocStatus: 'Pending' },
-                { id: 'PO-88293', description: 'Lead Acid Battery 12V 100Ah', quantity: '4', hmStatus: 'Unassigned', mdStatus: 'Received', sdocStatus: 'Pending' },
-                { id: 'PO-88294', description: 'Fluorescent Lighting Tubes', quantity: '20', hmStatus: 'Unassigned', mdStatus: 'Pending', sdocStatus: 'Received' },
-                { id: 'PO-88295', description: 'Hydraulic Oil ISO 46', quantity: '200L', hmStatus: 'Unassigned', mdStatus: 'N/A', sdocStatus: 'N/A' },
-                { id: 'PO-88296', description: 'Cromium Plated Valves', quantity: '10', hmStatus: 'Unassigned', mdStatus: 'Pending', sdocStatus: 'Pending' },
-                { id: 'PO-88297', description: 'Standard Steel Bolt M16', quantity: '100', hmStatus: 'Green', mdStatus: 'Received', sdocStatus: 'Received' },
-                { id: 'PO-88298', description: 'Fire Extinguisher ABC 6kg', quantity: '8', hmStatus: 'Unassigned', mdStatus: 'Pending', sdocStatus: 'Pending' },
-            ];
-            setReviewItems(dummyItems);
-        }
-
-        if (registryRaw) {
-            const registry = JSON.parse(registryRaw);
-            const vessel = registry.find((r: any) => r.imoNumber === imo);
-            if (vessel) setVesselInfo(vessel);
-            else {
-                // Fallback for dummy data
-                setVesselInfo({
-                    vesselName: 'Vessel ' + imo,
-                    imoNumber: imo,
-                    createDate: '2023-11-20'
-                });
-            }
-        } else {
-            setVesselInfo({
-                vesselName: 'Vessel ' + imo,
-                imoNumber: imo,
-                createDate: '2023-11-20'
+                if (auditRes && auditRes.data) {
+                    setVesselInfo({
+                        vesselName: auditRes.data.vesselName,
+                        imoNumber: auditRes.data.imoNumber,
+                        createDate: (auditRes.data.createdAt as string | undefined)?.split('T')[0] ?? '',
+                    });
+                } else {
+                    setVesselInfo({ vesselName: 'Vessel ' + imo, imoNumber: imo, createDate: '' });
+                }
+            })
+            .catch(() => {
+                setReviewItems([]);
+                setVesselInfo({ vesselName: 'Vessel ' + imo, imoNumber: imo, createDate: '' });
             });
-        }
     }, [imo]);
 
     const stats = useMemo(() => {

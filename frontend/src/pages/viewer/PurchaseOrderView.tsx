@@ -1,10 +1,12 @@
-﻿import { useState, useMemo } from 'react';
+﻿import { useState, useMemo, useEffect } from 'react';
 import {
     ChevronDown, Search, Edit2, Trash2,
     FileText, Filter, Mail, X, Send, Paperclip,
     Link as LinkIcon, Smile, Image, CheckCircle2
 } from 'lucide-react';
 import './PurchaseOrderView.css';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
 
 interface PurchaseOrderItem {
     id: string;
@@ -77,30 +79,51 @@ interface PurchaseOrderViewProps {
 export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
     const [activeFilter, setActiveFilter] = useState('All');
     const [openSuppliers, setOpenSuppliers] = useState<string[]>(['s1']);
-    const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(() => {
-        const base = initializeData();
-        const stored = JSON.parse(localStorage.getItem(`pending_clarifications_${imo}`) || '[]');
-        const mapped = stored.map((s: any) => ({
-            id: s.id,
-            emailStatus: 'SENT',
-            ihmProductCode: s.details?.[4] || 'N/A',
-            poNumber: s.poNumber,
-            mdsReq: s.date,
-            mdsRec: '',
-            itemDescription: s.itemDescription,
-            orderDate: s.date,
-            quantityTotal: `${s.details?.[12] || '0'} | 0 | ${s.details?.[12] || '0'}`,
-            unit: s.details?.[11] || 'PCS',
-            category: 'Request Pending', // Set to Request Pending by default
-            isSuspected: true,
-            selected: false,
-            vendorName: s.vendorName,
-            vendorEmail: s.vendorEmail,
-            mailSubject: s.mailSubject,
-            mailBody: s.mailBody
-        }));
-        return [...base, ...mapped];
-    });
+    const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData);
+
+    // Fetch clarification history for this IMO from the backend and append each
+    // suspected row as a "SENT" line item so it shows in the viewer grid. One
+    // clarification email may reference many suspected POs — we flatten.
+    useEffect(() => {
+        if (!imo) return;
+        api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(ENDPOINTS.AUDITS.CLARIFICATIONS(imo))
+            .then((res) => {
+                const items: PurchaseOrderItem[] = [];
+                for (const c of res.data || []) {
+                    const rows = Array.isArray(c.suspected_items) ? c.suspected_items as unknown[][] : [];
+                    const sentDate = typeof c.created_at === 'string' ? c.created_at.split('T')[0] : '';
+                    const subject = String(c.subject || '');
+                    const body = String(c.body || '');
+                    const recipients = String(c.recipient_emails || '');
+                    rows.forEach((row, i) => {
+                        const r = Array.isArray(row) ? row : [];
+                        items.push({
+                            id: `${c.id}-${i}`,
+                            emailStatus: 'SENT',
+                            ihmProductCode: String(r[8] ?? r[9] ?? 'N/A'), // IMPA → ISSA fallback
+                            poNumber: String(r[2] ?? ''),
+                            mdsReq: String(r[5] ?? sentDate),
+                            mdsRec: '',
+                            itemDescription: String(r[6] ?? ''),
+                            orderDate: String(r[4] ?? sentDate),
+                            quantityTotal: `${r[16] ?? '0'} | 0 | ${r[16] ?? '0'}`,
+                            unit: String(r[15] ?? 'PCS'),
+                            category: 'Request Pending',
+                            isSuspected: true,
+                            selected: false,
+                            vendorName: String(r[19] ?? ''),
+                            vendorEmail: String(r[18] ?? recipients),
+                            mailSubject: subject,
+                            mailBody: body,
+                        } as PurchaseOrderItem);
+                    });
+                }
+                if (items.length > 0) {
+                    setAllItems((prev) => [...prev, ...items]);
+                }
+            })
+            .catch(() => { /* endpoint unavailable — keep base data only */ });
+    }, [imo]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isFilterBarOpen, setIsFilterBarOpen] = useState(false);
 

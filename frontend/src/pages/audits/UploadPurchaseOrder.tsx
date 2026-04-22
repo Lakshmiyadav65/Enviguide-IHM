@@ -340,37 +340,9 @@ export default function UploadPurchaseOrder() {
             }
         });
 
-        // 3. Save standard mapping & standardized raw data
-        //    Always clear stale cached keys first so a re-upload for the same vessel
-        //    never shows old data from a previous session.
-        localStorage.removeItem(`audit_rows_${imo}`);
-        localStorage.removeItem(`audit_mapping_${imo}`);
+        // Clear any stale per-audit UI preferences from a previous upload of
+        // the same IMO. Rows/mapping are no longer kept in localStorage.
         localStorage.removeItem(`audit_visible_cols_${imo}`);
-
-        const standardMappings: Record<string, string> = {
-            name: '0',
-            vesselName: '1',
-            poNumber: '2',
-            imoNumber: '3',
-            poSentDate: '4',
-            mdRequestedDate: '5',
-            itemDescription: '6',
-            isSuspected: '7',
-            impaCode: '8',
-            issaCode: '9',
-            equipmentCode: '10',
-            equipmentName: '11',
-            maker: '12',
-            model: '13',
-            partNumber: '14',
-            unit: '15',
-            quantity: '16',
-            vendorRemark: '17',
-            vendorEmail: '18',
-            vendorName: '19'
-        };
-        localStorage.setItem(`audit_mapping_${imo}`, JSON.stringify(standardMappings));
-        localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(transformedData));
 
         // 4. Compute statistics from original data for metrics
         const rows = excelData.slice(1); // skip header row
@@ -458,29 +430,9 @@ export default function UploadPurchaseOrder() {
             return;
         }
 
-        // 6. Update registry in localStorage so existing Pending Audits / Pending
-        //    Reviews pages keep working until they are migrated to read from the API.
-        const existingRegistry = JSON.parse(localStorage.getItem('audit_registry_main') || '[]');
+        // Audit registry is now in the backend — Pending Audits re-fetches on mount.
 
-        const newAudit = {
-            imoNumber: imo,
-            vesselName: shipName,
-            name: shipName,
-            totalPO,
-            totalItems: rows.length,
-            duplicatePO,
-            duplicateSupplierCode,
-            duplicateProduct,
-            createDate: new Date().toISOString().split('T')[0],
-        };
-
-        const entryIdx = existingRegistry.findIndex((r: any) => r.imoNumber === imo);
-        if (entryIdx !== -1) existingRegistry[entryIdx] = newAudit;
-        else existingRegistry.unshift(newAudit);
-
-        localStorage.setItem('audit_registry_main', JSON.stringify(existingRegistry));
-
-        // 7. Add notification
+        // 6. Add notification
         const newNotif = {
             id: Date.now(),
             type: 'PO IMPORT',

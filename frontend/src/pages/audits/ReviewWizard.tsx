@@ -93,17 +93,21 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
     const [, setHistory] = useState<any[][][]>([]);
 
     useEffect(() => {
-        const rows = localStorage.getItem(`audit_rows_${imo}`);
-        if (rows) {
-            const parsed = JSON.parse(rows);
-            setData(parsed);
-            setVisibleCols(new Array(parsed[0]?.length || 0).fill(true));
-            setColumnWidths(new Array(parsed[0]?.length || 0).fill(150));
-        } else {
-            setData([]);
-            setVisibleCols([]);
-            setColumnWidths([]);
-        }
+        if (!imo) return;
+        api.get<{ success: boolean; data: { header: string[]; rows: unknown[][] } }>(ENDPOINTS.AUDITS.LINE_ITEMS(imo))
+            .then((res) => {
+                const header = res.data.header || [];
+                const rows = res.data.rows || [];
+                const full = [header, ...rows];
+                setData(full);
+                setVisibleCols(new Array(header.length).fill(true));
+                setColumnWidths(new Array(header.length).fill(150));
+            })
+            .catch(() => {
+                setData([]);
+                setVisibleCols([]);
+                setColumnWidths([]);
+            });
     }, [imo]);
 
     const pushToHistory = useCallback(() => {
@@ -361,8 +365,13 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
         ]);
     };
 
-    const nextStep = () => {
-        localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(data));
+    const nextStep = async () => {
+        // Persist the edited rows to the backend before advancing.
+        try {
+            await api.patch(ENDPOINTS.AUDITS.LINE_ITEMS(imo), { rows: data.slice(1) });
+        } catch (err) {
+            console.error('Failed to save rows before advancing step:', err);
+        }
         if (step < 3) setStep(step + 1);
         else handleFinalize();
     };
@@ -415,28 +424,18 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                 suspectedItems,
             });
 
-            // Also persist in localStorage so PurchaseOrderView keeps showing these
-            // until that page is migrated to read from the backend.
-            const existingClarifications = JSON.parse(localStorage.getItem(`pending_clarifications_${imo}`) || '[]');
-            const newClarifications = [...existingClarifications, ...suspectedItems.map(row => ({
-                id: Date.now() + Math.random(),
-                imo,
-                vesselName,
-                poNumber: row[data[0].indexOf('PO Number')],
-                itemDescription: row[data[0].indexOf('Item Description')],
-                vendorName: row[data[0].indexOf('Vendor Name')],
-                vendorEmail: row[data[0].indexOf('Vendor Email')],
-                status: 'Clarification Pending',
-                date: new Date().toISOString().split('T')[0],
-                details: row,
-                mailSubject: mailContent.subject,
-                mailBody: mailContent.body
-            }))];
-            localStorage.setItem(`pending_clarifications_${imo}`, JSON.stringify(newClarifications));
+            // Remove suspected rows from the grid and persist the trimmed set to
+            // the backend. The clarification email call above already created the
+            // audit trail record — PurchaseOrderView now reads that from the API.
             const header = data[0];
             const suspectedIdx = header.indexOf('Is Suspected');
             const newData = [header, ...data.slice(1).filter(row => row[suspectedIdx] !== 'Yes')];
-            localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(newData));
+            setData(newData);
+            try {
+                await api.patch(ENDPOINTS.AUDITS.LINE_ITEMS(imo), { rows: newData.slice(1) });
+            } catch {
+                // Non-fatal: the email was sent; grid will self-correct on next load.
+            }
 
             setToastData({
                 title: 'Mail Sent Successfully',

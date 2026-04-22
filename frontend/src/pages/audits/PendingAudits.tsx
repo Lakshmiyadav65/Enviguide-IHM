@@ -6,6 +6,32 @@ import Header from '../../components/Header';
 import { Search, ChevronDown, Download, Edit2, Send, Trash2, X, CheckCircle2, XCircle } from 'lucide-react';
 
 import type { AuditSummary } from '../../types';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
+
+// Canonical indices in the 20-column line-items layout the backend stores.
+const COL = {
+    NAME: 0, VESSEL_NAME: 1, PO_NUMBER: 2, IMO_NUMBER: 3,
+    PO_SENT_DATE: 4, MD_REQUESTED_DATE: 5, ITEM_DESCRIPTION: 6, IS_SUSPECTED: 7,
+    IMPA_CODE: 8, ISSA_CODE: 9, EQUIPMENT_CODE: 10, EQUIPMENT_NAME: 11,
+    MAKER: 12, MODEL: 13, PART_NUMBER: 14, UNIT: 15, QUANTITY: 16,
+    VENDOR_REMARK: 17, VENDOR_EMAIL: 18, VENDOR_NAME: 19,
+};
+
+function auditFromApi(a: Record<string, unknown>): AuditSummary {
+    return {
+        id: a.id as string | undefined,
+        vesselName: String(a.vesselName ?? ''),
+        imoNumber: String(a.imoNumber ?? ''),
+        totalPO: Number(a.totalPO ?? 0),
+        totalItems: Number(a.totalItems ?? 0),
+        duplicatePO: Number(a.duplicatePO ?? 0),
+        duplicateSupplierCode: Number(a.duplicateSupplierCode ?? 0),
+        duplicateProduct: Number(a.duplicateProduct ?? 0),
+        createDate: typeof a.createdAt === 'string' ? a.createdAt.split('T')[0] : '',
+        status: a.status as AuditSummary['status'],
+    };
+}
 
 interface AuditEditorProps {
     imo: string;
@@ -29,34 +55,38 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
     const [, setHistory] = useState<{ data: any[][]; actions: Record<number, string> }[]>([]);
 
     useEffect(() => {
-        const rows = localStorage.getItem(`audit_rows_${imo}`);
-        const mapping = localStorage.getItem(`audit_mapping_${imo}`);
-        if (rows) {
-            const parsedData = JSON.parse(rows);
-            setData(parsedData);
-            if (mapping) {
-                const parsedMapping = JSON.parse(mapping);
-                if (parsedMapping.poNumber) setPoColIdx(parseInt(parsedMapping.poNumber));
-                if (parsedMapping.itemDescription) setItemDescColIdx(parseInt(parsedMapping.itemDescription));
-                if (parsedMapping.quantity) setQtyColIdx(parseInt(parsedMapping.quantity));
-                if (parsedMapping.vendorName) setSupplierColIdx(parseInt(parsedMapping.vendorName));
-                if (parsedMapping.poSentDate) setSentDateColIdx(parseInt(parsedMapping.poSentDate));
-                if (parsedMapping.impaCode) setImpaColIdx(parseInt(parsedMapping.impaCode));
-                if (parsedMapping.unit) setUnitColIdx(parseInt(parsedMapping.unit));
-            }
+        if (!imo) return;
+        api.get<{ success: boolean; data: { header: string[]; rows: unknown[][] } }>(ENDPOINTS.AUDITS.LINE_ITEMS(imo))
+            .then((res) => {
+                const header = res.data.header || [];
+                const rows = res.data.rows || [];
+                const full = [header, ...rows];
+                setData(full);
 
-            const savedVisibility = localStorage.getItem(`audit_visible_cols_${imo}`);
-            if (savedVisibility) {
-                const parsedVis = JSON.parse(savedVisibility);
-                if (parsedVis.length === parsedData[0]?.length) {
-                    setVisibleColumns(parsedVis);
-                } else {
-                    setVisibleColumns(new Array(parsedData[0]?.length || 0).fill(true));
+                // Standard 20-column layout — map by index constants.
+                setPoColIdx(COL.PO_NUMBER);
+                setItemDescColIdx(COL.ITEM_DESCRIPTION);
+                setQtyColIdx(COL.QUANTITY);
+                setSupplierColIdx(COL.VENDOR_NAME);
+                setSentDateColIdx(COL.PO_SENT_DATE);
+                setImpaColIdx(COL.IMPA_CODE);
+                setUnitColIdx(COL.UNIT);
+
+                // Column visibility is a UI-only preference, keep it in localStorage.
+                const savedVisibility = localStorage.getItem(`audit_visible_cols_${imo}`);
+                if (savedVisibility) {
+                    const parsedVis = JSON.parse(savedVisibility);
+                    if (parsedVis.length === header.length) {
+                        setVisibleColumns(parsedVis);
+                        return;
+                    }
                 }
-            } else {
-                setVisibleColumns(new Array(parsedData[0]?.length || 0).fill(true));
-            }
-        }
+                setVisibleColumns(new Array(header.length).fill(true));
+            })
+            .catch(() => {
+                setData([]);
+                setVisibleColumns([]);
+            });
     }, [imo]);
 
     const [isDragging, setIsDragging] = useState(false);
@@ -236,15 +266,23 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
         });
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         // Filter out rows marked as D (Delete) or R (Reject)
         const filteredData = [data[0], ...data.slice(1).filter((_, i) => {
             const status = rowActions[i + 1];
             return status !== 'D' && status !== 'R';
         })];
 
-        localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(filteredData));
+        // Column visibility is a UI preference — still local.
         localStorage.setItem(`audit_visible_cols_${imo}`, JSON.stringify(visibleColumns));
+
+        // Persist the edited rows to the backend (bulk replace).
+        try {
+            await api.patch(ENDPOINTS.AUDITS.LINE_ITEMS(imo), { rows: filteredData.slice(1) });
+        } catch (err) {
+            console.error('Failed to save line items:', err);
+            // Still close the editor; list will re-fetch from backend.
+        }
 
         // Recalculate summary
         let poD = 0;
@@ -474,21 +512,17 @@ export default function PendingAudits() {
 
 
     const loadRecords = useCallback(() => {
-        const scrubRegistry = (records: AuditSummary[]) => {
-            const sentToReview = JSON.parse(localStorage.getItem('sentToReview') || '[]');
-            const reviewImos = new Set(sentToReview.map((r: any) => r.imoNumber));
-            // Hide records that have been sent to review from the pending audits list
-            return records.filter(r => !reviewImos.has(r.imoNumber));
-        };
-
-        const persistedRegistry = localStorage.getItem('audit_registry_main');
-        if (persistedRegistry) {
-            const parsed = JSON.parse(persistedRegistry);
-            const scrubbed = scrubRegistry(parsed);
-            setAllRecords(scrubbed);
-            // Note: don't overwrite audit_registry_main — keep full list there so records can be restored if review is rejected
-        }
-        // If no registry yet, nothing to show (upload will create it)
+        // Backend already filters by status — returns audits with status
+        // 'In Progress' / 'Pending', excluding those sent for review.
+        api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(ENDPOINTS.AUDITS.PENDING)
+            .then((res) => {
+                const audits = (res.data || []).map(auditFromApi);
+                setAllRecords(audits);
+            })
+            .catch((err) => {
+                console.error('Failed to load pending audits:', err);
+                setAllRecords([]);
+            });
     }, []);
 
     useEffect(() => {
@@ -549,46 +583,31 @@ export default function PendingAudits() {
         setShowReviewModal(true);
     };
 
-    const confirmSendReview = () => {
-        if (selectedVessel) {
-            const updatedList: AuditSummary[] = allRecords.map(r =>
-                r.imoNumber === selectedVessel.imoNumber ? { ...r, status: 'PENDING REVIEW' } : r
-            );
-            setAllRecords(updatedList);
-            localStorage.setItem('audit_registry_main', JSON.stringify(updatedList));
-
-            // Persist to localStorage for Pending Reviews page
-            const existingSent = JSON.parse(localStorage.getItem('sentToReview') || '[]');
-            const newSent = {
-                ...selectedVessel,
-                reviewStatus: 'Pending',
-                createDate: new Date().toISOString().split('T')[0], // Use current date
-                assignedTo: { name: 'Unassigned', avatar: 'https://i.pravatar.cc/150?u=unassigned' }
-            };
-            localStorage.setItem('sentToReview', JSON.stringify([newSent, ...existingSent]));
+    const confirmSendReview = async () => {
+        if (selectedVessel?.id) {
+            try {
+                await api.patch(`/audits/${selectedVessel.id}/send-for-review`, {});
+                // Drop the audit from the pending list — backend now has it as 'Pending Review'.
+                setAllRecords(prev => prev.filter(r => r.imoNumber !== selectedVessel.imoNumber));
+            } catch (err) {
+                console.error('Send for review failed:', err);
+            }
         }
         setShowReviewModal(false);
         setShowSuccessToast(true);
         setTimeout(() => setShowSuccessToast(false), 5000);
     };
 
-    const handleUndo = () => {
-        if (selectedVessel) {
-            // Update local registry state
-            setAllRecords(prev => prev.map(r =>
-                r.imoNumber === selectedVessel.imoNumber ? { ...r, status: undefined } : r
-            ));
-
-            // Sync the main audit registry
-            const updatedMain = allRecords.map(r =>
-                r.imoNumber === selectedVessel.imoNumber ? { ...r, status: undefined } : r
-            );
-            localStorage.setItem('audit_registry_main', JSON.stringify(updatedMain));
-
-            // REMOVE from the Sent to Review registry
-            const currentSent = JSON.parse(localStorage.getItem('sentToReview') || '[]');
-            const updatedSent = currentSent.filter((r: any) => r.imoNumber !== selectedVessel.imoNumber);
-            localStorage.setItem('sentToReview', JSON.stringify(updatedSent));
+    const handleUndo = async () => {
+        if (selectedVessel?.id) {
+            try {
+                // Reject endpoint moves 'Pending Review' back to 'In Progress'.
+                await api.patch(`/audits/reviews/${selectedVessel.id}/reject`, {});
+                // Re-fetch list so the audit reappears under pending.
+                loadRecords();
+            } catch (err) {
+                console.error('Undo failed:', err);
+            }
         }
         setShowSuccessToast(false);
     };
@@ -812,12 +831,9 @@ export default function PendingAudits() {
                         imo={editingVessel.imoNumber}
                         vesselName={editingVessel.vesselName}
                         onClose={() => setEditingVessel(null)}
-                        onSave={(updates) => {
-                            const updatedList = allRecords.map(r =>
-                                r.imoNumber === editingVessel.imoNumber ? { ...r, ...updates } : r
-                            );
-                            setAllRecords(updatedList);
-                            localStorage.setItem('audit_registry_main', JSON.stringify(updatedList));
+                        onSave={() => {
+                            // Editor already PATCHed the backend — reload from source of truth.
+                            loadRecords();
                         }}
                     />
                 )}

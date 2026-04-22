@@ -13,6 +13,8 @@ import {
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { useAuth } from '../../contexts/AuthContext';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
 import type { Vessel, AuditSummary, DashboardFilters } from '../../types';
 import './Dashboard.css';
 
@@ -32,11 +34,29 @@ export default function Dashboard() {
     const [auditRegistry, setAuditRegistry] = useState<AuditSummary[]>([]);
 
     useEffect(() => {
-        const savedVessels = localStorage.getItem('vessel_list_main');
-        if (savedVessels) setVesselList(JSON.parse(savedVessels));
+        api.get<{ success: boolean; data: Vessel[] }>(ENDPOINTS.VESSELS.LIST)
+            .then((res) => setVesselList(res.data))
+            .catch(() => setVesselList([]));
 
-        const savedAudits = localStorage.getItem('audit_registry_main');
-        if (savedAudits) setAuditRegistry(JSON.parse(savedAudits));
+        // Combine pending + reviews so Active POs / Total Items reflect all audits
+        // that haven't been archived — same semantics as the old audit_registry_main.
+        Promise.all([
+            api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(ENDPOINTS.AUDITS.PENDING),
+            api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(ENDPOINTS.AUDITS.REVIEWS),
+        ])
+            .then(([pending, reviews]) => {
+                const combined: AuditSummary[] = [...(pending.data || []), ...(reviews.data || [])].map((a) => ({
+                    id: a.id as string | undefined,
+                    vesselName: String(a.vesselName ?? ''),
+                    imoNumber: String(a.imoNumber ?? ''),
+                    totalPO: Number(a.totalPO ?? 0),
+                    totalItems: Number(a.totalItems ?? 0),
+                    createDate: typeof a.createdAt === 'string' ? a.createdAt.split('T')[0] : '',
+                    status: a.status as AuditSummary['status'],
+                }));
+                setAuditRegistry(combined);
+            })
+            .catch(() => setAuditRegistry([]));
     }, []);
 
     const totalVessels = vesselList.length;
