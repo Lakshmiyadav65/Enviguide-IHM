@@ -25,7 +25,12 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 const upload = multer({
   dest: uploadsDir,
-  limits: { fileSize: 25 * 1024 * 1024 },
+  limits: {
+    fileSize: 25 * 1024 * 1024,
+    // Bulk uploads send parsed rows as a JSON text field; default 1MB is too
+    // small — 6933 rows already produces ~1.5MB. Allow up to 50MB.
+    fieldSize: 50 * 1024 * 1024,
+  },
 });
 
 const router = Router();
