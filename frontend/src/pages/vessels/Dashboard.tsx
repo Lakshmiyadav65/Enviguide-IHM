@@ -12,10 +12,14 @@ import {
 } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
+import { useAuth } from '../../contexts/AuthContext';
 import type { Vessel, AuditSummary, DashboardFilters } from '../../types';
 import './Dashboard.css';
 
 export default function Dashboard() {
+    const { user } = useAuth();
+    const firstName = user?.name?.split(' ')[0] || 'there';
+
     const [activeFilters, setActiveFilters] = useState<DashboardFilters>({
         yearly: 'Yearly',
         shipOwner: 'Ship Owner',
@@ -73,7 +77,7 @@ export default function Dashboard() {
                     {/* 1. Welcome & Header */}
                     <div className="header-section">
                         <div className="welcome-text">
-                            <h1>Welcome back, John</h1>
+                            <h1>Welcome back, {firstName}</h1>
                             <p>Here's what's happening with your IHM operations today.</p>
                         </div>
                     </div>
