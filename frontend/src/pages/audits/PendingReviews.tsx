@@ -1,11 +1,32 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import './PendingReviews.css';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { Download, Eye, Edit2, Trash2, Ship, X, Search } from 'lucide-react';
 import ReviewWizard from './ReviewWizard';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
 
 import type { AuditSummary } from '../../types';
+
+function auditFromApi(a: Record<string, unknown>): AuditSummary {
+    return {
+        id: a.id as string | undefined,
+        vesselName: String(a.vesselName ?? ''),
+        imoNumber: String(a.imoNumber ?? ''),
+        totalPO: Number(a.totalPO ?? 0),
+        totalItems: Number(a.totalItems ?? 0),
+        duplicatePO: Number(a.duplicatePO ?? 0),
+        duplicateSupplierCode: Number(a.duplicateSupplierCode ?? 0),
+        duplicateProduct: Number(a.duplicateProduct ?? 0),
+        createDate: typeof a.createdAt === 'string' ? a.createdAt.split('T')[0] : '',
+        status: a.status as AuditSummary['status'],
+        reviewStatus: 'Pending',
+        assignedTo: a.reviewAssignedTo
+            ? { name: String(a.reviewAssignedTo), avatar: '' }
+            : undefined,
+    };
+}
 
 // ReviewEditor removed as per new multi-step wizard requirement
 
@@ -18,25 +39,47 @@ export default function PendingReviews() {
     const [editingRecord, setEditingRecord] = useState<AuditSummary | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
-    useEffect(() => {
-        const storedSent = localStorage.getItem('sentToReview');
-        if (storedSent) {
-            setAllRecords(JSON.parse(storedSent));
-        } else {
-            setAllRecords([]);
-        }
+    const loadRecords = useCallback(() => {
+        api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(ENDPOINTS.AUDITS.REVIEWS)
+            .then((res) => {
+                setAllRecords((res.data || []).map(auditFromApi));
+            })
+            .catch(() => setAllRecords([]));
     }, []);
+
+    useEffect(() => {
+        loadRecords();
+        // Re-fetch when the tab regains focus (e.g. after sending an audit for review).
+        const onFocus = () => loadRecords();
+        const onVis = () => { if (document.visibilityState === 'visible') loadRecords(); };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVis);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVis);
+        };
+    }, [loadRecords]);
 
     const handleDelete = (imo: string) => {
         setDeletingImo(imo);
         setShowDeleteModal(true);
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (deletingImo) {
-            const updated = allRecords.filter(r => r.imoNumber !== deletingImo);
-            setAllRecords(updated);
-            localStorage.setItem('sentToReview', JSON.stringify(updated));
+            const record = allRecords.find(r => r.imoNumber === deletingImo);
+            if (record?.id) {
+                // "Delete" from Pending Reviews = reject the review (moves audit back
+                // to Pending Audits as 'In Progress'). The backend has no hard-delete
+                // endpoint for audits, and this matches the existing reject flow.
+                try {
+                    await api.patch(`/audits/reviews/${record.id}/reject`, {});
+                } catch (err) {
+                    console.error('Reject review failed:', err);
+                }
+            }
+            // Drop from UI regardless; next focus event re-syncs with backend.
+            setAllRecords(prev => prev.filter(r => r.imoNumber !== deletingImo));
         }
         setShowDeleteModal(false);
         setDeletingImo(null);
@@ -44,7 +87,8 @@ export default function PendingReviews() {
 
     const handleWizardComplete = () => {
         setEditingRecord(null);
-        // Refresh or show success toast if needed
+        // Review wizard may have marked the audit completed — re-fetch.
+        loadRecords();
     };
 
     // Sorting and Filtering logic
