@@ -1,9 +1,12 @@
 // -- Audit Controller (Pending Audits & Reviews) -----------
 import type { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { AuditService } from '../services/audit.service.js';
 import { DocumentService } from '../services/document.service.js';
 import { sendMail } from '../services/email.service.js';
+import { persistUploadedFile } from '../services/storage.service.js';
 import { query } from '../config/database.js';
+import { env } from '../config/env.js';
 import { createError } from '../middleware/errorHandler.js';
 
 // Canonical 20-column header used by the upload + review screens. If you add a
@@ -173,16 +176,31 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
     const audit = await AuditService.getAuditByImo(imo, req.user!.userId);
     const vesselId = audit ? (audit as Record<string, unknown>).vesselId as string : null;
 
-    const html = body
+    // Generate a one-way token the supplier will use on the public upload page.
+    // 32 random bytes, URL-safe base64 → ~43 chars. 90-day expiry.
+    const publicToken = crypto.randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+    const supplierLink = `${env.APP_BASE_URL.replace(/\/$/, '')}/upload/${publicToken}`;
+
+    // Append the upload link to whatever the user typed in the body.
+    const bodyWithLink = `${body}\n\n---\nUpload documents directly via this secure link (no login required):\n${supplierLink}\n\nThis link expires on ${expiresAt.toISOString().split('T')[0]}.`;
+    const html = bodyWithLink
       .split('\n')
-      .map((line) => `<div>${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') || '&nbsp;'}</div>`)
+      .map((line) => {
+        const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        // Turn the supplier link into a real anchor tag.
+        if (line.trim() === supplierLink) {
+          return `<div><a href="${supplierLink}" style="color:#00B0FA;font-weight:600">${supplierLink}</a></div>`;
+        }
+        return `<div>${escaped || '&nbsp;'}</div>`;
+      })
       .join('');
 
     let status = 'sent';
     let errorMessage: string | null = null;
 
     try {
-      await sendMail({ to, cc, subject, text: body, html });
+      await sendMail({ to, cc, subject, text: bodyWithLink, html });
     } catch (mailErr) {
       status = 'failed';
       errorMessage = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
@@ -191,8 +209,9 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
     const inserted = await query(
       `INSERT INTO clarification_requests
          (vessel_id, imo_number, vessel_name, recipient_emails, cc_emails,
-          subject, body, suspected_items, status, error_message, sent_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11)
+          subject, body, suspected_items, status, error_message, sent_by,
+          public_token, public_token_expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13)
        RETURNING id, status, created_at`,
       [
         vesselId,
@@ -201,11 +220,13 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
         to.join(', '),
         cc && cc.length ? cc.join(', ') : null,
         subject,
-        body,
+        bodyWithLink,
         JSON.stringify(suspectedItems || []),
         status,
         errorMessage,
         req.user!.userId,
+        publicToken,
+        expiresAt,
       ],
     );
 
@@ -327,12 +348,12 @@ export async function uploadClarificationItemDocument(
     const parent = await AuditService.getAuditByImo(imo, req.user!.userId);
     if (!parent) return next(createError('Audit not found for this user', 404));
 
-    const filePath = `/uploads/mds/${req.file.filename}`;
+    const stored = await persistUploadedFile(req.file.path, req.file.originalname, 'mds');
     const updated = await AuditService.setClarificationItemDocument(
       clarificationId,
       itemIndex,
-      filePath,
-      req.file.originalname,
+      stored.url,
+      stored.name,
     );
 
     res.json({ success: true, data: updated });

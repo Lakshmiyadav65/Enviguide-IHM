@@ -385,6 +385,15 @@ CREATE TABLE IF NOT EXISTS "clarification_requests" (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Public upload token that goes in the clarification email body. Suppliers
+-- click the link and upload docs without logging in. 90-day expiry.
+ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS public_token VARCHAR(64) UNIQUE;
+ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS public_token_expires_at TIMESTAMPTZ;
+
+-- Track who uploaded (captured on the supplier portal before upload).
+ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS uploaded_by_email VARCHAR(255);
+ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS uploaded_by_ip VARCHAR(64);
+
 -- Per-item state for a clarification request. Mirrors one row per entry in
 -- clarification_requests.suspected_items (JSONB), tracking MDS document upload,
 -- reminder count, HM classification etc. over time.
@@ -430,6 +439,7 @@ CREATE INDEX IF NOT EXISTS idx_clarification_imo ON "clarification_requests"(imo
 CREATE INDEX IF NOT EXISTS idx_clarification_vessel ON "clarification_requests"(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_clarif_items_clar ON "clarification_items"(clarification_id);
 CREATE INDEX IF NOT EXISTS idx_clarif_items_status ON "clarification_items"(mds_status);
+CREATE INDEX IF NOT EXISTS idx_clarif_public_token ON "clarification_requests"(public_token);
 CREATE INDEX IF NOT EXISTS idx_audit_lines_audit ON "audit_line_items"(audit_id);
 CREATE INDEX IF NOT EXISTS idx_audit_lines_vessel ON "audit_line_items"(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_audit_lines_po ON "audit_line_items"(po_number);

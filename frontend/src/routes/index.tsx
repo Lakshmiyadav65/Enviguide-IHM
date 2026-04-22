@@ -27,11 +27,15 @@ import Users from '../pages/settings/Users';
 import UserRoleRights from '../pages/settings/UserRoleRights';
 import UserCategory from '../pages/settings/UserCategory';
 import Contact from '../pages/cms/Contact';
+import SupplierUpload from '../pages/public/SupplierUpload';
 
 export const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
+
+      {/* Public supplier upload page — no auth, token in URL */}
+      <Route path="/upload/:token" element={<SupplierUpload />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Dashboard />} />

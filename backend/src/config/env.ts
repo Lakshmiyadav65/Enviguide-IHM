@@ -34,4 +34,13 @@ export const env = {
   SMTP_USER:    process.env.SMTP_USER,
   SMTP_PASS:    process.env.SMTP_PASS,
   EMAIL_FROM:   process.env.EMAIL_FROM,
+  // Cloudflare R2 (S3-compatible) for persistent file storage. All optional —
+  // if unset, uploads stay on local disk and we serve them via /uploads/*
+  // (fine for dev, ephemeral on Render's free tier).
+  R2_ACCOUNT_ID:        process.env.R2_ACCOUNT_ID,
+  R2_ACCESS_KEY_ID:     process.env.R2_ACCESS_KEY_ID,
+  R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
+  R2_BUCKET:            process.env.R2_BUCKET,
+  R2_PUBLIC_BASE_URL:   process.env.R2_PUBLIC_BASE_URL,
+  APP_BASE_URL:         optional('APP_BASE_URL', 'https://ihm-enviguide.vercel.app'),
 };

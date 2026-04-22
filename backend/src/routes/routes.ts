@@ -15,8 +15,12 @@ import supplierRouter from './subRoutes/supplier.routes.js';
 import equipmentRouter from './subRoutes/equipment.routes.js';
 import suspectedKeywordRouter from './subRoutes/suspectedKeyword.routes.js';
 import contactRouter from './subRoutes/contact.routes.js';
+import publicRouter from './subRoutes/public.routes.js';
 
 const router = Router();
+
+// Public supplier portal — mounted FIRST so it doesn't hit any auth middleware.
+router.use('/public',              publicRouter);
 
 router.use('/auth',                authRouter);
 router.use('/users',               userRouter);
