@@ -86,6 +86,38 @@ CREATE TABLE IF NOT EXISTS "audit_summaries" (
 ALTER TABLE "audit_summaries" ADD COLUMN IF NOT EXISTS review_assigned_to VARCHAR(255);
 ALTER TABLE "audit_summaries" ADD COLUMN IF NOT EXISTS reviewed_by VARCHAR(255);
 ALTER TABLE "audit_summaries" ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+ALTER TABLE "audit_summaries" ADD COLUMN IF NOT EXISTS uploaded_file_path VARCHAR(500);
+ALTER TABLE "audit_summaries" ADD COLUMN IF NOT EXISTS uploaded_file_name VARCHAR(255);
+
+-- Audit line items (one row per parsed Excel/PDF/CSV row)
+CREATE TABLE IF NOT EXISTS "audit_line_items" (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  audit_id          UUID NOT NULL REFERENCES "audit_summaries"(id) ON DELETE CASCADE,
+  vessel_id         UUID REFERENCES "vessels"(id) ON DELETE SET NULL,
+  row_index         INTEGER NOT NULL,
+  name              VARCHAR(255),
+  vessel_name       VARCHAR(255),
+  po_number         VARCHAR(100),
+  imo_number        VARCHAR(20),
+  po_sent_date      VARCHAR(50),
+  md_requested_date VARCHAR(50),
+  item_description  TEXT,
+  is_suspected      VARCHAR(10) NOT NULL DEFAULT 'No',
+  impa_code         VARCHAR(50),
+  issa_code         VARCHAR(50),
+  equipment_code    VARCHAR(100),
+  equipment_name    VARCHAR(255),
+  maker             VARCHAR(255),
+  model             VARCHAR(255),
+  part_number       VARCHAR(100),
+  unit              VARCHAR(50),
+  quantity          VARCHAR(50),
+  vendor_remark     TEXT,
+  vendor_email      VARCHAR(255),
+  vendor_name       VARCHAR(255),
+  extra_data        JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 -- GA Plans table
 CREATE TABLE IF NOT EXISTS "ga_plans" (
@@ -377,6 +409,9 @@ CREATE INDEX IF NOT EXISTS idx_user_perm_user    ON "user_permissions"(user_id);
 CREATE INDEX IF NOT EXISTS idx_role_perm_role    ON "role_permissions"(role_name);
 CREATE INDEX IF NOT EXISTS idx_clarification_imo ON "clarification_requests"(imo_number);
 CREATE INDEX IF NOT EXISTS idx_clarification_vessel ON "clarification_requests"(vessel_id);
+CREATE INDEX IF NOT EXISTS idx_audit_lines_audit ON "audit_line_items"(audit_id);
+CREATE INDEX IF NOT EXISTS idx_audit_lines_vessel ON "audit_line_items"(vessel_id);
+CREATE INDEX IF NOT EXISTS idx_audit_lines_po ON "audit_line_items"(po_number);
 `;
 
 async function migrate() {

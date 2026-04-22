@@ -34,6 +34,7 @@ export const ENDPOINTS = {
     LIST: '/purchase-orders',
     DETAIL: (id: string) => `/purchase-orders/${id}`,
     UPLOAD: '/purchase-orders/upload',
+    UPLOAD_BULK: '/purchase-orders/upload-bulk',
   },
 
   // Materials / IHM

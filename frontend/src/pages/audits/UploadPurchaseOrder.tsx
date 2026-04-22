@@ -75,6 +75,40 @@ export default function UploadPurchaseOrder() {
     const [showManagerDropdown, setShowManagerDropdown] = useState(false);
     const [showVesselDropdown, setShowVesselDropdown] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isDragActive, setIsDragActive] = useState(false);
+
+    const isAllowedFile = (file: File) => {
+        const name = file.name.toLowerCase();
+        if (source === 'Excel') return name.endsWith('.xlsx') || name.endsWith('.xls');
+        if (source === 'PDF') return name.endsWith('.pdf');
+        if (source === 'CSV') return name.endsWith('.csv');
+        return false;
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isDragActive) setIsDragActive(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragActive(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragActive(false);
+        const file = e.dataTransfer.files?.[0];
+        if (!file) return;
+        if (!isAllowedFile(file)) {
+            showToast('Unsupported file', `This source only accepts ${getAcceptedFileTypes()}.`, 'error');
+            return;
+        }
+        setSelectedFile(file);
+    };
 
     const [fieldMappings, setFieldMappings] = useState<Record<string, string>>({});
     const [showMappingErrors, setShowMappingErrors] = useState(false);
@@ -223,7 +257,7 @@ export default function UploadPurchaseOrder() {
         finalizeImport();
     };
 
-    const finalizeImport = () => {
+    const finalizeImport = async () => {
         const unmappedRequired = ALL_MAPPING_FIELDS.filter(f => f.req && !fieldMappings[f.id]);
         if (unmappedRequired.length > 0) {
             setShowMappingErrors(true);
@@ -237,6 +271,18 @@ export default function UploadPurchaseOrder() {
 
         const selectedVessel = filteredVessels.find(v => v.name === shipName);
         const imo = selectedVessel?.imo || 'UNKNOWN';
+
+        // Find the full Vessel record (with id) from the API-fetched list for the backend upload.
+        const vesselRecord = vessels.find(v => v.name === shipName && v.imoNumber === imo);
+        if (!vesselRecord?.id) {
+            showToast("Vessel Not Found", "Could not resolve vessel ID. Please re-select the vessel.", "error");
+            return;
+        }
+
+        if (!selectedFile) {
+            showToast("Missing File", "The uploaded file is no longer available. Please re-select it.", "error");
+            return;
+        }
 
         // 1. Mark recently added vessel
         localStorage.setItem('recentlyAddedAudit', JSON.stringify({ imo, timestamp: Date.now() }));
@@ -387,7 +433,33 @@ export default function UploadPurchaseOrder() {
             duplicateProduct = dups.size;
         }
 
-        // 5. Update registry
+        // 5. POST to backend (file + line items + stats). Only persist localStorage
+        //    + notify + navigate if the backend call succeeds.
+        const lineItems = transformedData.slice(1); // drop header row
+        const statsPayload = {
+            totalPO,
+            totalItems: rows.length,
+            duplicatePO,
+            duplicateSupplierCode,
+            duplicateProduct,
+        };
+
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('vesselId', vesselRecord.id);
+        formData.append('stats', JSON.stringify(statsPayload));
+        formData.append('lineItems', JSON.stringify(lineItems));
+
+        try {
+            await api.upload(ENDPOINTS.PURCHASE_ORDERS.UPLOAD_BULK, formData);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Unknown error';
+            showToast("Upload Failed", msg, "error");
+            return;
+        }
+
+        // 6. Update registry in localStorage so existing Pending Audits / Pending
+        //    Reviews pages keep working until they are migrated to read from the API.
         const existingRegistry = JSON.parse(localStorage.getItem('audit_registry_main') || '[]');
 
         const newAudit = {
@@ -408,7 +480,7 @@ export default function UploadPurchaseOrder() {
 
         localStorage.setItem('audit_registry_main', JSON.stringify(existingRegistry));
 
-        // 5. Add Notification
+        // 7. Add notification
         const newNotif = {
             id: Date.now(),
             type: 'PO IMPORT',
@@ -528,16 +600,43 @@ export default function UploadPurchaseOrder() {
                                         </div>
                                         <div style={{ flex: 1, textAlign: 'left' }}>
                                             <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#64748B', marginBottom: '8px' }}>DOCUMENT*</label>
-                                            <div style={{ display: 'flex', gap: '12px' }}>
-                                                <button
-                                                    onClick={() => fileInputRef.current?.click()}
-                                                    style={{ flex: 1, padding: '14px', background: '#F0F9FF', border: '1.5px dashed #00B0FA', borderRadius: '10px', color: '#0369A1', fontSize: '13px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                                                >
-                                                    <Upload size={16} /> {selectedFile ? 'CHANGE FILE' : 'SELECT DOCUMENT'}
-                                                </button>
-                                                {selectedFile && (
-                                                    <div style={{ flex: 1.5, padding: '14px', background: '#F8FAFC', borderRadius: '10px', fontSize: '13px', color: '#0F172A', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                                                        <FileText size={16} color="#00B0FA" /> {selectedFile.name}
+                                            <div
+                                                onDragOver={handleDragOver}
+                                                onDragEnter={handleDragOver}
+                                                onDragLeave={handleDragLeave}
+                                                onDrop={handleDrop}
+                                                onClick={() => !selectedFile && fileInputRef.current?.click()}
+                                                style={{
+                                                    padding: selectedFile ? '14px' : '24px 14px',
+                                                    background: isDragActive ? '#E0F2FE' : '#F0F9FF',
+                                                    border: `1.5px dashed ${isDragActive ? '#0284C7' : '#00B0FA'}`,
+                                                    borderRadius: '10px',
+                                                    color: '#0369A1',
+                                                    fontSize: '13px',
+                                                    fontWeight: 700,
+                                                    cursor: selectedFile ? 'default' : 'pointer',
+                                                    textAlign: 'center',
+                                                    transition: 'background 0.15s, border-color 0.15s',
+                                                }}
+                                            >
+                                                {selectedFile ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'space-between' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                                            <FileText size={16} color="#00B0FA" />
+                                                            <span style={{ color: '#0F172A', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedFile.name}</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                                                            style={{ background: 'white', border: '1px solid #BAE6FD', borderRadius: '6px', color: '#0369A1', padding: '6px 12px', fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}
+                                                        >
+                                                            CHANGE
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                                                        <Upload size={18} />
+                                                        <div>{isDragActive ? 'DROP FILE HERE' : 'DRAG & DROP OR CLICK TO SELECT'}</div>
+                                                        <div style={{ fontSize: '11px', fontWeight: 500, color: '#64748B' }}>Accepts {getAcceptedFileTypes()}</div>
                                                     </div>
                                                 )}
                                             </div>

@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 import {
   listPurchaseOrders, createPurchaseOrder, getPurchaseOrder,
   updatePurchaseOrder, deletePurchaseOrder, uploadPurchaseOrder,
-  getPurchaseOrdersBySupplier,
+  uploadPurchaseOrderBulk, getPurchaseOrdersBySupplier,
 } from '../../controller/purchaseOrder.controller.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 
@@ -33,6 +33,7 @@ router.use(authenticate);
 
 router.get('/by-supplier/:vesselId', getPurchaseOrdersBySupplier);
 router.post('/upload', upload.single('file'), uploadPurchaseOrder);
+router.post('/upload-bulk', upload.single('file'), uploadPurchaseOrderBulk);
 
 router.route('/')
   .get(listPurchaseOrders)
