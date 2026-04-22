@@ -29,4 +29,9 @@ export const env = {
   CORS_ORIGIN:  optional('CORS_ORIGIN', 'http://localhost:5173'),
   UPLOAD_DIR:   optional('UPLOAD_DIR', './uploads'),
   MAX_FILE_SIZE_MB: Number(optional('MAX_FILE_SIZE_MB', '10')),
+  SMTP_HOST:    process.env.SMTP_HOST,
+  SMTP_PORT:    process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
+  SMTP_USER:    process.env.SMTP_USER,
+  SMTP_PASS:    process.env.SMTP_PASS,
+  EMAIL_FROM:   process.env.EMAIL_FROM,
 };

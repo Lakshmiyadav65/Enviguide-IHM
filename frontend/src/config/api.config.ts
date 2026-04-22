@@ -51,6 +51,7 @@ export const ENDPOINTS = {
     REVIEW_DETAIL: (imo: string) => `/audits/reviews/${imo}`,
     MDS_DOC: '/audits/mds-doc',
     DOCUMENTS: (imo: string) => `/audits/${imo}/documents`,
+    CLARIFICATION_EMAIL: '/audits/clarification-email',
   },
 
   // Security / Users

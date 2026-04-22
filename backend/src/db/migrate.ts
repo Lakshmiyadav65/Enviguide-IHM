@@ -336,6 +336,23 @@ CREATE TABLE IF NOT EXISTS "contact_messages" (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Clarification emails sent to vendors during audit review
+CREATE TABLE IF NOT EXISTS "clarification_requests" (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vessel_id        UUID REFERENCES "vessels"(id) ON DELETE SET NULL,
+  imo_number       VARCHAR(20) NOT NULL,
+  vessel_name      VARCHAR(255),
+  recipient_emails TEXT NOT NULL,
+  cc_emails        TEXT,
+  subject          VARCHAR(500) NOT NULL,
+  body             TEXT NOT NULL,
+  suspected_items  JSONB NOT NULL DEFAULT '[]'::jsonb,
+  status           VARCHAR(20) NOT NULL DEFAULT 'sent',
+  error_message    TEXT,
+  sent_by          UUID REFERENCES "users"(id) ON DELETE SET NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_vessels_created_by ON "vessels"(created_by_id);
 CREATE INDEX IF NOT EXISTS idx_ga_plans_vessel ON "ga_plans"(vessel_id);
@@ -358,6 +375,8 @@ CREATE INDEX IF NOT EXISTS idx_contact_status    ON "contact_messages"(status);
 CREATE INDEX IF NOT EXISTS idx_menu_items_archived ON "menu_items"(archived);
 CREATE INDEX IF NOT EXISTS idx_user_perm_user    ON "user_permissions"(user_id);
 CREATE INDEX IF NOT EXISTS idx_role_perm_role    ON "role_permissions"(role_name);
+CREATE INDEX IF NOT EXISTS idx_clarification_imo ON "clarification_requests"(imo_number);
+CREATE INDEX IF NOT EXISTS idx_clarification_vessel ON "clarification_requests"(vessel_id);
 `;
 
 async function migrate() {

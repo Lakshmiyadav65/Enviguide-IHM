@@ -17,6 +17,7 @@ import {
   getPendingReviews, getReviewDetail,
   getMdsDocAudit, getAuditDocuments, uploadAuditDocument,
   sendAuditForReview, completeReview, rejectReview,
+  sendClarificationEmail,
 } from '../../controller/audit.controller.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 
@@ -28,6 +29,8 @@ router.get('/pending',                       getPendingAudits);
 router.get('/reviews',                       getPendingReviews);
 router.get('/reviews/:imo',                  getReviewDetail);
 router.get('/mds-doc',                       getMdsDocAudit);
+
+router.post('/clarification-email',          sendClarificationEmail);
 
 router.patch('/:id/send-for-review',         sendAuditForReview);
 router.patch('/reviews/:id/complete',        completeReview);

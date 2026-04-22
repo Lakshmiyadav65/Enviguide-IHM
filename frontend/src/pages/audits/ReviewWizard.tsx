@@ -1,5 +1,7 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './ReviewWizard.css';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
 import {
     ChevronDown,
     Send,
@@ -391,41 +393,67 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
         }
     };
 
-    const handleSendMail = () => {
-        const existingClarifications = JSON.parse(localStorage.getItem(`pending_clarifications_${imo}`) || '[]');
-        const newClarifications = [...existingClarifications, ...suspectedItems.map(row => ({
-            id: Date.now() + Math.random(),
-            imo,
-            vesselName,
-            poNumber: row[data[0].indexOf('PO Number')],
-            itemDescription: row[data[0].indexOf('Item Description')],
-            vendorName: row[data[0].indexOf('Vendor Name')],
-            vendorEmail: row[data[0].indexOf('Vendor Email')],
-            status: 'Clarification Pending',
-            date: new Date().toISOString().split('T')[0],
-            details: row,
-            mailSubject: mailContent.subject,
-            mailBody: mailContent.body
-        }))];
+    const handleSendMail = async () => {
+        if (toChips.length === 0) {
+            setToastData({ title: 'Missing recipients', message: 'Please add at least one recipient.' });
+            setShowToast(true);
+            return;
+        }
 
-        localStorage.setItem(`pending_clarifications_${imo}`, JSON.stringify(newClarifications));
-        const header = data[0];
-        const suspectedIdx = header.indexOf('Is Suspected');
-        const newData = [header, ...data.slice(1).filter(row => row[suspectedIdx] !== 'Yes')];
-        localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(newData));
+        const parseList = (s: string): string[] =>
+            s.split(/[,;]\s*/).map(x => x.trim()).filter(Boolean);
+        const ccList = parseList(ccVal);
 
-        // Show success toast
-        setToastData({
-            title: 'Mail Sent Successfully',
-            message: `Clarification request has been sent to ${toChips.join(', ')}`
-        });
-        setShowToast(true);
-        setShowMailModal(false);
+        try {
+            await api.post(ENDPOINTS.AUDITS.CLARIFICATION_EMAIL, {
+                imo,
+                vesselName,
+                to: toChips,
+                cc: ccList,
+                subject: mailContent.subject,
+                body: mailContent.body,
+                suspectedItems,
+            });
 
-        // Wait for toast before completing
-        setTimeout(() => {
-            onComplete();
-        }, 3000);
+            // Also persist in localStorage so PurchaseOrderView keeps showing these
+            // until that page is migrated to read from the backend.
+            const existingClarifications = JSON.parse(localStorage.getItem(`pending_clarifications_${imo}`) || '[]');
+            const newClarifications = [...existingClarifications, ...suspectedItems.map(row => ({
+                id: Date.now() + Math.random(),
+                imo,
+                vesselName,
+                poNumber: row[data[0].indexOf('PO Number')],
+                itemDescription: row[data[0].indexOf('Item Description')],
+                vendorName: row[data[0].indexOf('Vendor Name')],
+                vendorEmail: row[data[0].indexOf('Vendor Email')],
+                status: 'Clarification Pending',
+                date: new Date().toISOString().split('T')[0],
+                details: row,
+                mailSubject: mailContent.subject,
+                mailBody: mailContent.body
+            }))];
+            localStorage.setItem(`pending_clarifications_${imo}`, JSON.stringify(newClarifications));
+            const header = data[0];
+            const suspectedIdx = header.indexOf('Is Suspected');
+            const newData = [header, ...data.slice(1).filter(row => row[suspectedIdx] !== 'Yes')];
+            localStorage.setItem(`audit_rows_${imo}`, JSON.stringify(newData));
+
+            setToastData({
+                title: 'Mail Sent Successfully',
+                message: `Clarification request has been sent to ${toChips.join(', ')}`
+            });
+            setShowToast(true);
+            setShowMailModal(false);
+
+            setTimeout(() => { onComplete(); }, 3000);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Unknown error';
+            setToastData({
+                title: 'Mail failed to send',
+                message: msg,
+            });
+            setShowToast(true);
+        }
     };
 
     return (
@@ -724,7 +752,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                         <button
                                             className="recipient-remove"
                                             onClick={e => { e.stopPropagation(); setToChips(prev => prev.filter((_, fi) => fi !== i)); }}
-                                        >Ã—</button>
+                                        ><X size={12} /></button>
                                     </span>
                                 ))}
                                 <input
@@ -783,7 +811,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                                         <div key={i} className="attach-chip">
                                             <Paperclip size={13} />
                                             <span>{file.name}</span>
-                                            <button className="chip-remove" onClick={() => setAttachedFiles(prev => prev.filter((_, fi) => fi !== i))}>Ã—</button>
+                                            <button className="chip-remove" onClick={() => setAttachedFiles(prev => prev.filter((_, fi) => fi !== i))}><X size={12} /></button>
                                         </div>
                                     ))}
                                 </div>

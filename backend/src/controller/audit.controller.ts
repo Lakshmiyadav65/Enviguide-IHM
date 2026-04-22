@@ -2,6 +2,8 @@
 import type { Request, Response, NextFunction } from 'express';
 import { AuditService } from '../services/audit.service.js';
 import { DocumentService } from '../services/document.service.js';
+import { sendMail } from '../services/email.service.js';
+import { query } from '../config/database.js';
 import { createError } from '../middleware/errorHandler.js';
 
 /** GET /api/v1/audits/pending — Audits with status In Progress / Pending */
@@ -117,5 +119,77 @@ export async function uploadAuditDocument(req: Request, res: Response, next: Nex
     };
     const doc = await DocumentService.createDocument(data, vesselId);
     res.status(201).json({ success: true, data: doc });
+  } catch (err) { next(err); }
+}
+
+/** POST /api/v1/audits/clarification-email — send vendor clarification email */
+export async function sendClarificationEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const {
+      imo,
+      vesselName,
+      to,
+      cc,
+      subject,
+      body,
+      suspectedItems,
+    } = req.body as {
+      imo?: string;
+      vesselName?: string;
+      to?: string[];
+      cc?: string[];
+      subject?: string;
+      body?: string;
+      suspectedItems?: unknown[];
+    };
+
+    if (!imo || !to || to.length === 0 || !subject || !body) {
+      return next(createError('imo, to, subject, and body are required', 400));
+    }
+
+    const audit = await AuditService.getAuditByImo(imo, req.user!.userId);
+    const vesselId = audit ? (audit as Record<string, unknown>).vesselId as string : null;
+
+    const html = body
+      .split('\n')
+      .map((line) => `<div>${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') || '&nbsp;'}</div>`)
+      .join('');
+
+    let status = 'sent';
+    let errorMessage: string | null = null;
+
+    try {
+      await sendMail({ to, cc, subject, text: body, html });
+    } catch (mailErr) {
+      status = 'failed';
+      errorMessage = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
+    }
+
+    const inserted = await query(
+      `INSERT INTO clarification_requests
+         (vessel_id, imo_number, vessel_name, recipient_emails, cc_emails,
+          subject, body, suspected_items, status, error_message, sent_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11)
+       RETURNING id, status, created_at`,
+      [
+        vesselId,
+        imo,
+        vesselName || null,
+        to.join(', '),
+        cc && cc.length ? cc.join(', ') : null,
+        subject,
+        body,
+        JSON.stringify(suspectedItems || []),
+        status,
+        errorMessage,
+        req.user!.userId,
+      ],
+    );
+
+    if (status === 'failed') {
+      return next(createError(`Email not sent: ${errorMessage}`, 502));
+    }
+
+    res.json({ success: true, data: inserted.rows[0] });
   } catch (err) { next(err); }
 }
