@@ -21,7 +21,19 @@ const app = express();
 
 // -- Security & Parsing ------------------------------------
 app.use(helmet());
-app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
+
+// CORS_ORIGIN may be a single origin or a comma-separated list. Empty strings are
+// dropped so trailing commas don't accidentally match every origin.
+const allowedOrigins = env.CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    // Requests without an Origin header (curl, server-to-server) are allowed.
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error(`Origin ${origin} not allowed by CORS`));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
