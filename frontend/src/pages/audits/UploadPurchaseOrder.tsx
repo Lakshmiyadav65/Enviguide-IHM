@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useMemo } from 'react';
+﻿import { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import './UploadPurchaseOrder.css';
@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { INITIAL_VESSELS } from '../../data/vesselData';
 import type { Vessel } from '../../types';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
 
 type ExcelData = any[][];
 
@@ -78,11 +80,18 @@ export default function UploadPurchaseOrder() {
     const [showMappingErrors, setShowMappingErrors] = useState(false);
     const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-    const shipManagersData = useMemo(() => {
-        const saved = localStorage.getItem('vessel_list_main');
-        const vessels = saved ? JSON.parse(saved) : INITIAL_VESSELS;
-        return getShipManagersFromVessels(vessels);
+    const [vessels, setVessels] = useState<Vessel[]>([]);
+
+    useEffect(() => {
+        api.get<{ success: boolean; data: Vessel[] }>(ENDPOINTS.VESSELS.LIST)
+            .then((res) => setVessels(res.data))
+            .catch(() => setVessels(INITIAL_VESSELS));
     }, []);
+
+    const shipManagersData = useMemo(
+        () => getShipManagersFromVessels(vessels),
+        [vessels],
+    );
 
     const filteredManagers = useMemo(() =>
         shipManagersData.filter(m => m.name.toLowerCase().includes(shipManager.toLowerCase())),
