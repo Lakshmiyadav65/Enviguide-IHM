@@ -193,7 +193,9 @@ export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
                     return item;
                 })
             };
-        }).filter(s => s.items.length > 0);
+        });
+        // Keep empty supplier groups visible so the template (group headers + column
+        // labels) stays on screen even before any real items arrive.
     }, [activeFilter, searchTerm, allItems]);
 
     const selectedCount = allItems.filter(i => i.selected).length;
@@ -392,6 +394,13 @@ export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
+                                                    {supplier.items.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan={14} style={{ padding: '24px 16px', textAlign: 'center', color: '#94A3B8', fontSize: '13px', fontStyle: 'italic' }}>
+                                                                No items yet for this supplier.
+                                                            </td>
+                                                        </tr>
+                                                    )}
                                                     {supplier.items.map(item => (
                                                         <tr key={item.id} className={item.selected ? 'row-is-selected' : ''}>
                                                             <td className="ch-col">
