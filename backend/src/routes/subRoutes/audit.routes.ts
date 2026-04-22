@@ -12,6 +12,9 @@
 
 import { Router } from 'express';
 import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import {
   getPendingAudits, getAuditDetail,
   getPendingReviews, getReviewDetail,
@@ -19,11 +22,21 @@ import {
   sendAuditForReview, completeReview, rejectReview,
   sendClarificationEmail,
   getAuditLineItems, replaceAuditLineItems, getAuditClarifications,
+  uploadClarificationItemDocument,
   deleteAudit,
 } from '../../controller/audit.controller.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const mdsDir = path.resolve(__dirname, '..', '..', '..', 'uploads', 'mds');
+if (!fs.existsSync(mdsDir)) fs.mkdirSync(mdsDir, { recursive: true });
+
 const upload = multer({ dest: 'uploads/docs/' });
+const mdsUpload = multer({
+  dest: mdsDir,
+  limits: { fileSize: 25 * 1024 * 1024 },
+});
+
 const router = Router();
 router.use(authenticate);
 
@@ -42,6 +55,12 @@ router.delete('/:id',                        deleteAudit);
 router.get('/:imo/line-items',               getAuditLineItems);
 router.patch('/:imo/line-items',             replaceAuditLineItems);
 router.get('/:imo/clarifications',           getAuditClarifications);
+
+router.post(
+  '/clarifications/:clarId/items/:idx/document',
+  mdsUpload.single('file'),
+  uploadClarificationItemDocument,
+);
 
 router.get('/:imo',                          getAuditDetail);
 router.get('/:imo/documents',                getAuditDocuments);

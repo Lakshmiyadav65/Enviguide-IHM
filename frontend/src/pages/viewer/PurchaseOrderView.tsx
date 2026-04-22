@@ -22,6 +22,12 @@ interface PurchaseOrderItem {
     selected?: boolean;
     category: string;
     isSuspected?: boolean;
+    // Clarification-item identifiers (needed to upload the MDS doc).
+    clarificationId?: string;
+    itemIndex?: number;
+    mdsStatus?: 'pending' | 'received' | string;
+    mdsFilePath?: string;
+    mdsFileName?: string;
 }
 
 const FILTER_TAGS = [
@@ -54,34 +60,54 @@ export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
     const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData);
 
     // Fetch clarification history for this IMO from the backend. Each clarification
-    // email may reference many suspected POs; we flatten them into one row per item.
-    useEffect(() => {
+    // email may reference many suspected POs; we flatten them into one row per item
+    // and merge in per-item MDS state from clarification_items.
+    const loadClarifications = () => {
         if (!imo) return;
         api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(ENDPOINTS.AUDITS.CLARIFICATIONS(imo))
             .then((res) => {
                 const items: PurchaseOrderItem[] = [];
                 for (const c of res.data || []) {
+                    const clarificationId = String(c.id);
                     const rows = Array.isArray(c.suspected_items) ? c.suspected_items as unknown[][] : [];
+                    const perItemState = Array.isArray(c.items) ? c.items as Array<Record<string, unknown>> : [];
+                    const stateByIndex = new Map<number, Record<string, unknown>>();
+                    for (const s of perItemState) stateByIndex.set(Number(s.item_index), s);
+
                     const sentDate = typeof c.created_at === 'string' ? c.created_at.split('T')[0] : '';
                     const subject = String(c.subject || '');
                     const body = String(c.body || '');
                     const recipients = String(c.recipient_emails || '');
+
                     rows.forEach((row, i) => {
                         const r = Array.isArray(row) ? row : [];
+                        const state = stateByIndex.get(i) || {};
+                        const mdsStatus = String(state.mds_status ?? 'pending');
+                        const mdsFilePath = state.mds_file_path ? String(state.mds_file_path) : undefined;
+                        const mdsFileName = state.mds_file_name ? String(state.mds_file_name) : undefined;
+                        const mdsReceivedAt = typeof state.mds_received_at === 'string'
+                            ? state.mds_received_at.split('T')[0]
+                            : '';
+
                         items.push({
-                            id: `${c.id}-${i}`,
+                            id: `${clarificationId}-${i}`,
+                            clarificationId,
+                            itemIndex: i,
                             emailStatus: 'SENT',
-                            ihmProductCode: String(r[8] ?? r[9] ?? 'N/A'), // IMPA → ISSA fallback
+                            ihmProductCode: String(r[8] ?? r[9] ?? 'N/A'),
                             poNumber: String(r[2] ?? ''),
                             mdsReq: String(r[5] ?? sentDate),
-                            mdsRec: '',
+                            mdsRec: mdsReceivedAt,
                             itemDescription: String(r[6] ?? ''),
                             orderDate: String(r[4] ?? sentDate),
                             quantityTotal: `${r[16] ?? '0'} | 0 | ${r[16] ?? '0'}`,
                             unit: String(r[15] ?? 'PCS'),
-                            category: 'Request Pending',
+                            category: mdsStatus === 'received' ? 'Received Mds' : 'Request Pending',
                             isSuspected: true,
                             selected: false,
+                            mdsStatus,
+                            mdsFilePath,
+                            mdsFileName,
                             vendorName: String(r[19] ?? ''),
                             vendorEmail: String(r[18] ?? recipients),
                             mailSubject: subject,
@@ -92,7 +118,25 @@ export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
                 setAllItems(items);
             })
             .catch(() => setAllItems([]));
-    }, [imo]);
+    };
+
+    useEffect(loadClarifications, [imo]);
+
+    // Upload an MDS document for one clarification item, then refresh.
+    const uploadMdsDocument = async (item: PurchaseOrderItem, file: File) => {
+        if (!item.clarificationId || item.itemIndex === undefined) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+            await api.upload(
+                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_DOC(item.clarificationId, item.itemIndex),
+                fd,
+            );
+            loadClarifications();
+        } catch (err) {
+            console.error('MDS upload failed:', err);
+        }
+    };
     const [searchTerm, setSearchTerm] = useState('');
     const [isFilterBarOpen, setIsFilterBarOpen] = useState(false);
 
@@ -110,10 +154,13 @@ export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
     const currentSuppliersData = useMemo(() => {
         const filteredItems = allItems.filter(item => {
             if (activeFilter !== 'All') {
-                // If it's a suspected item, show it in Request Pending, Suspected Items, and Reminders
                 if (item.isSuspected) {
-                    const relevantFilters = ['Request Pending', 'Suspected Items', 'Reminder 1', 'Reminder 2'];
-                    if (!relevantFilters.includes(activeFilter)) return false;
+                    // Map each MDS status to the filter tabs that should show it.
+                    const pendingTabs = ['Request Pending', 'Suspected Items', 'Pending Mds', 'Reminder 1', 'Reminder 2'];
+                    const receivedTabs = ['Received Mds', 'Suspected Items'];
+                    const isReceived = item.mdsStatus === 'received';
+                    const allowed = isReceived ? receivedTabs : pendingTabs;
+                    if (!allowed.includes(activeFilter)) return false;
                 } else if (item.category !== activeFilter) {
                     return false;
                 }
@@ -172,11 +219,6 @@ export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
             });
             setShowMailView(true);
         }
-    };
-
-    const handleViewDoc = (item: any) => {
-        setSelectedDocName(item.itemDescription);
-        setShowDocView(true);
     };
 
     const handleSendMail = () => {
@@ -373,14 +415,36 @@ export default function PurchaseOrderView({ imo }: PurchaseOrderViewProps) {
                                                                 </div>
                                                             </td>
                                                             <td className="doc-col">
-                                                                <button
-                                                                    type="button"
-                                                                    className="po-v4-action-icon-btn-v4 doc"
-                                                                    title="View Document"
-                                                                    onClick={() => handleViewDoc(item)}
-                                                                >
-                                                                    <FileText size={14} />
-                                                                </button>
+                                                                {item.mdsFilePath ? (
+                                                                    <a
+                                                                        href={item.mdsFilePath}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="po-v4-action-icon-btn-v4 doc"
+                                                                        title={`View uploaded MDS (${item.mdsFileName || 'document'})`}
+                                                                        style={{ display: 'inline-flex', color: '#10B981' }}
+                                                                    >
+                                                                        <FileText size={14} />
+                                                                    </a>
+                                                                ) : (
+                                                                    <label
+                                                                        className="po-v4-action-icon-btn-v4 doc"
+                                                                        title="Upload MDS / SDoC document"
+                                                                        style={{ cursor: 'pointer', display: 'inline-flex' }}
+                                                                    >
+                                                                        <FileText size={14} />
+                                                                        <input
+                                                                            type="file"
+                                                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                                                            style={{ display: 'none' }}
+                                                                            onChange={(e) => {
+                                                                                const f = e.target.files?.[0];
+                                                                                if (f) uploadMdsDocument(item, f);
+                                                                                e.target.value = '';
+                                                                            }}
+                                                                        />
+                                                                    </label>
+                                                                )}
                                                             </td>
                                                             <td className="em-col">{item.emailStatus}</td>
                                                             <td className="ihm-col">{item.ihmProductCode}</td>

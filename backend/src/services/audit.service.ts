@@ -273,7 +273,7 @@ export const AuditService = {
     }
   },
 
-  /** Fetch clarifications for an IMO (most recent first). */
+  /** Fetch clarifications for an IMO (most recent first), with per-item state. */
   async getClarificationsForImo(imoNumber: string) {
     const r = await query(
       `SELECT id, vessel_id, imo_number, vessel_name, recipient_emails, cc_emails,
@@ -283,6 +283,64 @@ export const AuditService = {
         ORDER BY created_at DESC`,
       [imoNumber],
     );
-    return r.rows as Array<Record<string, unknown>>;
+    const clarifications = r.rows as Array<Record<string, unknown>>;
+    if (clarifications.length === 0) return [];
+
+    const ids = clarifications.map((c) => c.id);
+    const itemsRes = await query(
+      `SELECT clarification_id, item_index, mds_status, mds_file_path, mds_file_name,
+              mds_received_at, reminder_count, hm_status, notes, updated_at
+         FROM clarification_items
+        WHERE clarification_id = ANY($1::uuid[])
+        ORDER BY item_index ASC`,
+      [ids],
+    );
+
+    // Group items by clarification_id.
+    const byClar: Record<string, Array<Record<string, unknown>>> = {};
+    for (const row of itemsRes.rows as Array<Record<string, unknown>>) {
+      const key = String(row.clarification_id);
+      if (!byClar[key]) byClar[key] = [];
+      byClar[key].push(row);
+    }
+
+    return clarifications.map((c) => ({
+      ...c,
+      items: byClar[String(c.id)] ?? [],
+    }));
+  },
+
+  /** Fetch a single clarification_item row (for ownership checks before update). */
+  async getClarificationItem(clarificationId: string, itemIndex: number) {
+    const r = await query(
+      `SELECT ci.*, cr.imo_number, cr.vessel_id
+         FROM clarification_items ci
+         JOIN clarification_requests cr ON cr.id = ci.clarification_id
+        WHERE ci.clarification_id = $1 AND ci.item_index = $2
+        LIMIT 1`,
+      [clarificationId, itemIndex],
+    );
+    return r.rows[0] as Record<string, unknown> | undefined;
+  },
+
+  /** Attach an uploaded MDS document to a clarification item. */
+  async setClarificationItemDocument(
+    clarificationId: string,
+    itemIndex: number,
+    filePath: string,
+    fileName: string,
+  ) {
+    const r = await query(
+      `UPDATE clarification_items
+          SET mds_status = 'received',
+              mds_file_path = $3,
+              mds_file_name = $4,
+              mds_received_at = NOW(),
+              updated_at = NOW()
+        WHERE clarification_id = $1 AND item_index = $2
+      RETURNING *`,
+      [clarificationId, itemIndex, filePath, fileName],
+    );
+    return r.rows[0] as Record<string, unknown> | undefined;
   },
 };

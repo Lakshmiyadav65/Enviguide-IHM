@@ -385,6 +385,25 @@ CREATE TABLE IF NOT EXISTS "clarification_requests" (
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Per-item state for a clarification request. Mirrors one row per entry in
+-- clarification_requests.suspected_items (JSONB), tracking MDS document upload,
+-- reminder count, HM classification etc. over time.
+CREATE TABLE IF NOT EXISTS "clarification_items" (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  clarification_id  UUID NOT NULL REFERENCES "clarification_requests"(id) ON DELETE CASCADE,
+  item_index        INTEGER NOT NULL,
+  mds_status        VARCHAR(20) NOT NULL DEFAULT 'pending',
+  mds_file_path     VARCHAR(500),
+  mds_file_name     VARCHAR(255),
+  mds_received_at   TIMESTAMPTZ,
+  reminder_count    INTEGER NOT NULL DEFAULT 0,
+  hm_status         VARCHAR(20),
+  notes             TEXT,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(clarification_id, item_index)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_vessels_created_by ON "vessels"(created_by_id);
 CREATE INDEX IF NOT EXISTS idx_ga_plans_vessel ON "ga_plans"(vessel_id);
@@ -409,6 +428,8 @@ CREATE INDEX IF NOT EXISTS idx_user_perm_user    ON "user_permissions"(user_id);
 CREATE INDEX IF NOT EXISTS idx_role_perm_role    ON "role_permissions"(role_name);
 CREATE INDEX IF NOT EXISTS idx_clarification_imo ON "clarification_requests"(imo_number);
 CREATE INDEX IF NOT EXISTS idx_clarification_vessel ON "clarification_requests"(vessel_id);
+CREATE INDEX IF NOT EXISTS idx_clarif_items_clar ON "clarification_items"(clarification_id);
+CREATE INDEX IF NOT EXISTS idx_clarif_items_status ON "clarification_items"(mds_status);
 CREATE INDEX IF NOT EXISTS idx_audit_lines_audit ON "audit_line_items"(audit_id);
 CREATE INDEX IF NOT EXISTS idx_audit_lines_vessel ON "audit_line_items"(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_audit_lines_po ON "audit_line_items"(po_number);

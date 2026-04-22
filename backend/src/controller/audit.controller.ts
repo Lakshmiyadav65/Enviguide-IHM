@@ -209,6 +209,25 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
       ],
     );
 
+    // Seed per-item rows so we can track MDS upload, reminders etc. per item.
+    const clarificationId = String((inserted.rows[0] as Record<string, unknown>).id);
+    const itemCount = Array.isArray(suspectedItems) ? suspectedItems.length : 0;
+    if (itemCount > 0) {
+      const placeholders: string[] = [];
+      const vals: unknown[] = [];
+      for (let i = 0; i < itemCount; i++) {
+        const start = vals.length;
+        placeholders.push(`($${start + 1}, $${start + 2})`);
+        vals.push(clarificationId, i);
+      }
+      await query(
+        `INSERT INTO clarification_items (clarification_id, item_index)
+         VALUES ${placeholders.join(', ')}
+         ON CONFLICT (clarification_id, item_index) DO NOTHING`,
+        vals,
+      );
+    }
+
     if (status === 'failed') {
       return next(createError(`Email not sent: ${errorMessage}`, 502));
     }
@@ -278,6 +297,45 @@ export async function getAuditClarifications(req: Request, res: Response, next: 
 
     const rows = await AuditService.getClarificationsForImo(req.params.imo as string);
     res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+}
+
+/**
+ * POST /api/v1/audits/clarifications/:clarId/items/:idx/document — upload the
+ * vendor's MD/SDoC reply for a specific suspected item. Stores the file and
+ * marks the item as 'received'.
+ */
+export async function uploadClarificationItemDocument(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    if (!req.file) return next(createError('File required', 400));
+
+    const clarificationId = req.params.clarId as string;
+    const itemIndex = Number(req.params.idx);
+    if (!Number.isFinite(itemIndex) || itemIndex < 0) {
+      return next(createError('Invalid item index', 400));
+    }
+
+    const item = await AuditService.getClarificationItem(clarificationId, itemIndex);
+    if (!item) return next(createError('Clarification item not found', 404));
+
+    // Verify user owns the vessel this clarification belongs to.
+    const imo = String(item.imo_number);
+    const parent = await AuditService.getAuditByImo(imo, req.user!.userId);
+    if (!parent) return next(createError('Audit not found for this user', 404));
+
+    const filePath = `/uploads/mds/${req.file.filename}`;
+    const updated = await AuditService.setClarificationItemDocument(
+      clarificationId,
+      itemIndex,
+      filePath,
+      req.file.originalname,
+    );
+
+    res.json({ success: true, data: updated });
   } catch (err) { next(err); }
 }
 
