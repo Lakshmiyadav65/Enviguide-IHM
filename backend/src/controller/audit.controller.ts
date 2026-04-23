@@ -177,13 +177,14 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
     const vesselId = audit ? (audit as Record<string, unknown>).vesselId as string : null;
 
     // Generate a one-way token the supplier will use on the public upload page.
-    // 32 random bytes, URL-safe base64 → ~43 chars. 90-day expiry.
+    // 32 random bytes, URL-safe base64 → ~43 chars. 72-hour expiry.
     const publicToken = crypto.randomBytes(32).toString('base64url');
-    const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
     const supplierLink = `${env.APP_BASE_URL.replace(/\/$/, '')}/upload/${publicToken}`;
 
     // Append the upload link to whatever the user typed in the body.
-    const bodyWithLink = `${body}\n\n---\nUpload documents directly via this secure link (no login required):\n${supplierLink}\n\nThis link expires on ${expiresAt.toISOString().split('T')[0]}.`;
+    const expiresText = expiresAt.toISOString().replace('T', ' ').replace(/\..+/, ' UTC');
+    const bodyWithLink = `${body}\n\n---\nUpload documents directly via this secure link (no login required):\n${supplierLink}\n\nThis link expires on ${expiresText} (72 hours from now).`;
     const html = bodyWithLink
       .split('\n')
       .map((line) => {

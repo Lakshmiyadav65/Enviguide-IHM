@@ -386,7 +386,7 @@ CREATE TABLE IF NOT EXISTS "clarification_requests" (
 );
 
 -- Public upload token that goes in the clarification email body. Suppliers
--- click the link and upload docs without logging in. 90-day expiry.
+-- click the link and upload docs without logging in. 72-hour expiry.
 ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS public_token VARCHAR(64) UNIQUE;
 ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS public_token_expires_at TIMESTAMPTZ;
 

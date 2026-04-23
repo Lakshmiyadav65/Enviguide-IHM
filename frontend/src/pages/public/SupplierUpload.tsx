@@ -226,7 +226,7 @@ export default function SupplierUpload() {
                 </div>
 
                 <footer style={{ marginTop: 24, fontSize: 12, color: '#94A3B8', textAlign: 'center' }}>
-                    Powered by EnviGuide IHM · This upload link is unique to your company and will expire after 90 days.
+                    Powered by EnviGuide IHM · This upload link is unique to your company and will expire 72 hours after it was sent.
                 </footer>
             </div>
 
