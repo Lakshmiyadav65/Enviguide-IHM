@@ -180,25 +180,38 @@ export async function uploadPurchaseOrderBulk(req: Request, res: Response, next:
     const v = vessel as Record<string, unknown>;
     const filePath = `/uploads/po/${req.file.filename}`;
 
-    // 1. Upsert the audit summary. If an 'In Progress' audit already exists for
-    //    this vessel, re-uploading replaces it (stats + file + line items).
-    //    Audits that have already moved to 'Pending Review' or 'Completed' are
-    //    preserved — the new upload becomes a separate audit.
-    const existingInProgress = await query(
+    // 1. Upsert the audit summary. Any active audit for this vessel — whether
+     //    'In Progress' or 'Pending Review' — is replaced by this upload.
+     //    Completed audits are preserved (they are historical records).
+     //    If there are multiple active rows (legacy duplicates), we keep the
+     //    newest, reset it, and delete the rest.
+    const existingActive = await query(
       `SELECT id FROM audit_summaries
-         WHERE vessel_id = $1 AND status = 'In Progress'
-         ORDER BY created_at DESC LIMIT 1`,
+         WHERE vessel_id = $1 AND status IN ('In Progress', 'Pending', 'Pending Review')
+         ORDER BY created_at DESC`,
       [vesselId],
     );
 
     let auditId: string;
-    if (existingInProgress.rows.length > 0) {
-      auditId = String((existingInProgress.rows[0] as Record<string, unknown>).id);
+    if (existingActive.rows.length > 0) {
+      const all = existingActive.rows as Array<Record<string, unknown>>;
+      auditId = String(all[0]!.id);
+      // Drop any older duplicates — we collapse all active audits for this
+      // vessel into the newest one.
+      if (all.length > 1) {
+        const extraIds = all.slice(1).map((r) => String(r.id));
+        await query(
+          `DELETE FROM audit_summaries WHERE id = ANY($1::uuid[])`,
+          [extraIds],
+        );
+      }
       await query(
         `UPDATE audit_summaries
             SET total_po = $1, total_items = $2,
                 duplicate_po = $3, duplicate_supplier_code = $4, duplicate_product = $5,
                 uploaded_file_path = $6, uploaded_file_name = $7,
+                status = 'In Progress',
+                review_assigned_to = NULL, reviewed_by = NULL, reviewed_at = NULL,
                 last_activity = NOW(), updated_at = NOW()
           WHERE id = $8`,
         [
