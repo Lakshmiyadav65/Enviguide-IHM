@@ -28,6 +28,9 @@ interface PurchaseOrderItem {
     mdsStatus?: 'pending' | 'received' | string;
     mdsFilePath?: string;
     mdsFileName?: string;
+    reminderCount?: number;
+    vendorName?: string;
+    vendorEmail?: string;
 }
 
 const FILTER_TAGS = [
@@ -71,17 +74,22 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                     const mdsReceivedAt = typeof r.mds_received_at === 'string' ? r.mds_received_at.split('T')[0] : '';
                     const poSentDate = typeof r.po_sent_date === 'string' ? r.po_sent_date.split('T')[0] : String(r.po_sent_date ?? '');
                     const mdReqDate = typeof r.md_requested_date === 'string' ? r.md_requested_date.split('T')[0] : String(r.md_requested_date ?? '');
+                    const reminderCount = Number(r.reminder_count ?? 0);
 
                     // Suspected items live under 'Request Pending' by default;
                     // the filter bar also cross-checks mdsStatus so Received MDS
                     // / Pending MDS can break them apart when needed.
                     let category: string;
                     if (!isSuspected) category = 'Non HM';
+                    else if (reminderCount >= 2) category = 'Reminder 2';
+                    else if (reminderCount === 1) category = 'Reminder 1';
                     else category = 'Request Pending';
 
-                    const emailStatus = isSuspected
-                        ? (mdsStatus === 'received' ? 'REPLIED' : 'SENT')
-                        : 'NOT SENT';
+                    let emailStatus: string;
+                    if (!isSuspected) emailStatus = 'NOT SENT';
+                    else if (mdsStatus === 'received') emailStatus = 'REPLIED';
+                    else if (reminderCount >= 1) emailStatus = `REMINDER ${reminderCount}`;
+                    else emailStatus = 'SENT';
 
                     return {
                         id: r.clarification_id
@@ -104,9 +112,10 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                         mdsStatus,
                         mdsFilePath,
                         mdsFileName,
+                        reminderCount,
                         vendorName: String(r.vendor_name ?? ''),
                         vendorEmail: String(r.vendor_email ?? ''),
-                    } as PurchaseOrderItem;
+                    };
                 });
                 setAllItems(items);
             })
@@ -136,9 +145,15 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
     // Mail & Doc View State
     const [showMailView, setShowMailView] = useState(false);
     const [selectedMail, setSelectedMail] = useState<{ subject: string; body: string; to: string } | null>(null);
+    const [reminderItem, setReminderItem] = useState<PurchaseOrderItem | null>(null);
+    const [sendingReminder, setSendingReminder] = useState(false);
     const [showDocView, setShowDocView] = useState(false);
     const [selectedDocName, setSelectedDocName] = useState('');
     const [showToast, setShowToast] = useState(false);
+    const [toastMessage, setToastMessage] = useState({
+        title: 'Mail Sent Successfully',
+        body: 'Your clarification/reminder has been dispatched to the supplier.',
+    });
 
     const toggleSupplier = (id: string) => {
         setOpenSuppliers(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
@@ -150,26 +165,35 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                 // Rules:
                 //   Request Pending / Suspected Items → every suspected item,
                 //     regardless of MDS status (pending or received inline).
-                //   Pending Mds / Reminder 1 / Reminder 2 → only suspected items
-                //     that have NOT received a document yet.
+                //   Pending Mds → suspected, not received, no reminders yet.
+                //   Reminder 1 → suspected, not received, reminder_count === 1.
+                //   Reminder 2 → suspected, not received, reminder_count >= 2.
                 //   Received Mds → only suspected items WITH an uploaded document.
                 //   Non HM → every non-suspected item.
                 //   Other tabs (Tracked Items, HM Red, etc.) → nothing until we
                 //     track that state explicitly.
-                const alwaysSuspected = ['Request Pending', 'Suspected Items'];
-                const pendingOnly = ['Pending Mds', 'Reminder 1', 'Reminder 2'];
-                const receivedOnly = ['Received Mds'];
                 const isReceived = item.mdsStatus === 'received';
+                const reminders = item.reminderCount ?? 0;
 
                 if (item.isSuspected) {
-                    if (alwaysSuspected.includes(activeFilter)) {
-                        // allow through
-                    } else if (pendingOnly.includes(activeFilter)) {
-                        if (isReceived) return false;
-                    } else if (receivedOnly.includes(activeFilter)) {
-                        if (!isReceived) return false;
-                    } else {
-                        return false;
+                    switch (activeFilter) {
+                        case 'Request Pending':
+                        case 'Suspected Items':
+                            break; // allow every suspected item through
+                        case 'Pending Mds':
+                            if (isReceived || reminders !== 0) return false;
+                            break;
+                        case 'Reminder 1':
+                            if (isReceived || reminders !== 1) return false;
+                            break;
+                        case 'Reminder 2':
+                            if (isReceived || reminders < 2) return false;
+                            break;
+                        case 'Received Mds':
+                            if (!isReceived) return false;
+                            break;
+                        default:
+                            return false;
                     }
                 } else {
                     if (activeFilter !== 'Non HM') return false;
@@ -199,14 +223,6 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
             byVendor.get(vendor)!.push(item);
         }
 
-        const decorate = (item: PurchaseOrderItem): PurchaseOrderItem => {
-            if (item.isSuspected) {
-                if (activeFilter === 'Reminder 1') return { ...item, emailStatus: 'SENT (Reminder 1)' };
-                if (activeFilter === 'Reminder 2') return { ...item, emailStatus: 'SENT (Reminder 2)' };
-            }
-            return item;
-        };
-
         const suppliers: Supplier[] = [];
         let idx = 0;
         for (const [vendor, items] of byVendor.entries()) {
@@ -217,16 +233,17 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                 totalItems: `${items.length}`,
                 mds: `${items.filter(i => i.mdsRec).length} / ${items.length}`,
                 hm: `0 | 0`,
-                items: items.map(decorate),
+                items,
             });
         }
 
         // No real items yet — emit a single empty group so the column template
-        // is still visible. Use the vessel name as the group label.
+        // is still visible. Don't label it with the vessel name (that reads as
+        // a fake supplier); show a clear empty-state heading instead.
         if (suppliers.length === 0) {
             suppliers.push({
                 id: 'placeholder',
-                name: vesselName || 'Purchase Orders',
+                name: 'No suppliers yet',
                 ref: imo ? `( IMO ${imo} )` : '',
                 totalItems: '0',
                 mds: '0 / 0',
@@ -252,21 +269,64 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
 
 
 
-    const handleViewMail = (item: any) => {
-        if (item.emailStatus.includes('SENT')) {
-            setSelectedMail({
-                subject: item.mailSubject || `Inquiry: ${item.poNumber} - ${item.itemDescription}`,
-                body: item.mailBody || `Dear Supplier,\n\nWe are following up on the status of MDs/SDoCs for ${item.itemDescription} under PO ${item.poNumber}.\n\nPlease provide the required documentation at your earliest convenience.\n\nBest Regards,\nIHM Platform Team`,
-                to: item.vendorEmail || 'supplier@example.com'
-            });
-            setShowMailView(true);
-        }
+    // Open the compose modal prefilled with a reminder. The supplier can
+    // edit the subject/body before sending. Send → POST /remind which
+    // re-sends the email via the existing public link and increments
+    // reminder_count on the item.
+    const handleOpenReminder = (item: PurchaseOrderItem) => {
+        if (!item.clarificationId || item.itemIndex === undefined) return;
+        const nextReminder = (item.reminderCount ?? 0) + 1;
+        setReminderItem(item);
+        setSelectedMail({
+            to: item.vendorEmail || '',
+            subject: `Reminder ${nextReminder}: Documentation required for PO ${item.poNumber}`,
+            body: `Dear ${item.vendorName || 'Supplier'},\n\nThis is reminder ${nextReminder} regarding the MDs/SDoCs we need for ${item.itemDescription || 'the item below'} under PO ${item.poNumber}.\n\nPlease use the secure upload link from the original email to submit the required documents at your earliest convenience.\n\nBest regards,\nIHM Platform Team`,
+        });
+        setShowMailView(true);
     };
 
-    const handleSendMail = () => {
-        setShowMailView(false);
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3000);
+    const handleSendMail = async () => {
+        if (!reminderItem || !selectedMail) {
+            setShowMailView(false);
+            return;
+        }
+        if (!reminderItem.clarificationId || reminderItem.itemIndex === undefined) {
+            setShowMailView(false);
+            return;
+        }
+        setSendingReminder(true);
+        try {
+            await api.post(
+                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_REMIND(
+                    reminderItem.clarificationId,
+                    reminderItem.itemIndex,
+                ),
+                {
+                    to: selectedMail.to,
+                    subject: selectedMail.subject,
+                    body: selectedMail.body,
+                },
+            );
+            setToastMessage({
+                title: 'Reminder Sent',
+                body: `Reminder email delivered to ${selectedMail.to || 'the supplier'}.`,
+            });
+            setShowMailView(false);
+            setReminderItem(null);
+            loadClarifications();
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } catch (err) {
+            console.error('Reminder send failed:', err);
+            setToastMessage({
+                title: 'Reminder Failed',
+                body: err instanceof Error ? err.message : 'Could not send reminder. Please try again.',
+            });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 4000);
+        } finally {
+            setSendingReminder(false);
+        }
     };
 
     const handleBulkEmail = () => {
@@ -437,7 +497,9 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                     {supplier.items.length === 0 && (
                                                         <tr>
                                                             <td colSpan={14} style={{ padding: '24px 16px', textAlign: 'center', color: '#94A3B8', fontSize: '13px', fontStyle: 'italic' }}>
-                                                                No items yet for this supplier.
+                                                                {supplier.id === 'placeholder'
+                                                                    ? 'Upload a purchase order to see vendors and items here.'
+                                                                    : 'No items yet for this supplier.'}
                                                             </td>
                                                         </tr>
                                                     )}
@@ -453,9 +515,16 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                                     <button
                                                                         type="button"
                                                                         className="po-v4-action-icon-btn-v4 view"
-                                                                        title="View Sent Mail"
-                                                                        onClick={() => handleViewMail(item)}
-                                                                        style={{ visibility: ['SENT', 'SENT (Reminder 1)', 'SENT (Reminder 2)'].some(s => item.emailStatus.includes(s)) ? 'visible' : 'hidden' }}
+                                                                        title={item.reminderCount && item.reminderCount > 0
+                                                                            ? `Send reminder ${(item.reminderCount ?? 0) + 1}`
+                                                                            : 'Send reminder'}
+                                                                        onClick={() => handleOpenReminder(item)}
+                                                                        disabled={!item.clarificationId || item.mdsStatus === 'received'}
+                                                                        style={{
+                                                                            visibility: item.isSuspected && item.clarificationId ? 'visible' : 'hidden',
+                                                                            opacity: item.mdsStatus === 'received' ? 0.4 : 1,
+                                                                            cursor: item.mdsStatus === 'received' ? 'not-allowed' : 'pointer',
+                                                                        }}
                                                                     >
                                                                         <Mail size={14} />
                                                                     </button>
@@ -585,9 +654,14 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
 
                         <div className="gmail-footer">
                             <div className="footer-left">
-                                <button className="gmail-send-btn" onClick={handleSendMail}>
+                                <button
+                                    className="gmail-send-btn"
+                                    onClick={handleSendMail}
+                                    disabled={sendingReminder}
+                                    style={{ opacity: sendingReminder ? 0.6 : 1, cursor: sendingReminder ? 'wait' : 'pointer' }}
+                                >
                                     <Send size={15} style={{ marginRight: 8 }} />
-                                    Send
+                                    {sendingReminder ? 'Sending…' : 'Send'}
                                 </button>
                                 <div className="gmail-tool-icons">
                                     <span className="tool-icon-btn"><Paperclip size={20} /></span>
@@ -613,8 +687,8 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                             <CheckCircle2 size={24} fill="#10B981" color="white" />
                         </div>
                         <div className="toast-text-area">
-                            <h3>Mail Sent Successfully</h3>
-                            <p>Your clarification/reminder has been dispatched to the supplier.</p>
+                            <h3>{toastMessage.title}</h3>
+                            <p>{toastMessage.body}</p>
                         </div>
                     </div>
                     <button className="undo-action-btn" onClick={() => setShowToast(false)}>CLOSE</button>

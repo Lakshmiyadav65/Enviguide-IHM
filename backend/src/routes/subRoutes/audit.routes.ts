@@ -24,6 +24,7 @@ import {
   getAuditLineItems, replaceAuditLineItems, getAuditClarifications,
   getAuditLineItemsById, replaceAuditLineItemsById,
   uploadClarificationItemDocument,
+  sendClarificationItemReminder,
   getMdsPendingOverview, getVesselPoItems,
   deleteAudit,
 } from '../../controller/audit.controller.js';
@@ -67,6 +68,11 @@ router.post(
   '/clarifications/:clarId/items/:idx/document',
   mdsUpload.single('file'),
   uploadClarificationItemDocument,
+);
+
+router.post(
+  '/clarifications/:clarId/items/:idx/remind',
+  sendClarificationItemReminder,
 );
 
 router.get('/:imo',                          getAuditDetail);

@@ -444,6 +444,111 @@ export async function uploadClarificationItemDocument(
   } catch (err) { next(err); }
 }
 
+/**
+ * POST /api/v1/audits/clarifications/:clarId/items/:idx/remind
+ * Re-send the clarification email as a reminder for one item. Optional body:
+ *   { subject?, body?, to?, cc? }  — overrides for the outgoing mail.
+ * Reuses the existing public_token (so the supplier's link stays the same)
+ * and extends its expiry by 72 hours. Increments reminder_count on the item.
+ */
+export async function sendClarificationItemReminder(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const clarificationId = req.params.clarId as string;
+    const itemIndex = Number(req.params.idx);
+    if (!Number.isFinite(itemIndex) || itemIndex < 0) {
+      return next(createError('Invalid item index', 400));
+    }
+
+    const clar = await AuditService.getClarificationForReminder(clarificationId, itemIndex);
+    if (!clar) return next(createError('Clarification item not found', 404));
+
+    // Ownership via the parent audit.
+    const owned = await AuditService.getAuditByImo(String(clar.imo_number), req.user!.userId);
+    if (!owned) return next(createError('Audit not found for this user', 404));
+
+    const overrides = (req.body || {}) as {
+      subject?: string;
+      body?: string;
+      to?: string | string[];
+      cc?: string | string[];
+    };
+
+    const parseList = (v: string | string[] | undefined): string[] => {
+      if (Array.isArray(v)) return v.map((s) => String(s).trim()).filter(Boolean);
+      if (typeof v === 'string') return v.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+      return [];
+    };
+
+    const toOverride = parseList(overrides.to);
+    const ccOverride = parseList(overrides.cc);
+    const toField = toOverride.length > 0
+      ? toOverride
+      : parseList(String(clar.recipient_emails || ''));
+    const ccField = ccOverride.length > 0
+      ? ccOverride
+      : parseList(clar.cc_emails ? String(clar.cc_emails) : '');
+
+    if (toField.length === 0) {
+      return next(createError('No recipient email available for reminder', 400));
+    }
+
+    const supplierLink = `${env.APP_BASE_URL.replace(/\/$/, '')}/upload/${clar.public_token}`;
+    const newExpiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+    const expiresText = newExpiresAt.toISOString().replace('T', ' ').replace(/\..+/, ' UTC');
+
+    const subjectLine = overrides.subject?.trim()
+      || `Reminder: ${clar.subject || 'Documentation required'}`;
+    const bodyBase = overrides.body?.trim()
+      || `This is a reminder regarding our earlier request. We still need the MDS / SDoC documents for vessel ${clar.vessel_name || clar.imo_number}.`;
+    const bodyWithLink = `${bodyBase}\n\n---\nUpload documents directly via this secure link (no login required):\n${supplierLink}\n\nThis link expires on ${expiresText} (72 hours from now).`;
+    const html = bodyWithLink
+      .split('\n')
+      .map((line) => {
+        const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        if (line.trim() === supplierLink) {
+          return `<div><a href="${supplierLink}" style="color:#00B0FA;font-weight:600">${supplierLink}</a></div>`;
+        }
+        return `<div>${escaped || '&nbsp;'}</div>`;
+      })
+      .join('');
+
+    try {
+      await sendMail({
+        to: toField,
+        cc: ccField.length > 0 ? ccField : undefined,
+        subject: subjectLine,
+        text: bodyWithLink,
+        html,
+      });
+    } catch (mailErr) {
+      return next(createError(
+        `Email not sent: ${mailErr instanceof Error ? mailErr.message : 'Unknown mail error'}`,
+        502,
+      ));
+    }
+
+    const updated = await AuditService.incrementReminderAndExtendToken(
+      clarificationId,
+      itemIndex,
+      newExpiresAt,
+    );
+
+    res.json({
+      success: true,
+      data: {
+        reminderCount: updated?.reminder_count ?? null,
+        sentTo: toField,
+        publicLink: supplierLink,
+        expiresAt: newExpiresAt,
+      },
+    });
+  } catch (err) { next(err); }
+}
+
 /** DELETE /api/v1/audits/:id — hard-delete an audit and its line items */
 export async function deleteAudit(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {

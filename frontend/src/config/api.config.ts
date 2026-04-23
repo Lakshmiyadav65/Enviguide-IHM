@@ -60,6 +60,8 @@ export const ENDPOINTS = {
     CLARIFICATIONS: (imo: string) => `/audits/${imo}/clarifications`,
     CLARIFICATION_ITEM_DOC: (clarId: string, idx: number | string) =>
       `/audits/clarifications/${clarId}/items/${idx}/document`,
+    CLARIFICATION_ITEM_REMIND: (clarId: string, idx: number | string) =>
+      `/audits/clarifications/${clarId}/items/${idx}/remind`,
     DELETE: (id: string) => `/audits/${id}`,
   },
 

@@ -517,6 +517,51 @@ export const AuditService = {
     return r.rows[0] as Record<string, unknown> | undefined;
   },
 
+  /**
+   * Fetch a clarification + the item, joined, for a reminder re-send. Returns
+   * enough columns to build the email (recipients, subject, public_token) and
+   * to verify ownership via imo_number.
+   */
+  async getClarificationForReminder(clarificationId: string, itemIndex: number) {
+    const r = await query(
+      `SELECT cr.id, cr.imo_number, cr.vessel_id, cr.vessel_name,
+              cr.recipient_emails, cr.cc_emails, cr.subject,
+              cr.public_token, cr.public_token_expires_at
+         FROM clarification_requests cr
+         JOIN clarification_items ci ON ci.clarification_id = cr.id
+        WHERE cr.id = $1 AND ci.item_index = $2
+        LIMIT 1`,
+      [clarificationId, itemIndex],
+    );
+    return r.rows[0] as Record<string, unknown> | undefined;
+  },
+
+  /**
+   * After a reminder email has been sent, bump the item's reminder_count and
+   * extend the clarification's public link expiry so the supplier can still
+   * use it.
+   */
+  async incrementReminderAndExtendToken(
+    clarificationId: string,
+    itemIndex: number,
+    newExpiresAt: Date,
+  ) {
+    const r = await query(
+      `UPDATE clarification_items
+          SET reminder_count = reminder_count + 1, updated_at = NOW()
+        WHERE clarification_id = $1 AND item_index = $2
+      RETURNING item_index, reminder_count`,
+      [clarificationId, itemIndex],
+    );
+    await query(
+      `UPDATE clarification_requests
+          SET public_token_expires_at = $2
+        WHERE id = $1`,
+      [clarificationId, newExpiresAt],
+    );
+    return r.rows[0] as Record<string, unknown> | undefined;
+  },
+
   /** Attach an uploaded MDS document to a clarification item. */
   async setClarificationItemDocument(
     clarificationId: string,
