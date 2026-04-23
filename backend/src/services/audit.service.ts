@@ -430,7 +430,7 @@ export const AuditService = {
       });
     }
 
-    const items = itemsRes.rows.map((row) => {
+    const items: Array<Record<string, unknown>> = itemsRes.rows.map((row) => {
       const r = row as Record<string, unknown>;
       const po = String(r.po_number ?? '').trim();
       const state = stateByPO.get(po);
@@ -447,7 +447,47 @@ export const AuditService = {
       };
     });
 
-    return { items, auditId };
+    // Rescue orphan clarification items — rows that were previously in
+    // audit_line_items but got stripped (legacy bug after Send Mail). Rebuild
+    // the row from the suspected_items snapshot stored on clarification_requests
+    // and append so the PO viewer still shows them in Suspected / Received /
+    // Pending Mds tabs.
+    const existingPOs = new Set(items.map((i) => String(i.po_number ?? '').trim()).filter(Boolean));
+    const standardHeaderCols = [
+      'name', 'vessel_name', 'po_number', 'imo_number',
+      'po_sent_date', 'md_requested_date', 'item_description', 'is_suspected',
+      'impa_code', 'issa_code', 'equipment_code', 'equipment_name',
+      'maker', 'model', 'part_number', 'unit', 'quantity',
+      'vendor_remark', 'vendor_email', 'vendor_name',
+    ];
+    const orphanMap = new Map<string, Record<string, unknown>>();
+    for (const row of clarRes.rows as Clar[]) {
+      if (row.item_index == null) continue;
+      const suspected = Array.isArray(row.suspected_items) ? row.suspected_items as unknown[][] : [];
+      const r = suspected[row.item_index];
+      if (!Array.isArray(r)) continue;
+      const po = String(r[2] ?? '').trim();
+      if (!po || existingPOs.has(po) || orphanMap.has(po)) continue;
+
+      const synth: Record<string, unknown> = {
+        row_index: -1,
+        extra_data: {},
+        clarification_id: row.clarification_id,
+        clarification_item_index: row.item_index,
+        mds_status: row.mds_status ?? 'pending',
+        mds_file_name: row.mds_file_name,
+        mds_file_path: row.mds_file_path,
+        mds_received_at: row.mds_received_at,
+        reminder_count: row.reminder_count ?? 0,
+        submitted_at: row.submitted_at,
+      };
+      standardHeaderCols.forEach((col, idx) => {
+        synth[col] = col === 'is_suspected' ? 'Yes' : (r[idx] ?? null);
+      });
+      orphanMap.set(po, synth);
+    }
+
+    return { items: [...items, ...orphanMap.values()], auditId };
   },
 
   /** Fetch a single clarification_item row (for ownership checks before update). */
