@@ -41,10 +41,11 @@ const initializeData = (): PurchaseOrderItem[] => [];
 
 interface PurchaseOrderViewProps {
     imo: string;
+    vesselId?: string;
     vesselName?: string;
 }
 
-export default function PurchaseOrderView({ imo, vesselName }: PurchaseOrderViewProps) {
+export default function PurchaseOrderView({ imo, vesselId, vesselName }: PurchaseOrderViewProps) {
     const [activeFilter, setActiveFilter] = useState('All');
     const [openSuppliers, setOpenSuppliers] = useState<string[]>(['s1']);
     const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData);
@@ -52,65 +53,65 @@ export default function PurchaseOrderView({ imo, vesselName }: PurchaseOrderView
     // Fetch clarification history for this IMO from the backend. Each clarification
     // email may reference many suspected POs; we flatten them into one row per item
     // and merge in per-item MDS state from clarification_items.
+    // Fetch every line item for the vessel's active audit. The backend already
+    // joins clarification state per PO, so non-suspected items show with
+    // mds_status='none' and suspected items carry real pending/received status.
     const loadClarifications = () => {
-        if (!imo) return;
-        api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(ENDPOINTS.AUDITS.CLARIFICATIONS(imo))
+        if (!vesselId) { setAllItems([]); return; }
+        api.get<{ success: boolean; data: { items: Array<Record<string, unknown>> } }>(
+            ENDPOINTS.AUDITS.VESSEL_PO_ITEMS(vesselId),
+        )
             .then((res) => {
-                const items: PurchaseOrderItem[] = [];
-                for (const c of res.data || []) {
-                    const clarificationId = String(c.id);
-                    const rows = Array.isArray(c.suspected_items) ? c.suspected_items as unknown[][] : [];
-                    const perItemState = Array.isArray(c.items) ? c.items as Array<Record<string, unknown>> : [];
-                    const stateByIndex = new Map<number, Record<string, unknown>>();
-                    for (const s of perItemState) stateByIndex.set(Number(s.item_index), s);
+                const rows = res.data?.items || [];
+                const items: PurchaseOrderItem[] = rows.map((r, i) => {
+                    const mdsStatus = String(r.mds_status ?? 'none');
+                    const isSuspected = String(r.is_suspected ?? 'No') === 'Yes';
+                    const mdsFilePath = r.mds_file_path ? String(r.mds_file_path) : undefined;
+                    const mdsFileName = r.mds_file_name ? String(r.mds_file_name) : undefined;
+                    const mdsReceivedAt = typeof r.mds_received_at === 'string' ? r.mds_received_at.split('T')[0] : '';
+                    const poSentDate = typeof r.po_sent_date === 'string' ? r.po_sent_date.split('T')[0] : String(r.po_sent_date ?? '');
+                    const mdReqDate = typeof r.md_requested_date === 'string' ? r.md_requested_date.split('T')[0] : String(r.md_requested_date ?? '');
 
-                    const sentDate = typeof c.created_at === 'string' ? c.created_at.split('T')[0] : '';
-                    const subject = String(c.subject || '');
-                    const body = String(c.body || '');
-                    const recipients = String(c.recipient_emails || '');
+                    let category: string;
+                    if (!isSuspected) category = 'Non HM';
+                    else if (mdsStatus === 'received') category = 'Received Mds';
+                    else category = 'Request Pending';
 
-                    rows.forEach((row, i) => {
-                        const r = Array.isArray(row) ? row : [];
-                        const state = stateByIndex.get(i) || {};
-                        const mdsStatus = String(state.mds_status ?? 'pending');
-                        const mdsFilePath = state.mds_file_path ? String(state.mds_file_path) : undefined;
-                        const mdsFileName = state.mds_file_name ? String(state.mds_file_name) : undefined;
-                        const mdsReceivedAt = typeof state.mds_received_at === 'string'
-                            ? state.mds_received_at.split('T')[0]
-                            : '';
+                    const emailStatus = isSuspected
+                        ? (mdsStatus === 'received' ? 'RECEIVED' : 'SENT')
+                        : 'NOT SENT';
 
-                        items.push({
-                            id: `${clarificationId}-${i}`,
-                            clarificationId,
-                            itemIndex: i,
-                            emailStatus: 'SENT',
-                            ihmProductCode: String(r[8] ?? r[9] ?? 'N/A'),
-                            poNumber: String(r[2] ?? ''),
-                            mdsReq: String(r[5] ?? sentDate),
-                            mdsRec: mdsReceivedAt,
-                            itemDescription: String(r[6] ?? ''),
-                            orderDate: String(r[4] ?? sentDate),
-                            quantityTotal: `${r[16] ?? '0'} | 0 | ${r[16] ?? '0'}`,
-                            unit: String(r[15] ?? 'PCS'),
-                            category: mdsStatus === 'received' ? 'Received Mds' : 'Request Pending',
-                            isSuspected: true,
-                            selected: false,
-                            mdsStatus,
-                            mdsFilePath,
-                            mdsFileName,
-                            vendorName: String(r[19] ?? ''),
-                            vendorEmail: String(r[18] ?? recipients),
-                            mailSubject: subject,
-                            mailBody: body,
-                        } as PurchaseOrderItem);
-                    });
-                }
+                    return {
+                        id: r.clarification_id
+                            ? `${r.clarification_id}-${r.clarification_item_index}`
+                            : `row-${r.row_index ?? i}`,
+                        clarificationId: r.clarification_id ? String(r.clarification_id) : undefined,
+                        itemIndex: r.clarification_item_index != null ? Number(r.clarification_item_index) : undefined,
+                        emailStatus,
+                        ihmProductCode: String(r.impa_code ?? r.issa_code ?? 'N/A'),
+                        poNumber: String(r.po_number ?? ''),
+                        mdsReq: mdReqDate || poSentDate,
+                        mdsRec: mdsReceivedAt,
+                        itemDescription: String(r.item_description ?? ''),
+                        orderDate: poSentDate,
+                        quantityTotal: `${r.quantity ?? '0'} | ${mdsStatus === 'received' ? (r.quantity ?? '0') : '0'} | ${r.quantity ?? '0'}`,
+                        unit: String(r.unit ?? 'PCS'),
+                        category,
+                        isSuspected,
+                        selected: false,
+                        mdsStatus,
+                        mdsFilePath,
+                        mdsFileName,
+                        vendorName: String(r.vendor_name ?? ''),
+                        vendorEmail: String(r.vendor_email ?? ''),
+                    } as PurchaseOrderItem;
+                });
                 setAllItems(items);
             })
             .catch(() => setAllItems([]));
     };
 
-    useEffect(loadClarifications, [imo]);
+    useEffect(loadClarifications, [vesselId]);
 
     // Upload an MDS document for one clarification item, then refresh.
     const uploadMdsDocument = async (item: PurchaseOrderItem, file: File) => {

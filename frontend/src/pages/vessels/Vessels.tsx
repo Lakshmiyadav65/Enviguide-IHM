@@ -865,6 +865,7 @@ export default function Vessels() {
                 <PurchaseOrderView
                     key={activeVesselName}
                     imo={activeVesselData?.imoNumber || ''}
+                    vesselId={activeVesselData?.id || ''}
                     vesselName={activeVesselName}
                 />
             );

@@ -310,6 +310,146 @@ export const AuditService = {
     }));
   },
 
+  /**
+   * Aggregate rows for the MD SDoC Audit Pending page: one row per vessel
+   * that has at least one clarification item, with counts + last submission.
+   */
+  async getMdsPendingOverview(userId: string) {
+    const r = await query(
+      `SELECT
+          a.imo_number,
+          a.vessel_name,
+          a.total_po,
+          a.id AS audit_id,
+          COUNT(ci.id) FILTER (WHERE ci.mds_status = 'pending') AS pending_mds,
+          COUNT(ci.id) FILTER (WHERE ci.mds_status = 'received') AS received_mds,
+          COUNT(ci.id)                                          AS total_clarification_items,
+          COUNT(DISTINCT cr.id)                                 AS clarification_count,
+          BOOL_OR(cr.submitted_at IS NOT NULL)                  AS any_submitted,
+          MAX(ci.mds_received_at)                               AS last_received_at,
+          MAX(cr.submitted_at)                                  AS last_submitted_at
+        FROM audit_summaries a
+        JOIN vessels v ON v.id = a.vessel_id
+        LEFT JOIN clarification_requests cr ON cr.vessel_id = a.vessel_id
+        LEFT JOIN clarification_items ci   ON ci.clarification_id = cr.id
+       WHERE v.created_by_id = $1
+       GROUP BY a.id
+       HAVING COUNT(ci.id) > 0
+       ORDER BY MAX(COALESCE(ci.mds_received_at, cr.created_at)) DESC NULLS LAST`,
+      [userId],
+    );
+    return r.rows as Array<Record<string, unknown>>;
+  },
+
+  /**
+   * Line items for a vessel's active audit, annotated with clarification
+   * state when the item was emailed. Used by the PO viewer's All / Pending /
+   * Received filters. Matches line items to clarification_items by PO number
+   * within the vessel (PO numbers are unique per upload).
+   */
+  async getVesselPoItems(vesselId: string, userId: string) {
+    // Pick the newest non-Completed audit for the vessel owned by this user.
+    const auditRes = await query(
+      `SELECT a.id FROM audit_summaries a
+         JOIN vessels v ON v.id = a.vessel_id
+        WHERE v.id = $1 AND v.created_by_id = $2
+          AND a.status IN ('In Progress', 'Pending', 'Pending Review', 'submitted')
+        ORDER BY a.created_at DESC
+        LIMIT 1`,
+      [vesselId, userId],
+    );
+    if (auditRes.rows.length === 0) return { items: [] as Array<Record<string, unknown>> };
+    const auditId = String((auditRes.rows[0] as Record<string, unknown>).id);
+
+    const itemsRes = await query(
+      `SELECT row_index, name, vessel_name, po_number, imo_number,
+              po_sent_date, md_requested_date, item_description, is_suspected,
+              impa_code, issa_code, equipment_code, equipment_name,
+              maker, model, part_number, unit, quantity,
+              vendor_remark, vendor_email, vendor_name
+         FROM audit_line_items
+        WHERE audit_id = $1
+        ORDER BY row_index ASC`,
+      [auditId],
+    );
+
+    // Gather clarification state keyed by PO number. If a PO was referenced
+    // in multiple clarification emails, the newest wins.
+    const clarRes = await query(
+      `SELECT cr.id AS clarification_id, cr.created_at,
+              cr.suspected_items, cr.submitted_at, cr.status AS cr_status,
+              ci.item_index, ci.mds_status, ci.mds_file_name, ci.mds_file_path,
+              ci.mds_received_at, ci.reminder_count
+         FROM clarification_requests cr
+         LEFT JOIN clarification_items ci ON ci.clarification_id = cr.id
+        WHERE cr.vessel_id = $1
+        ORDER BY cr.created_at ASC`,
+      [vesselId],
+    );
+
+    type Clar = {
+      clarification_id: string;
+      created_at: string;
+      suspected_items: unknown;
+      submitted_at: string | null;
+      cr_status: string;
+      item_index: number | null;
+      mds_status: string | null;
+      mds_file_name: string | null;
+      mds_file_path: string | null;
+      mds_received_at: string | null;
+      reminder_count: number | null;
+    };
+    const stateByPO = new Map<string, {
+      clarificationId: string;
+      itemIndex: number;
+      mdsStatus: string;
+      mdsFileName: string | null;
+      mdsFilePath: string | null;
+      mdsReceivedAt: string | null;
+      reminderCount: number;
+      submittedAt: string | null;
+    }>();
+
+    for (const row of clarRes.rows as Clar[]) {
+      if (row.item_index == null) continue;
+      const suspected = Array.isArray(row.suspected_items) ? row.suspected_items as unknown[][] : [];
+      const r = suspected[row.item_index];
+      if (!Array.isArray(r)) continue;
+      const poNumber = String(r[2] ?? '').trim();
+      if (!poNumber) continue;
+      stateByPO.set(poNumber, {
+        clarificationId: row.clarification_id,
+        itemIndex: row.item_index,
+        mdsStatus: row.mds_status ?? 'pending',
+        mdsFileName: row.mds_file_name,
+        mdsFilePath: row.mds_file_path,
+        mdsReceivedAt: row.mds_received_at,
+        reminderCount: row.reminder_count ?? 0,
+        submittedAt: row.submitted_at,
+      });
+    }
+
+    const items = itemsRes.rows.map((row) => {
+      const r = row as Record<string, unknown>;
+      const po = String(r.po_number ?? '').trim();
+      const state = stateByPO.get(po);
+      return {
+        ...r,
+        clarification_id: state?.clarificationId ?? null,
+        clarification_item_index: state?.itemIndex ?? null,
+        mds_status: state?.mdsStatus ?? 'none',
+        mds_file_name: state?.mdsFileName ?? null,
+        mds_file_path: state?.mdsFilePath ?? null,
+        mds_received_at: state?.mdsReceivedAt ?? null,
+        reminder_count: state?.reminderCount ?? 0,
+        submitted_at: state?.submittedAt ?? null,
+      };
+    });
+
+    return { items, auditId };
+  },
+
   /** Fetch a single clarification_item row (for ownership checks before update). */
   async getClarificationItem(clarificationId: string, itemIndex: number) {
     const r = await query(

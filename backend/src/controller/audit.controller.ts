@@ -360,6 +360,40 @@ export async function replaceAuditLineItemsById(req: Request, res: Response, nex
   } catch (err) { next(err); }
 }
 
+/** GET /api/v1/audits/mds-pending — aggregate view for the MD SDoC Audit Pending page */
+export async function getMdsPendingOverview(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const rows = await AuditService.getMdsPendingOverview(req.user!.userId);
+    const data = rows.map((r) => {
+      const pendingMds = Number(r.pending_mds ?? 0);
+      const submitted = Boolean(r.any_submitted);
+      return {
+        imoNumber: String(r.imo_number ?? ''),
+        vesselName: String(r.vessel_name ?? ''),
+        totalPOs: Number(r.total_po ?? 0),
+        pendingMDS: pendingMds,
+        pendingSdocs: pendingMds, // same until we track MD and SDoC separately
+        receivedMDS: Number(r.received_mds ?? 0),
+        clarificationCount: Number(r.clarification_count ?? 0),
+        clarificationStatus: pendingMds === 0 && submitted ? 'Resolved' : 'Awaiting Clarification',
+        lastSubmissionDate: r.last_submitted_at
+          ? String(r.last_submitted_at).split('T')[0]
+          : (r.last_received_at ? String(r.last_received_at).split('T')[0] : ''),
+      };
+    });
+    res.json({ success: true, data, total: data.length });
+  } catch (err) { next(err); }
+}
+
+/** GET /api/v1/audits/vessels/:vesselId/po-items — all line items for the vessel's active audit, with clarification state */
+export async function getVesselPoItems(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const vesselId = req.params.vesselId as string;
+    const result = await AuditService.getVesselPoItems(vesselId, req.user!.userId);
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}
+
 /** GET /api/v1/audits/:imo/clarifications — clarifications sent for an audit */
 export async function getAuditClarifications(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {

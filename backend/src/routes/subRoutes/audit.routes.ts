@@ -24,6 +24,7 @@ import {
   getAuditLineItems, replaceAuditLineItems, getAuditClarifications,
   getAuditLineItemsById, replaceAuditLineItemsById,
   uploadClarificationItemDocument,
+  getMdsPendingOverview, getVesselPoItems,
   deleteAudit,
 } from '../../controller/audit.controller.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
@@ -45,6 +46,8 @@ router.get('/pending',                       getPendingAudits);
 router.get('/reviews',                       getPendingReviews);
 router.get('/reviews/:imo',                  getReviewDetail);
 router.get('/mds-doc',                       getMdsDocAudit);
+router.get('/mds-pending',                   getMdsPendingOverview);
+router.get('/vessels/:vesselId/po-items',    getVesselPoItems);
 
 router.post('/clarification-email',          sendClarificationEmail);
 

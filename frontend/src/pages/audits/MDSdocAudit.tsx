@@ -4,6 +4,8 @@ import './MDSdocAudit.css';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { Download, Eye, Ship, Search } from 'lucide-react';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
 
 interface AuditRecord {
     imoNumber: string;
@@ -23,12 +25,9 @@ export default function MDSdocAudit() {
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
-        const stored = localStorage.getItem('md_sdoc_audit_registry');
-        if (stored) {
-            setAllRecords(JSON.parse(stored));
-        } else {
-            setAllRecords([]);
-        }
+        api.get<{ success: boolean; data: AuditRecord[] }>(ENDPOINTS.AUDITS.MDS_PENDING)
+            .then((res) => setAllRecords(res.data || []))
+            .catch(() => setAllRecords([]));
     }, []);
 
     const filteredRecords = allRecords.filter(record =>

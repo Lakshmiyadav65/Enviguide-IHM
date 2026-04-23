@@ -51,6 +51,8 @@ export const ENDPOINTS = {
     REVIEWS: '/audits/reviews',
     REVIEW_DETAIL: (imo: string) => `/audits/reviews/${imo}`,
     MDS_DOC: '/audits/mds-doc',
+    MDS_PENDING: '/audits/mds-pending',
+    VESSEL_PO_ITEMS: (vesselId: string) => `/audits/vessels/${vesselId}/po-items`,
     DOCUMENTS: (imo: string) => `/audits/${imo}/documents`,
     CLARIFICATION_EMAIL: '/audits/clarification-email',
     LINE_ITEMS: (imo: string) => `/audits/${imo}/line-items`,
