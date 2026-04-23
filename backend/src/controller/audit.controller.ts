@@ -258,7 +258,10 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
   } catch (err) { next(err); }
 }
 
-/** GET /api/v1/audits/:imo/line-items — rows for the review/edit grid */
+/** GET /api/v1/audits/:imo/line-items — rows for the review/edit grid.
+ *  Picks an arbitrary audit if the IMO has duplicates; prefer by-id for
+ *  pages that already know the audit UUID.
+ */
 export async function getAuditLineItems(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const audit = await AuditService.getAuditByImo(req.params.imo as string, req.user!.userId);
@@ -280,11 +283,33 @@ export async function getAuditLineItems(req: Request, res: Response, next: NextF
   } catch (err) { next(err); }
 }
 
+/** GET /api/v1/audits/by-id/:auditId/line-items — exact audit, no IMO ambiguity */
+export async function getAuditLineItemsById(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const auditId = req.params.auditId as string;
+    const audit = await AuditService.getAuditById(auditId, req.user!.userId);
+    if (!audit) return next(createError('Audit not found', 404));
+
+    const a = audit as Record<string, unknown>;
+    const dbRows = await AuditService.getLineItems(auditId);
+    const rows = dbRows.map(lineItemRowToArray);
+
+    res.json({
+      success: true,
+      data: {
+        auditId,
+        imo: a.imoNumber,
+        header: LINE_ITEM_HEADER,
+        rows,
+      },
+    });
+  } catch (err) { next(err); }
+}
+
 /**
- * PATCH /api/v1/audits/:imo/line-items — replace all rows for an audit.
- * Body: { rows: any[][] }   where each row is aligned to LINE_ITEM_HEADER (extras after col 20 go to extra_data).
- * Used by the editor grid (manual edits) and by the review wizard after sending a clarification email
- * (which removes suspected rows).
+ * PATCH /api/v1/audits/:imo/line-items — replace all rows for the audit
+ * matching this IMO (picks arbitrary one if multiple exist). Prefer the
+ * by-id variant below when the caller has the audit UUID.
  */
 export async function replaceAuditLineItems(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -301,7 +326,31 @@ export async function replaceAuditLineItems(req: Request, res: Response, next: N
     const vesselId = auditRow.vesselId ? String(auditRow.vesselId) : null;
 
     await AuditService.replaceLineItems(auditId, vesselId, rows);
-    // Keep totalItems in sync so list pages show correct counts.
+    await query(
+      `UPDATE audit_summaries SET total_items = $1, last_activity = NOW(), updated_at = NOW() WHERE id = $2`,
+      [rows.length, auditId],
+    );
+
+    res.json({ success: true, data: { auditId, rowsWritten: rows.length } });
+  } catch (err) { next(err); }
+}
+
+/** PATCH /api/v1/audits/by-id/:auditId/line-items — exact audit, no IMO ambiguity */
+export async function replaceAuditLineItemsById(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const auditId = req.params.auditId as string;
+    const audit = await AuditService.getAuditById(auditId, req.user!.userId);
+    if (!audit) return next(createError('Audit not found', 404));
+
+    const { rows } = req.body as { rows?: unknown[][] };
+    if (!Array.isArray(rows)) {
+      return next(createError('rows must be an array of row arrays', 400));
+    }
+
+    const a = audit as Record<string, unknown>;
+    const vesselId = a.vesselId ? String(a.vesselId) : null;
+
+    await AuditService.replaceLineItems(auditId, vesselId, rows);
     await query(
       `UPDATE audit_summaries SET total_items = $1, last_activity = NOW(), updated_at = NOW() WHERE id = $2`,
       [rows.length, auditId],

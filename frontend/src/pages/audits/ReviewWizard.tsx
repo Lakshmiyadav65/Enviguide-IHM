@@ -22,11 +22,12 @@ import {
 interface ReviewWizardProps {
     imo: string;
     vesselName: string;
+    auditId?: string; // Preferred — disambiguates when multiple audits share an IMO
     onClose: () => void;
     onComplete: () => void;
 }
 
-const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProps) => {
+const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewWizardProps) => {
     const [step, setStep] = useState(1);
     const [data, setData] = useState<any[][]>([]);
     const [visibleCols, setVisibleCols] = useState<boolean[]>([]);
@@ -93,8 +94,13 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
     const [, setHistory] = useState<any[][][]>([]);
 
     useEffect(() => {
-        if (!imo) return;
-        api.get<{ success: boolean; data: { header: string[]; rows: unknown[][] } }>(ENDPOINTS.AUDITS.LINE_ITEMS(imo))
+        if (!imo && !auditId) return;
+        // Prefer the by-id endpoint when we have a UUID — fixes ambiguity when
+        // the same IMO has multiple audit rows (pending / completed / etc.).
+        const endpoint = auditId
+            ? ENDPOINTS.AUDITS.LINE_ITEMS_BY_ID(auditId)
+            : ENDPOINTS.AUDITS.LINE_ITEMS(imo);
+        api.get<{ success: boolean; data: { header: string[]; rows: unknown[][] } }>(endpoint)
             .then((res) => {
                 const header = res.data.header || [];
                 const rows = res.data.rows || [];
@@ -108,7 +114,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
                 setVisibleCols([]);
                 setColumnWidths([]);
             });
-    }, [imo]);
+    }, [imo, auditId]);
 
     const pushToHistory = useCallback(() => {
         setHistory(prev => [...prev.slice(-49), JSON.parse(JSON.stringify(data))]);
@@ -365,10 +371,14 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
         ]);
     };
 
+    const lineItemsEndpoint = auditId
+        ? ENDPOINTS.AUDITS.LINE_ITEMS_BY_ID(auditId)
+        : ENDPOINTS.AUDITS.LINE_ITEMS(imo);
+
     const nextStep = async () => {
         // Persist the edited rows to the backend before advancing.
         try {
-            await api.patch(ENDPOINTS.AUDITS.LINE_ITEMS(imo), { rows: data.slice(1) });
+            await api.patch(lineItemsEndpoint, { rows: data.slice(1) });
         } catch (err) {
             console.error('Failed to save rows before advancing step:', err);
         }
@@ -432,7 +442,7 @@ const ReviewWizard = ({ imo, vesselName, onClose, onComplete }: ReviewWizardProp
             const newData = [header, ...data.slice(1).filter(row => row[suspectedIdx] !== 'Yes')];
             setData(newData);
             try {
-                await api.patch(ENDPOINTS.AUDITS.LINE_ITEMS(imo), { rows: newData.slice(1) });
+                await api.patch(lineItemsEndpoint, { rows: newData.slice(1) });
             } catch {
                 // Non-fatal: the email was sent; grid will self-correct on next load.
             }

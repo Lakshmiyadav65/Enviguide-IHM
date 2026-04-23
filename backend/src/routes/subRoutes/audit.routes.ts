@@ -22,6 +22,7 @@ import {
   sendAuditForReview, completeReview, rejectReview,
   sendClarificationEmail,
   getAuditLineItems, replaceAuditLineItems, getAuditClarifications,
+  getAuditLineItemsById, replaceAuditLineItemsById,
   uploadClarificationItemDocument,
   deleteAudit,
 } from '../../controller/audit.controller.js';
@@ -51,6 +52,9 @@ router.patch('/:id/send-for-review',         sendAuditForReview);
 router.patch('/reviews/:id/complete',        completeReview);
 router.patch('/reviews/:id/reject',          rejectReview);
 router.delete('/:id',                        deleteAudit);
+
+router.get('/by-id/:auditId/line-items',     getAuditLineItemsById);
+router.patch('/by-id/:auditId/line-items',   replaceAuditLineItemsById);
 
 router.get('/:imo/line-items',               getAuditLineItems);
 router.patch('/:imo/line-items',             replaceAuditLineItems);

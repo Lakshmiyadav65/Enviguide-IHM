@@ -54,6 +54,7 @@ export const ENDPOINTS = {
     DOCUMENTS: (imo: string) => `/audits/${imo}/documents`,
     CLARIFICATION_EMAIL: '/audits/clarification-email',
     LINE_ITEMS: (imo: string) => `/audits/${imo}/line-items`,
+    LINE_ITEMS_BY_ID: (auditId: string) => `/audits/by-id/${auditId}/line-items`,
     CLARIFICATIONS: (imo: string) => `/audits/${imo}/clarifications`,
     CLARIFICATION_ITEM_DOC: (clarId: string, idx: number | string) =>
       `/audits/clarifications/${clarId}/items/${idx}/document`,

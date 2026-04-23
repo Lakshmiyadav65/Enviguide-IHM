@@ -246,6 +246,7 @@ export default function PendingReviews() {
                 <ReviewWizard
                     imo={editingRecord.imoNumber}
                     vesselName={editingRecord.vesselName}
+                    auditId={editingRecord.id}
                     onClose={() => setEditingRecord(null)}
                     onComplete={handleWizardComplete}
                 />
