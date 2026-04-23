@@ -390,6 +390,14 @@ CREATE TABLE IF NOT EXISTS "clarification_requests" (
 ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS public_token VARCHAR(64) UNIQUE;
 ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS public_token_expires_at TIMESTAMPTZ;
 
+-- Fields the supplier fills in on the public portal.
+ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS supplier_company VARCHAR(255);
+ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS supplier_contact_name VARCHAR(255);
+ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS supplier_comments TEXT;
+ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS prepared_date VARCHAR(50);
+ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ;
+ALTER TABLE "clarification_requests" ADD COLUMN IF NOT EXISTS submitted_by_ip VARCHAR(64);
+
 -- Per-item state for a clarification request. Mirrors one row per entry in
 -- clarification_requests.suspected_items (JSONB), tracking MDS document upload,
 -- reminder count, HM classification etc. over time.

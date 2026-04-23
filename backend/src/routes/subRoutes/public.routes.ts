@@ -8,7 +8,10 @@ import { fileURLToPath } from 'url';
 import {
   getPublicClarification,
   uploadPublicMdsDocument,
+  deletePublicMdsDocument,
+  submitPublicClarification,
 } from '../../controller/publicSupplier.controller.js';
+import express from 'express';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const mdsDir = path.resolve(__dirname, '..', '..', '..', 'uploads', 'mds');
@@ -54,6 +57,17 @@ router.post(
   '/clarifications/:token/items/:idx/document',
   upload.single('file'),
   uploadPublicMdsDocument,
+);
+// Delete + Submit accept JSON bodies (no file upload) — parse JSON inline.
+router.delete(
+  '/clarifications/:token/items/:idx/document',
+  express.json(),
+  deletePublicMdsDocument,
+);
+router.post(
+  '/clarifications/:token/submit',
+  express.json(),
+  submitPublicClarification,
 );
 
 export default router;
