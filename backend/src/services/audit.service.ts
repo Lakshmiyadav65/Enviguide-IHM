@@ -346,32 +346,46 @@ export const AuditService = {
    * state when the item was emailed. Used by the PO viewer's All / Pending /
    * Received filters. Matches line items to clarification_items by PO number
    * within the vessel (PO numbers are unique per upload).
+   *
+   * If no active audit exists for the vessel but clarification_items do, we
+   * still return them as synthetic rows so the admin can see what's pending.
    */
   async getVesselPoItems(vesselId: string, userId: string) {
-    // Pick the newest non-Completed audit for the vessel owned by this user.
+    // Verify the caller owns this vessel before returning anything.
+    const ownershipRes = await query(
+      `SELECT 1 FROM vessels WHERE id = $1 AND created_by_id = $2 LIMIT 1`,
+      [vesselId, userId],
+    );
+    if (ownershipRes.rows.length === 0) {
+      return { items: [] as Array<Record<string, unknown>>, auditId: null };
+    }
+
+    // Pick the newest non-Completed audit for the vessel — may be null.
     const auditRes = await query(
       `SELECT a.id FROM audit_summaries a
-         JOIN vessels v ON v.id = a.vessel_id
-        WHERE v.id = $1 AND v.created_by_id = $2
+        WHERE a.vessel_id = $1
           AND a.status IN ('In Progress', 'Pending', 'Pending Review', 'submitted')
         ORDER BY a.created_at DESC
         LIMIT 1`,
-      [vesselId, userId],
+      [vesselId],
     );
-    if (auditRes.rows.length === 0) return { items: [] as Array<Record<string, unknown>> };
-    const auditId = String((auditRes.rows[0] as Record<string, unknown>).id);
+    const auditId = auditRes.rows.length > 0
+      ? String((auditRes.rows[0] as Record<string, unknown>).id)
+      : null;
 
-    const itemsRes = await query(
-      `SELECT row_index, name, vessel_name, po_number, imo_number,
-              po_sent_date, md_requested_date, item_description, is_suspected,
-              impa_code, issa_code, equipment_code, equipment_name,
-              maker, model, part_number, unit, quantity,
-              vendor_remark, vendor_email, vendor_name
-         FROM audit_line_items
-        WHERE audit_id = $1
-        ORDER BY row_index ASC`,
-      [auditId],
-    );
+    const itemsRes = auditId
+      ? await query(
+          `SELECT row_index, name, vessel_name, po_number, imo_number,
+                  po_sent_date, md_requested_date, item_description, is_suspected,
+                  impa_code, issa_code, equipment_code, equipment_name,
+                  maker, model, part_number, unit, quantity,
+                  vendor_remark, vendor_email, vendor_name
+             FROM audit_line_items
+            WHERE audit_id = $1
+            ORDER BY row_index ASC`,
+          [auditId],
+        )
+      : { rows: [] as Array<Record<string, unknown>> };
 
     // Gather clarification state keyed by PO number. If a PO was referenced
     // in multiple clarification emails, the newest wins.
