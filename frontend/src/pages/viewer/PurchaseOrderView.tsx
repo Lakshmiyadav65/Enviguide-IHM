@@ -72,13 +72,15 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                     const poSentDate = typeof r.po_sent_date === 'string' ? r.po_sent_date.split('T')[0] : String(r.po_sent_date ?? '');
                     const mdReqDate = typeof r.md_requested_date === 'string' ? r.md_requested_date.split('T')[0] : String(r.md_requested_date ?? '');
 
+                    // Suspected items live under 'Request Pending' by default;
+                    // the filter bar also cross-checks mdsStatus so Received MDS
+                    // / Pending MDS can break them apart when needed.
                     let category: string;
                     if (!isSuspected) category = 'Non HM';
-                    else if (mdsStatus === 'received') category = 'Received Mds';
                     else category = 'Request Pending';
 
                     const emailStatus = isSuspected
-                        ? (mdsStatus === 'received' ? 'RECEIVED' : 'SENT')
+                        ? (mdsStatus === 'received' ? 'REPLIED' : 'SENT')
                         : 'NOT SENT';
 
                     return {
@@ -145,15 +147,32 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
     const currentSuppliersData = useMemo(() => {
         const filteredItems = allItems.filter(item => {
             if (activeFilter !== 'All') {
+                // Rules:
+                //   Request Pending / Suspected Items → every suspected item,
+                //     regardless of MDS status (pending or received inline).
+                //   Pending Mds / Reminder 1 / Reminder 2 → only suspected items
+                //     that have NOT received a document yet.
+                //   Received Mds → only suspected items WITH an uploaded document.
+                //   Non HM → every non-suspected item.
+                //   Other tabs (Tracked Items, HM Red, etc.) → nothing until we
+                //     track that state explicitly.
+                const alwaysSuspected = ['Request Pending', 'Suspected Items'];
+                const pendingOnly = ['Pending Mds', 'Reminder 1', 'Reminder 2'];
+                const receivedOnly = ['Received Mds'];
+                const isReceived = item.mdsStatus === 'received';
+
                 if (item.isSuspected) {
-                    // Map each MDS status to the filter tabs that should show it.
-                    const pendingTabs = ['Request Pending', 'Suspected Items', 'Pending Mds', 'Reminder 1', 'Reminder 2'];
-                    const receivedTabs = ['Received Mds', 'Suspected Items'];
-                    const isReceived = item.mdsStatus === 'received';
-                    const allowed = isReceived ? receivedTabs : pendingTabs;
-                    if (!allowed.includes(activeFilter)) return false;
-                } else if (item.category !== activeFilter) {
-                    return false;
+                    if (alwaysSuspected.includes(activeFilter)) {
+                        // allow through
+                    } else if (pendingOnly.includes(activeFilter)) {
+                        if (isReceived) return false;
+                    } else if (receivedOnly.includes(activeFilter)) {
+                        if (!isReceived) return false;
+                    } else {
+                        return false;
+                    }
+                } else {
+                    if (activeFilter !== 'Non HM') return false;
                 }
             }
             if (searchTerm && !item.itemDescription.toLowerCase().includes(searchTerm.toLowerCase()) && !item.poNumber.toLowerCase().includes(searchTerm.toLowerCase())) return false;

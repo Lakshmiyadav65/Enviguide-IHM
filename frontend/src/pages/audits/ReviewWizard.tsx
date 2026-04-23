@@ -434,18 +434,11 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
                 suspectedItems,
             });
 
-            // Remove suspected rows from the grid and persist the trimmed set to
-            // the backend. The clarification email call above already created the
-            // audit trail record — PurchaseOrderView now reads that from the API.
-            const header = data[0];
-            const suspectedIdx = header.indexOf('Is Suspected');
-            const newData = [header, ...data.slice(1).filter(row => row[suspectedIdx] !== 'Yes')];
-            setData(newData);
-            try {
-                await api.patch(lineItemsEndpoint, { rows: newData.slice(1) });
-            } catch {
-                // Non-fatal: the email was sent; grid will self-correct on next load.
-            }
+            // Do NOT strip suspected rows from audit_line_items after sending.
+            // They need to stay so the PO viewer can show them in Suspected
+            // Items / Request Pending / Received MDS filters. Their clarification
+            // state is tracked separately via clarification_items and joined by
+            // PO number on the backend.
 
             setToastData({
                 title: 'Mail Sent Successfully',
