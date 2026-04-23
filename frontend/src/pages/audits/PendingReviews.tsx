@@ -35,7 +35,7 @@ export default function PendingReviews() {
     const recordsPerPage = 10;
     const [allRecords, setAllRecords] = useState<AuditSummary[]>([]);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [deletingImo, setDeletingImo] = useState<string | null>(null);
+    const [deletingRecord, setDeletingRecord] = useState<AuditSummary | null>(null);
     const [editingRecord, setEditingRecord] = useState<AuditSummary | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -60,25 +60,25 @@ export default function PendingReviews() {
         };
     }, [loadRecords]);
 
-    const handleDelete = (imo: string) => {
-        setDeletingImo(imo);
+    const handleDelete = (record: AuditSummary) => {
+        setDeletingRecord(record);
         setShowDeleteModal(true);
     };
 
     const confirmDelete = async () => {
-        if (deletingImo) {
-            const record = allRecords.find(r => r.imoNumber === deletingImo);
-            if (record?.id) {
-                try {
-                    await api.delete(ENDPOINTS.AUDITS.DELETE(record.id));
-                } catch (err) {
-                    console.error('Delete audit failed:', err);
-                }
+        if (deletingRecord?.id) {
+            const id = deletingRecord.id;
+            try {
+                await api.delete(ENDPOINTS.AUDITS.DELETE(id));
+            } catch (err) {
+                console.error('Delete audit failed:', err);
             }
-            setAllRecords(prev => prev.filter(r => r.imoNumber !== deletingImo));
+            // Remove only the exact row by its unique ID — not every row
+            // sharing the same IMO (legacy duplicates).
+            setAllRecords(prev => prev.filter(r => r.id !== id));
         }
         setShowDeleteModal(false);
-        setDeletingImo(null);
+        setDeletingRecord(null);
     };
 
     const handleWizardComplete = () => {
@@ -198,7 +198,7 @@ export default function PendingReviews() {
                                                     <button
                                                         className="action-btn delete"
                                                         title="Delete"
-                                                        onClick={() => handleDelete(record.imoNumber)}
+                                                        onClick={() => handleDelete(record)}
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>

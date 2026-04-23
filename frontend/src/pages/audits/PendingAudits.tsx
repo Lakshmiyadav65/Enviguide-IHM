@@ -560,7 +560,7 @@ export default function PendingAudits() {
     const [showSuccessToast, setShowSuccessToast] = useState(false);
     const [showDuplicateToast, setShowDuplicateToast] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [deletingImo, setDeletingImo] = useState<string | null>(null);
+    const [deletingRecord, setDeletingRecord] = useState<AuditSummary | null>(null);
     const [editingVessel, setEditingVessel] = useState<AuditSummary | null>(null);
 
     const handleEdit = (imoNumber: string) => {
@@ -611,25 +611,25 @@ export default function PendingAudits() {
         }
         setShowSuccessToast(false);
     };
-    const handleDelete = (imoNumber: string) => {
-        setDeletingImo(imoNumber);
+    const handleDelete = (record: AuditSummary) => {
+        setDeletingRecord(record);
         setShowDeleteModal(true);
     };
 
     const confirmDelete = async () => {
-        if (deletingImo) {
-            const record = allRecords.find(r => r.imoNumber === deletingImo);
-            if (record?.id) {
-                try {
-                    await api.delete(ENDPOINTS.AUDITS.DELETE(record.id));
-                } catch (err) {
-                    console.error('Delete audit failed:', err);
-                }
+        if (deletingRecord?.id) {
+            const id = deletingRecord.id;
+            try {
+                await api.delete(ENDPOINTS.AUDITS.DELETE(id));
+            } catch (err) {
+                console.error('Delete audit failed:', err);
             }
-            setAllRecords(prev => prev.filter(r => r.imoNumber !== deletingImo));
+            // Remove only the row with this exact id — avoids wiping every row
+            // that happens to share the same IMO (legacy duplicates).
+            setAllRecords(prev => prev.filter(r => r.id !== id));
         }
         setShowDeleteModal(false);
-        setDeletingImo(null);
+        setDeletingRecord(null);
     };
 
     return (
@@ -735,7 +735,7 @@ export default function PendingAudits() {
                                                         <button className="action-btn edit-btn" onClick={() => handleEdit(record.imoNumber)} title="Edit"><Edit2 size={16} /></button>
                                                     )}
                                                     <button className="action-btn send-btn" onClick={() => handleSend(record.imoNumber)} title="Send to Review"><Send size={16} /></button>
-                                                    <button className="action-btn delete-btn" onClick={() => handleDelete(record.imoNumber)} title="Delete"><Trash2 size={16} /></button>
+                                                    <button className="action-btn delete-btn" onClick={() => handleDelete(record)} title="Delete"><Trash2 size={16} /></button>
                                                 </div>
                                             </td>
                                         </tr>
