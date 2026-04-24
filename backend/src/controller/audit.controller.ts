@@ -148,7 +148,47 @@ export async function uploadAuditDocument(req: Request, res: Response, next: Nex
   } catch (err) { next(err); }
 }
 
-/** POST /api/v1/audits/clarification-email — send vendor clarification email */
+/**
+ * Replace the template-generated "Suspected Items List:" block in the admin's
+ * body with a per-vendor list so each recipient only sees their own POs. If
+ * the admin removed the block, we append a fresh one instead.
+ */
+function rewriteSuspectedBlock(body: string, rows: unknown[][]): string {
+  const list = rows.map((row, i) => {
+    const r = Array.isArray(row) ? row : [];
+    return `${i + 1}. PO: ${String(r[2] ?? '')} - ${String(r[6] ?? '')}`;
+  }).join('\n');
+
+  const START = 'Suspected Items List:\n';
+  const endMarkers = [
+    '\n\nPlease provide',
+    '\n\nBest Regards',
+    '\n\nBest regards',
+    '\n\nRegards',
+  ];
+
+  const startIdx = body.indexOf(START);
+  if (startIdx === -1) return `${body}\n\n${START}${list}`;
+
+  const afterStart = startIdx + START.length;
+  let endIdx = -1;
+  for (const marker of endMarkers) {
+    const idx = body.indexOf(marker, afterStart);
+    if (idx !== -1 && (endIdx === -1 || idx < endIdx)) endIdx = idx;
+  }
+  if (endIdx === -1) endIdx = body.length;
+  return body.slice(0, startIdx) + START + list + body.slice(endIdx);
+}
+
+/**
+ * POST /api/v1/audits/clarification-email
+ *
+ * Split the outgoing clarification by vendor_email (column 18 of the
+ * suspected_items rows) so each vendor gets a dedicated clarification
+ * record, a dedicated public_token (and upload link), and a body that
+ * only lists their own POs. This prevents two vendors on the same To
+ * line from seeing each other's items when they open the link.
+ */
 export async function sendClarificationEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const {
@@ -176,85 +216,149 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
     const audit = await AuditService.getAuditByImo(imo, req.user!.userId);
     const vesselId = audit ? (audit as Record<string, unknown>).vesselId as string : null;
 
-    // Generate a one-way token the supplier will use on the public upload page.
-    // 32 random bytes, URL-safe base64 → ~43 chars. 72-hour expiry.
-    const publicToken = crypto.randomBytes(32).toString('base64url');
-    const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
-    const supplierLink = `${env.APP_BASE_URL.replace(/\/$/, '')}/upload/${publicToken}`;
+    // --- Split suspected items per vendor_email (row index 18). ------------
+    const rowsIn: unknown[][] = Array.isArray(suspectedItems)
+      ? (suspectedItems as unknown[][]).filter((r) => Array.isArray(r))
+      : [];
 
-    // Append the upload link to whatever the user typed in the body.
-    const expiresText = expiresAt.toISOString().replace('T', ' ').replace(/\..+/, ' UTC');
-    const bodyWithLink = `${body}\n\n---\nUpload documents directly via this secure link (no login required):\n${supplierLink}\n\nThis link expires on ${expiresText} (72 hours from now).`;
-    const html = bodyWithLink
-      .split('\n')
-      .map((line) => {
-        const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        // Turn the supplier link into a real anchor tag.
-        if (line.trim() === supplierLink) {
-          return `<div><a href="${supplierLink}" style="color:#00B0FA;font-weight:600">${supplierLink}</a></div>`;
-        }
-        return `<div>${escaped || '&nbsp;'}</div>`;
-      })
-      .join('');
-
-    let status = 'sent';
-    let errorMessage: string | null = null;
-
-    try {
-      await sendMail({ to, cc, subject, text: bodyWithLink, html });
-    } catch (mailErr) {
-      status = 'failed';
-      errorMessage = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
-    }
-
-    const inserted = await query(
-      `INSERT INTO clarification_requests
-         (vessel_id, imo_number, vessel_name, recipient_emails, cc_emails,
-          subject, body, suspected_items, status, error_message, sent_by,
-          public_token, public_token_expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13)
-       RETURNING id, status, created_at`,
-      [
-        vesselId,
-        imo,
-        vesselName || null,
-        to.join(', '),
-        cc && cc.length ? cc.join(', ') : null,
-        subject,
-        bodyWithLink,
-        JSON.stringify(suspectedItems || []),
-        status,
-        errorMessage,
-        req.user!.userId,
-        publicToken,
-        expiresAt,
-      ],
+    const lcTo = new Set(
+      to.map((e) => String(e).trim().toLowerCase()).filter(Boolean),
     );
 
-    // Seed per-item rows so we can track MDS upload, reminders etc. per item.
-    const clarificationId = String((inserted.rows[0] as Record<string, unknown>).id);
-    const itemCount = Array.isArray(suspectedItems) ? suspectedItems.length : 0;
-    if (itemCount > 0) {
-      const placeholders: string[] = [];
-      const vals: unknown[] = [];
-      for (let i = 0; i < itemCount; i++) {
-        const start = vals.length;
-        placeholders.push(`($${start + 1}, $${start + 2})`);
-        vals.push(clarificationId, i);
+    // canonical casing preserved from the admin's input
+    const canonicalByLc = new Map<string, string>();
+    for (const entry of to) {
+      const raw = String(entry).trim();
+      if (!raw) continue;
+      canonicalByLc.set(raw.toLowerCase(), raw);
+    }
+
+    const byVendor = new Map<string, unknown[][]>();
+    const orphanRows: unknown[][] = [];
+    for (const row of rowsIn) {
+      const vendorEmail = String(row[18] ?? '').trim().toLowerCase();
+      if (vendorEmail && lcTo.has(vendorEmail)) {
+        if (!byVendor.has(vendorEmail)) byVendor.set(vendorEmail, []);
+        byVendor.get(vendorEmail)!.push(row);
+      } else {
+        orphanRows.push(row);
       }
-      await query(
-        `INSERT INTO clarification_items (clarification_id, item_index)
-         VALUES ${placeholders.join(', ')}
-         ON CONFLICT (clarification_id, item_index) DO NOTHING`,
-        vals,
+    }
+
+    // Recipients the admin typed but that aren't the vendor_email for any
+    // suspected row — they'll receive the orphan bucket (if any).
+    const extrasLc = Array.from(lcTo).filter((e) => !byVendor.has(e));
+
+    type Batch = { to: string[]; rows: unknown[][] };
+    const batches: Batch[] = [];
+    for (const [vendorLc, rows] of byVendor.entries()) {
+      const canonical = canonicalByLc.get(vendorLc) ?? vendorLc;
+      batches.push({ to: [canonical], rows });
+    }
+    if (orphanRows.length > 0 && extrasLc.length > 0) {
+      const canonicalExtras = extrasLc
+        .map((e) => canonicalByLc.get(e) ?? e);
+      batches.push({ to: canonicalExtras, rows: orphanRows });
+    }
+    if (batches.length === 0) {
+      return next(createError(
+        'No outgoing mail: none of the suspected items match the recipients in To.',
+        400,
+      ));
+    }
+
+    // --- Send + persist each batch. ----------------------------------------
+    const results: Array<Record<string, unknown>> = [];
+    let firstFailure: { to: string[]; message: string } | null = null;
+
+    for (const batch of batches) {
+      const publicToken = crypto.randomBytes(32).toString('base64url');
+      const expiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+      const supplierLink = `${env.APP_BASE_URL.replace(/\/$/, '')}/upload/${publicToken}`;
+      const expiresText = expiresAt.toISOString().replace('T', ' ').replace(/\..+/, ' UTC');
+
+      const perVendorBody = rewriteSuspectedBlock(body, batch.rows);
+      const bodyWithLink = `${perVendorBody}\n\n---\nUpload documents directly via this secure link (no login required):\n${supplierLink}\n\nThis link expires on ${expiresText} (72 hours from now).`;
+      const html = bodyWithLink
+        .split('\n')
+        .map((line) => {
+          const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          if (line.trim() === supplierLink) {
+            return `<div><a href="${supplierLink}" style="color:#00B0FA;font-weight:600">${supplierLink}</a></div>`;
+          }
+          return `<div>${escaped || '&nbsp;'}</div>`;
+        })
+        .join('');
+
+      let status = 'sent';
+      let errorMessage: string | null = null;
+      try {
+        await sendMail({ to: batch.to, cc, subject, text: bodyWithLink, html });
+      } catch (mailErr) {
+        status = 'failed';
+        errorMessage = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
+        if (!firstFailure) firstFailure = { to: batch.to, message: errorMessage };
+      }
+
+      const inserted = await query(
+        `INSERT INTO clarification_requests
+           (vessel_id, imo_number, vessel_name, recipient_emails, cc_emails,
+            subject, body, suspected_items, status, error_message, sent_by,
+            public_token, public_token_expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13)
+         RETURNING id, status, created_at`,
+        [
+          vesselId,
+          imo,
+          vesselName || null,
+          batch.to.join(', '),
+          cc && cc.length ? cc.join(', ') : null,
+          subject,
+          bodyWithLink,
+          JSON.stringify(batch.rows),
+          status,
+          errorMessage,
+          req.user!.userId,
+          publicToken,
+          expiresAt,
+        ],
       );
+
+      const clarificationId = String((inserted.rows[0] as Record<string, unknown>).id);
+      const itemCount = batch.rows.length;
+      if (itemCount > 0) {
+        const placeholders: string[] = [];
+        const vals: unknown[] = [];
+        for (let i = 0; i < itemCount; i++) {
+          const start = vals.length;
+          placeholders.push(`($${start + 1}, $${start + 2})`);
+          vals.push(clarificationId, i);
+        }
+        await query(
+          `INSERT INTO clarification_items (clarification_id, item_index)
+           VALUES ${placeholders.join(', ')}
+           ON CONFLICT (clarification_id, item_index) DO NOTHING`,
+          vals,
+        );
+      }
+
+      results.push({
+        clarificationId,
+        to: batch.to,
+        itemCount,
+        status,
+        errorMessage,
+      });
     }
 
-    if (status === 'failed') {
-      return next(createError(`Email not sent: ${errorMessage}`, 502));
+    if (firstFailure) {
+      return next(createError(
+        `Email not sent to ${firstFailure.to.join(', ')}: ${firstFailure.message}`,
+        502,
+      ));
     }
 
-    res.json({ success: true, data: inserted.rows[0] });
+    res.json({ success: true, data: { batches: results } });
   } catch (err) { next(err); }
 }
 
