@@ -245,20 +245,29 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
       }
     }
 
-    // Recipients the admin typed but that aren't the vendor_email for any
-    // suspected row — they'll receive the orphan bucket (if any).
+    // Admin-typed addresses that aren't the vendor_email on any suspected
+    // row. Two roles:
+    //   - If there are orphan rows (items with unknown vendor_email), the
+    //     extras become the To for that orphan batch.
+    //   - Regardless, they're Bcc'd on every per-vendor batch so a reviewer
+    //     / admin who's CC'd-in-spirit still gets a copy of the outreach.
     const extrasLc = Array.from(lcTo).filter((e) => !byVendor.has(e));
+    const canonicalExtras = extrasLc.map((e) => canonicalByLc.get(e) ?? e);
 
-    type Batch = { to: string[]; rows: unknown[][] };
+    type Batch = { to: string[]; bcc?: string[]; rows: unknown[][]; isOrphan?: boolean };
     const batches: Batch[] = [];
     for (const [vendorLc, rows] of byVendor.entries()) {
       const canonical = canonicalByLc.get(vendorLc) ?? vendorLc;
-      batches.push({ to: [canonical], rows });
+      batches.push({
+        to: [canonical],
+        // Extras ride as Bcc so the admin/reviewer gets a copy without
+        // leaking to the vendor and without being shown other Bcc addresses.
+        bcc: canonicalExtras.length > 0 ? canonicalExtras : undefined,
+        rows,
+      });
     }
-    if (orphanRows.length > 0 && extrasLc.length > 0) {
-      const canonicalExtras = extrasLc
-        .map((e) => canonicalByLc.get(e) ?? e);
-      batches.push({ to: canonicalExtras, rows: orphanRows });
+    if (orphanRows.length > 0 && canonicalExtras.length > 0) {
+      batches.push({ to: canonicalExtras, rows: orphanRows, isOrphan: true });
     }
     if (batches.length === 0) {
       return next(createError(
@@ -293,12 +302,26 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
       let status = 'sent';
       let errorMessage: string | null = null;
       try {
-        await sendMail({ to: batch.to, cc, subject, text: bodyWithLink, html });
+        await sendMail({
+          to: batch.to,
+          cc,
+          bcc: batch.bcc,
+          subject,
+          text: bodyWithLink,
+          html,
+        });
       } catch (mailErr) {
         status = 'failed';
         errorMessage = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
         if (!firstFailure) firstFailure = { to: batch.to, message: errorMessage };
       }
+
+      // Store Cc + Bcc together in cc_emails so anyone who received the mail
+      // (vendor, admin reviewer on Bcc, etc.) authenticates on the public
+      // upload page. The schema has no dedicated bcc column.
+      const ccAndBcc: string[] = [];
+      if (cc && cc.length) ccAndBcc.push(...cc);
+      if (batch.bcc && batch.bcc.length) ccAndBcc.push(...batch.bcc);
 
       const inserted = await query(
         `INSERT INTO clarification_requests
@@ -312,7 +335,7 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
           imo,
           vesselName || null,
           batch.to.join(', '),
-          cc && cc.length ? cc.join(', ') : null,
+          ccAndBcc.length > 0 ? ccAndBcc.join(', ') : null,
           subject,
           bodyWithLink,
           JSON.stringify(batch.rows),
