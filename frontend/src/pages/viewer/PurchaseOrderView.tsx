@@ -20,7 +20,6 @@ interface PurchaseOrderItem {
     quantityTotal: string;
     unit: string;
     selected?: boolean;
-    category: string;
     isSuspected?: boolean;
     // Clarification-item identifiers (needed to upload the MDS doc).
     clarificationId?: string;
@@ -29,6 +28,8 @@ interface PurchaseOrderItem {
     mdsFilePath?: string;
     mdsFileName?: string;
     reminderCount?: number;
+    // 'red' | 'green' | 'pchm' | null — set by the HM categorization flow.
+    hmStatus?: string | null;
     vendorName?: string;
     vendorEmail?: string;
 }
@@ -75,19 +76,13 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                     const poSentDate = typeof r.po_sent_date === 'string' ? r.po_sent_date.split('T')[0] : String(r.po_sent_date ?? '');
                     const mdReqDate = typeof r.md_requested_date === 'string' ? r.md_requested_date.split('T')[0] : String(r.md_requested_date ?? '');
                     const reminderCount = Number(r.reminder_count ?? 0);
-
-                    // Suspected items live under 'Request Pending' by default;
-                    // the filter bar also cross-checks mdsStatus so Received MDS
-                    // / Pending MDS can break them apart when needed.
-                    let category: string;
-                    if (!isSuspected) category = 'Non HM';
-                    else if (reminderCount >= 2) category = 'Reminder 2';
-                    else if (reminderCount === 1) category = 'Reminder 1';
-                    else category = 'Request Pending';
+                    const hmStatusRaw = r.hm_status ? String(r.hm_status).toLowerCase() : null;
 
                     let emailStatus: string;
                     if (!isSuspected) emailStatus = 'NOT SENT';
+                    else if (!r.clarification_id) emailStatus = 'NOT SENT';
                     else if (mdsStatus === 'received') emailStatus = 'REPLIED';
+                    else if (reminderCount >= 3) emailStatus = 'NON-RESPONSIVE';
                     else if (reminderCount >= 1) emailStatus = `REMINDER ${reminderCount}`;
                     else emailStatus = 'SENT';
 
@@ -106,13 +101,13 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                         orderDate: poSentDate,
                         quantityTotal: `${r.quantity ?? '0'} | ${mdsStatus === 'received' ? (r.quantity ?? '0') : '0'} | ${r.quantity ?? '0'}`,
                         unit: String(r.unit ?? 'PCS'),
-                        category,
                         isSuspected,
                         selected: false,
                         mdsStatus,
                         mdsFilePath,
                         mdsFileName,
                         reminderCount,
+                        hmStatus: hmStatusRaw,
                         vendorName: String(r.vendor_name ?? ''),
                         vendorEmail: String(r.vendor_email ?? ''),
                     };
@@ -159,46 +154,74 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
         setOpenSuppliers(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
     };
 
-    const currentSuppliersData = useMemo(() => {
-        const filteredItems = allItems.filter(item => {
-            if (activeFilter !== 'All') {
-                // Rules:
-                //   Request Pending / Suspected Items → every suspected item,
-                //     regardless of MDS status (pending or received inline).
-                //   Pending Mds → suspected, not received, no reminders yet.
-                //   Reminder 1 → suspected, not received, reminder_count === 1.
-                //   Reminder 2 → suspected, not received, reminder_count >= 2.
-                //   Received Mds → only suspected items WITH an uploaded document.
-                //   Non HM → every non-suspected item.
-                //   Other tabs (Tracked Items, HM Red, etc.) → nothing until we
-                //     track that state explicitly.
-                const isReceived = item.mdsStatus === 'received';
-                const reminders = item.reminderCount ?? 0;
+    // Set of item-description keys that appear on 2+ rows — feeds the
+    // 'Review Repeated Items' filter.
+    const repeatedKeys = useMemo(() => {
+        const counts = new Map<string, number>();
+        for (const item of allItems) {
+            const key = item.itemDescription.trim().toLowerCase();
+            if (!key) continue;
+            counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+        const out = new Set<string>();
+        counts.forEach((c, k) => { if (c >= 2) out.add(k); });
+        return out;
+    }, [allItems]);
 
-                if (item.isSuspected) {
-                    switch (activeFilter) {
-                        case 'Request Pending':
-                        case 'Suspected Items':
-                            break; // allow every suspected item through
-                        case 'Pending Mds':
-                            if (isReceived || reminders !== 0) return false;
-                            break;
-                        case 'Reminder 1':
-                            if (isReceived || reminders !== 1) return false;
-                            break;
-                        case 'Reminder 2':
-                            if (isReceived || reminders < 2) return false;
-                            break;
-                        case 'Received Mds':
-                            if (!isReceived) return false;
-                            break;
-                        default:
-                            return false;
-                    }
-                } else {
-                    if (activeFilter !== 'Non HM') return false;
-                }
+    const currentSuppliersData = useMemo(() => {
+        // One predicate per filter pill. Each rule is documented in the
+        // workflow spec; HM Red / HM Green / PCHM key off `hm_status` from
+        // clarification_items, which is currently set only via the audit
+        // categorization wizard — those tabs return zero until that flow is
+        // wired to persist hm_status.
+        const matchesFilter = (item: PurchaseOrderItem): boolean => {
+            if (activeFilter === 'All') return true;
+            const isReceived = item.mdsStatus === 'received';
+            const reminders = item.reminderCount ?? 0;
+            const hasClar = !!item.clarificationId;
+            const hm = (item.hmStatus ?? '').toLowerCase();
+            const descKey = item.itemDescription.trim().toLowerCase();
+
+            switch (activeFilter) {
+                case 'Suspected Items':
+                    return item.isSuspected === true;
+                case 'Request Pending':
+                    // Suspected, but the admin hasn't sent a request yet.
+                    return item.isSuspected === true && !hasClar;
+                case 'Pending Mds':
+                    // Request sent, no doc back, no reminders yet.
+                    return item.isSuspected === true && hasClar && !isReceived && reminders === 0;
+                case 'Reminder 1':
+                    return item.isSuspected === true && hasClar && !isReceived && reminders === 1;
+                case 'Reminder 2':
+                    return item.isSuspected === true && hasClar && !isReceived && reminders === 2;
+                case 'Non-Responsive Supplier':
+                    return item.isSuspected === true && hasClar && !isReceived && reminders >= 3;
+                case 'Received Mds':
+                    return isReceived;
+                case 'Tracked Items':
+                    // Anything we've taken action on (request sent at least once).
+                    return hasClar;
+                case 'Non Tracked Items':
+                    // Items we haven't started chasing — commodity rows + suspected-but-unsent.
+                    return !hasClar;
+                case 'HM Red':
+                    return hm === 'red';
+                case 'HM Green':
+                    return hm === 'green';
+                case 'PCHM':
+                    return hm === 'pchm';
+                case 'Non HM':
+                    return item.isSuspected !== true;
+                case 'Review Repeated Items':
+                    return descKey.length > 0 && repeatedKeys.has(descKey);
+                default:
+                    return false;
             }
+        };
+
+        const filteredItems = allItems.filter(item => {
+            if (!matchesFilter(item)) return false;
             if (searchTerm && !item.itemDescription.toLowerCase().includes(searchTerm.toLowerCase()) && !item.poNumber.toLowerCase().includes(searchTerm.toLowerCase())) return false;
             return true;
         });
@@ -333,42 +356,24 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
         const selected = allItems.filter(i => i.selected);
         if (selected.length === 0) return;
 
-        // Escalation Logic
-        const nextCategoryMap: Record<string, string> = {
-            'Request Pending': 'Reminder 1',
-            'Reminder 1': 'Reminder 2',
-            'Reminder 2': 'Non-Responsive Supplier'
-        };
-
-        // Update items
-        setAllItems(prev => prev.map(item => {
-            if (item.selected) {
-                const currentCat = item.category === 'All' ? 'Request Pending' : item.category;
-                const nextCat = nextCategoryMap[currentCat] || currentCat;
-                return {
-                    ...item,
-                    category: nextCat,
-                    emailStatus: `SENT (${nextCat})`,
-                    selected: false
-                };
-            }
-            return item;
-        }));
-
-        const isReminder2 = selected.some(i => i.category === 'Reminder 1');
-        const subject = isReminder2
+        // Pick the highest reminder count among the selection so the subject
+        // reflects how aggressive this batch should look. Note: this modal
+        // currently doesn't post to the reminder endpoint per row — the
+        // per-row mail icon is the supported path. This is left as a UI
+        // composer until we wire bulk reminders server-side.
+        const maxReminder = Math.max(0, ...selected.map((i) => i.reminderCount ?? 0));
+        const subject = maxReminder >= 2
             ? `URGENT: FINAL REMINDER - Documentation Overdue for ${imo}`
             : `Reminder: Documentation Required for POs on ${imo}`;
 
-        const bodyWithUrgency = isReminder2
+        const body = maxReminder >= 2
             ? `Dear Partners,\n\nThis is an URGENT FINAL REMINDER regarding ${selected.length} items on ${imo}. Outstanding MDs/SDoCs have NOT been received despite previous requests.\n\nItems:\n${selected.map(s => `- PO: ${s.poNumber}`).join('\n')}\n\nFailure to provide documentation within 24 hours will result in the supplier being marked as NON-RESPONSIVE in our system.\n\nBest Regards,\nIHM Audit Team`
             : `Dear Partners,\n\nWe are sending a follow-up reminder regarding ${selected.length} items on ${imo}. We have not yet received the requested MDs/SDoCs.\n\nItems:\n${selected.map(s => `- PO: ${s.poNumber}`).join('\n')}\n\nPlease update these records immediately.\n\nBest Regards,\nIHM Audit Team`;
 
-        // Open Mail Modal for the first item or a summary
         setSelectedMail({
-            to: (selected[0] as any).vendorEmail || 'multiple-suppliers@example.com',
-            subject: subject,
-            body: bodyWithUrgency
+            to: selected[0].vendorEmail || 'multiple-suppliers@example.com',
+            subject,
+            body,
         });
         setShowMailView(true);
     };

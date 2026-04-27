@@ -393,7 +393,7 @@ export const AuditService = {
       `SELECT cr.id AS clarification_id, cr.created_at,
               cr.suspected_items, cr.submitted_at, cr.status AS cr_status,
               ci.item_index, ci.mds_status, ci.mds_file_name, ci.mds_file_path,
-              ci.mds_received_at, ci.reminder_count
+              ci.mds_received_at, ci.reminder_count, ci.hm_status
          FROM clarification_requests cr
          LEFT JOIN clarification_items ci ON ci.clarification_id = cr.id
         WHERE cr.vessel_id = $1
@@ -413,6 +413,7 @@ export const AuditService = {
       mds_file_path: string | null;
       mds_received_at: string | null;
       reminder_count: number | null;
+      hm_status: string | null;
     };
     const stateByPO = new Map<string, {
       clarificationId: string;
@@ -423,6 +424,7 @@ export const AuditService = {
       mdsReceivedAt: string | null;
       reminderCount: number;
       submittedAt: string | null;
+      hmStatus: string | null;
     }>();
 
     for (const row of clarRes.rows as Clar[]) {
@@ -441,6 +443,7 @@ export const AuditService = {
         mdsReceivedAt: row.mds_received_at,
         reminderCount: row.reminder_count ?? 0,
         submittedAt: row.submitted_at,
+        hmStatus: row.hm_status,
       });
     }
 
@@ -458,6 +461,7 @@ export const AuditService = {
         mds_received_at: state?.mdsReceivedAt ?? null,
         reminder_count: state?.reminderCount ?? 0,
         submitted_at: state?.submittedAt ?? null,
+        hm_status: state?.hmStatus ?? null,
       };
     });
 
@@ -494,6 +498,7 @@ export const AuditService = {
         mds_received_at: row.mds_received_at,
         reminder_count: row.reminder_count ?? 0,
         submitted_at: row.submitted_at,
+        hm_status: row.hm_status ?? null,
       };
       standardHeaderCols.forEach((col, idx) => {
         synth[col] = col === 'is_suspected' ? 'Yes' : (r[idx] ?? null);
