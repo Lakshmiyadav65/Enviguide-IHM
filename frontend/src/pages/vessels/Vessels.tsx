@@ -857,7 +857,7 @@ export default function Vessels() {
         }
 
         if (activeTab === 'decks') {
-            return <DecksView key={activeVesselName} vesselName={activeVesselName} />;
+            return <DecksView key={activeVesselName} vesselName={activeVesselName} vesselId={activeVesselData?.id} />;
         }
 
         if (activeTab === 'purchase') {

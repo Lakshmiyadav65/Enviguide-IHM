@@ -29,6 +29,20 @@ export const ENDPOINTS = {
     CERTIFICATES: (id: string) => `/vessels/${id}/certificates`,
   },
 
+  // GA Plans (nested under a vessel)
+  GA_PLANS: {
+    LIST: (vesselId: string) => `/vessels/${vesselId}/ga-plans`,
+    DETAIL: (vesselId: string, planId: string) => `/vessels/${vesselId}/ga-plans/${planId}`,
+  },
+
+  // Deck Areas (nested under a GA Plan)
+  DECK_AREAS: {
+    LIST: (vesselId: string, planId: string) =>
+      `/vessels/${vesselId}/ga-plans/${planId}/deck-areas`,
+    DETAIL: (vesselId: string, planId: string, areaId: string) =>
+      `/vessels/${vesselId}/ga-plans/${planId}/deck-areas/${areaId}`,
+  },
+
   // Purchase Orders
   PURCHASE_ORDERS: {
     LIST: '/purchase-orders',

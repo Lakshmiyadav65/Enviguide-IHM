@@ -22,6 +22,8 @@ import {
 
 import './GAPlanViewer.css';
 import { PLAN_GENERIC } from '../../assets/ship_plans';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
 
 interface Rect {
     x: number;
@@ -47,6 +49,12 @@ interface GAPlanViewerProps {
     onUpdateSections: React.Dispatch<React.SetStateAction<MappedSection[]>>;
     focusedSectionId?: string | null;
     vesselName: string;
+    /** Backend vessel UUID. When present alongside gaPlanId, deck areas
+     *  persist via the API (load on mount, POST on save, DELETE on remove).
+     *  When absent we fall back to the local-state-only flow used by demo
+     *  vessels and ad-hoc opens. */
+    vesselId?: string;
+    gaPlanId?: string;
     isIsolationMode?: boolean;
 }
 
@@ -59,8 +67,12 @@ export default function GAPlanViewer({
     onUpdateSections,
     focusedSectionId,
     vesselName,
+    vesselId,
+    gaPlanId,
     isIsolationMode = false
 }: GAPlanViewerProps) {
+    // True when both UUIDs are present — i.e. we're allowed to hit the API.
+    const persistEnabled = Boolean(vesselId && gaPlanId);
     // View State
     const [zoom, setZoom] = useState(30); // Initial Zoom
     const [rotation, setRotation] = useState(0);
@@ -87,6 +99,39 @@ export default function GAPlanViewer({
             setLocalFocusedId(focusedSectionId);
         }
     }, [focusedSectionId]);
+
+    // Backend hydration: when we have real vessel + plan UUIDs, pull the
+    // authoritative deck-area list from the API and replace whatever
+    // localStorage / parent-state had. This keeps the popup viewer in sync
+    // when the parent tab's state is stale.
+    useEffect(() => {
+        if (!persistEnabled || !vesselId || !gaPlanId) return;
+        let cancelled = false;
+        api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(
+            ENDPOINTS.DECK_AREAS.LIST(vesselId, gaPlanId),
+        )
+            .then((res) => {
+                if (cancelled) return;
+                const sections: MappedSection[] = (res.data || []).map((a) => ({
+                    id: String(a.id),
+                    title: String(a.name ?? ''),
+                    sectionId: `DECK-${String(a.id).slice(0, 4).toUpperCase()}`,
+                    rect: {
+                        x: Number(a.x ?? 0),
+                        y: Number(a.y ?? 0),
+                        width: Number(a.width ?? 0),
+                        height: Number(a.height ?? 0),
+                    },
+                    itemsCount: 0,
+                    isVisible: true,
+                }));
+                onUpdateSections(sections);
+            })
+            .catch((err) => {
+                console.error('Failed to load deck areas:', err);
+            });
+        return () => { cancelled = true; };
+    }, [persistEnabled, vesselId, gaPlanId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Auto-open sidebar if sections exist on load
     useEffect(() => {
@@ -285,7 +330,7 @@ export default function GAPlanViewer({
         });
     };
 
-    const addSelection = () => {
+    const addSelection = async () => {
         if (!currentSelection) {
             showToast("No Selection", "Please draw a rectangle on the plan first.", "error");
             return;
@@ -311,26 +356,57 @@ export default function GAPlanViewer({
         }
 
         const trimmedTitle = newSelectionTitle.trim();
-        const newId = Date.now().toString();
-        const sectionId = `DECK-${newId.slice(-4)}`;
-        const newSection: MappedSection = {
-            id: newId,
-            title: trimmedTitle,
-            sectionId: sectionId,
-            rect: currentSelection,
-            itemsCount: 0,
-            isVisible: true
-        };
-        // Initialize empty inventory for this deck
+        // Initialize empty inventory for this deck (still localStorage — items
+        // tracking is unrelated to the deck-area persistence here).
         localStorage.setItem(`inventory_${vesselName}_${trimmedTitle}`, JSON.stringify([]));
 
-        const newSections = [...mappedSections, newSection];
-        executeUpdate(newSections);
+        // Persist to backend when we have real IDs; fall back to a
+        // client-generated id otherwise so the demo flow still works.
+        if (persistEnabled && vesselId && gaPlanId) {
+            try {
+                const res = await api.post<{ success: boolean; data: Record<string, unknown> }>(
+                    ENDPOINTS.DECK_AREAS.LIST(vesselId, gaPlanId),
+                    {
+                        name: trimmedTitle,
+                        x: currentSelection.x,
+                        y: currentSelection.y,
+                        width: currentSelection.width,
+                        height: currentSelection.height,
+                    },
+                );
+                const saved = res.data || {};
+                const persistedId = String(saved.id ?? Date.now());
+                const newSection: MappedSection = {
+                    id: persistedId,
+                    title: trimmedTitle,
+                    sectionId: `DECK-${persistedId.slice(0, 4).toUpperCase()}`,
+                    rect: currentSelection,
+                    itemsCount: 0,
+                    isVisible: true,
+                };
+                executeUpdate([...mappedSections, newSection]);
+                showToast("Deck Saved", `${trimmedTitle} has been saved to the project.`);
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : 'Save failed';
+                showToast("Save Failed", msg, "error");
+                return; // don't clear the input — let the user retry
+            }
+        } else {
+            const newId = Date.now().toString();
+            const sectionId = `DECK-${newId.slice(-4)}`;
+            const newSection: MappedSection = {
+                id: newId,
+                title: trimmedTitle,
+                sectionId,
+                rect: currentSelection,
+                itemsCount: 0,
+                isVisible: true,
+            };
+            executeUpdate([...mappedSections, newSection]);
+            showToast("Deck Saved Successfully", `${trimmedTitle} has been added to the vessel project`);
+        }
 
-
-        showToast("Deck Saved Successfully", `${trimmedTitle} has been added to the vessel project`);
-
-        // Clear selection to avoid duplication in UI
+        // Clear selection so the input doesn't re-render with stale state.
         setCurrentSelection(null);
         setNewSelectionTitle('');
         setActiveTool('none');
@@ -349,6 +425,13 @@ export default function GAPlanViewer({
 
     const deleteSection = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
+        // Best-effort backend delete; local state updates regardless so the
+        // UI stays responsive on transient errors.
+        if (persistEnabled && vesselId && gaPlanId) {
+            api.delete(ENDPOINTS.DECK_AREAS.DETAIL(vesselId, gaPlanId, id)).catch((err) => {
+                console.error('Deck area delete failed:', err);
+            });
+        }
         const newSections = mappedSections.filter(s => s.id !== id);
         executeUpdate(newSections);
     };

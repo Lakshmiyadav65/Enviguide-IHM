@@ -13,6 +13,11 @@ export default function FullPlanViewer() {
     const filename = query.get('name') || 'Plan Viewer';
 
     const vesselName = query.get('vessel') || 'Unknown Vessel';
+    // When the parent (DecksView) opened this with real backend IDs, the
+    // GA Plan viewer can persist deck areas to the API. Otherwise it falls
+    // back to localStorage / demo behaviour.
+    const vesselId = query.get('vesselId') || undefined;
+    const gaPlanId = query.get('planId') || undefined;
 
     const [mappedSections, setMappedSections] = useState<any[]>(() => {
         const saved = localStorage.getItem(`vessel_sections_${vesselName}`);
@@ -69,6 +74,8 @@ export default function FullPlanViewer() {
                 onUpdateSections={setMappedSections as any}
                 focusedSectionId={focusedId}
                 vesselName={vesselName}
+                vesselId={vesselId}
+                gaPlanId={gaPlanId}
                 isIsolationMode={query.get('isolated') === 'true'}
             />
         </div>

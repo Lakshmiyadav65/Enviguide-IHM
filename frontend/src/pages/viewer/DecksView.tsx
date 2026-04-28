@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect, useCallback } from 'react';
 import {
     Upload,
     Plus,
@@ -15,6 +15,8 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { PLAN_OCEAN_PIONEER, PLAN_ACOSTA, PLAN_AFIF, PLAN_PACIFIC_HORIZON, PLAN_GENERIC } from '../../assets/ship_plans';
 import GAPlanViewer from './GAPlanViewer';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS, API_CONFIG } from '../../config/api.config';
 import './DecksView.css';
 import './DecksViewPremium.css';
 
@@ -42,7 +44,16 @@ interface UploadedPlan {
     date: string;
 }
 
-export default function DecksView({ vesselName }: { vesselName: string }) {
+// Resolve a backend file_path (relative or full URL) to something the
+// browser can load directly. Backend stores like "/uploads/ga-plans/foo.png".
+function resolveBackendFileUrl(filePath: string): string {
+    if (!filePath) return filePath;
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath;
+    const base = API_CONFIG.BASE_URL.replace(/\/api\/v1\/?$/, '');
+    return `${base}${filePath.startsWith('/') ? '' : '/'}${filePath}`;
+}
+
+export default function DecksView({ vesselName, vesselId }: { vesselName: string; vesselId?: string }) {
     const [uploadedPlans, setUploadedPlans] = useState<UploadedPlan[]>(() => {
         const saved = localStorage.getItem(`vessel_plans_${vesselName}`);
         let plans = saved ? JSON.parse(saved) : [];
@@ -88,6 +99,79 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
     useEffect(() => {
         localStorage.setItem(`vessel_sections_${vesselName}`, JSON.stringify(mappedSections));
     }, [mappedSections, vesselName]);
+
+    // Backend hydration: when we have a real vesselId, fetch plans + their
+    // deck areas from the API and replace local state. Falls back to
+    // localStorage / demo data when the vessel isn't backed by a real
+    // record (e.g. the static demo vessels).
+    const reloadFromBackend = useCallback(async () => {
+        if (!vesselId) return;
+        try {
+            const plansRes = await api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(
+                ENDPOINTS.GA_PLANS.LIST(vesselId),
+            );
+            const plans: UploadedPlan[] = (plansRes.data || []).map((p) => ({
+                id: String(p.id),
+                name: String(p.name ?? p.fileName ?? 'GA Plan'),
+                url: resolveBackendFileUrl(String(p.filePath ?? '')),
+                date: typeof p.createdAt === 'string'
+                    ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : '',
+            }));
+
+            const sectionsAcrossPlans: MappedSection[] = [];
+            for (const p of plansRes.data || []) {
+                const planId = String(p.id);
+                try {
+                    const detail = await api.get<{ success: boolean; data: Record<string, unknown> }>(
+                        ENDPOINTS.GA_PLANS.DETAIL(vesselId, planId),
+                    );
+                    const areas = (detail.data?.deckAreas as Array<Record<string, unknown>>) || [];
+                    for (const a of areas) {
+                        sectionsAcrossPlans.push({
+                            id: String(a.id),
+                            title: String(a.name ?? ''),
+                            sectionId: `DECK-${String(a.id).slice(0, 4).toUpperCase()}`,
+                            rect: {
+                                x: Number(a.x ?? 0),
+                                y: Number(a.y ?? 0),
+                                width: Number(a.width ?? 0),
+                                height: Number(a.height ?? 0),
+                            },
+                            itemsCount: 0,
+                            isVisible: true,
+                            planId,
+                        });
+                    }
+                } catch (err) {
+                    console.error(`Failed to load deck areas for plan ${planId}:`, err);
+                }
+            }
+
+            setUploadedPlans(plans);
+            setMappedSections(sectionsAcrossPlans);
+            if (plans.length > 0 && !plans.some((p) => p.id === activePlanId)) {
+                setActivePlanId(plans[0].id);
+            }
+        } catch (err) {
+            console.error('Failed to load GA plans from backend:', err);
+        }
+    }, [vesselId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (!vesselId) return;
+        reloadFromBackend();
+        // Re-hydrate when the user returns to this tab (e.g. after saving
+        // a deck area in the popup viewer in another tab).
+        const onFocus = () => reloadFromBackend();
+        const onVis = () => { if (document.visibilityState === 'visible') reloadFromBackend(); };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVis);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVis);
+        };
+    }, [vesselId, reloadFromBackend]);
 
     useEffect(() => {
         // Unique Static Data Configuration for first 3 vessels
@@ -391,50 +475,99 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) {
-            setIsUploading(true);
-            setUploadProgress(0);
-            setCurrentStage(0);
+        if (!file) return;
 
-            // Simulate upload
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.floor(Math.random() * 15) + 5;
-                if (progress >= 100) {
-                    progress = 100;
-                    clearInterval(interval);
-                    setTimeout(() => {
-                        setIsUploading(false);
-                        const url = URL.createObjectURL(file);
-                        const newId = Math.random().toString(36).substr(2, 9);
-                        const newPlan = {
-                            id: newId,
-                            name: file.name,
-                            url: url,
-                            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                        };
-                        setUploadedPlans(prev => [...prev, newPlan]);
-                        setActivePlanId(newId); // Ensure the new plan is active
-                    }, 500);
-                }
-                setUploadProgress(progress);
+        setIsUploading(true);
+        setUploadProgress(0);
+        setCurrentStage(0);
 
-                // Update stage based on progress
-                if (progress < 33) {
-                    setCurrentStage(0); // Three decks identified
-                } else if (progress < 66) {
-                    setCurrentStage(1); // Structure layout detected
-                } else {
-                    setCurrentStage(2); // Preparing workspace
-                }
-            }, 300);
+        // Backend-backed upload when we have a real vessel. Falls back to
+        // the simulated client-only flow for the static demo vessels.
+        const realUpload = async () => {
+            if (!vesselId) return null;
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('name', file.name);
+            const res = await api.upload<{ success: boolean; data: Record<string, unknown> }>(
+                ENDPOINTS.GA_PLANS.LIST(vesselId),
+                fd,
+            );
+            return res.data;
+        };
+
+        // Drive the progress bar UI while the upload is on the wire.
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress = Math.min(95, progress + Math.floor(Math.random() * 12) + 4);
+            setUploadProgress(progress);
+            if (progress < 33) setCurrentStage(0);
+            else if (progress < 66) setCurrentStage(1);
+            else setCurrentStage(2);
+        }, 250);
+
+        const finish = (newPlan: UploadedPlan) => {
+            clearInterval(interval);
+            setUploadProgress(100);
+            setCurrentStage(2);
+            setTimeout(() => {
+                setIsUploading(false);
+                setUploadedPlans(prev => [...prev, newPlan]);
+                setActivePlanId(newPlan.id);
+            }, 400);
+        };
+
+        const fail = (err: unknown) => {
+            clearInterval(interval);
+            setIsUploading(false);
+            console.error('GA Plan upload failed:', err);
+        };
+
+        if (vesselId) {
+            realUpload()
+                .then((data) => {
+                    if (!data) {
+                        fail(new Error('No data returned from upload'));
+                        return;
+                    }
+                    finish({
+                        id: String(data.id),
+                        name: String(data.name ?? data.fileName ?? file.name),
+                        url: resolveBackendFileUrl(String(data.filePath ?? '')),
+                        date: typeof data.createdAt === 'string'
+                            ? new Date(data.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                            : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                    });
+                })
+                .catch(fail);
+        } else {
+            // Demo / no-backend path: simulate the upload as before.
+            const url = URL.createObjectURL(file);
+            const newId = Math.random().toString(36).substr(2, 9);
+            setTimeout(() => {
+                finish({
+                    id: newId,
+                    name: file.name,
+                    url,
+                    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                });
+            }, 1500);
         }
     };
 
     const removePlan = (id: string) => {
+        // Best-effort backend delete; local state updates regardless so
+        // the UI stays responsive even if the request fails.
+        if (vesselId) {
+            api.delete(ENDPOINTS.GA_PLANS.DETAIL(vesselId, id)).catch((err) => {
+                console.error('GA Plan delete failed:', err);
+            });
+        }
+
         setUploadedPlans(prev => {
             const planToRemove = prev.find(p => p.id === id);
-            if (planToRemove) URL.revokeObjectURL(planToRemove.url);
+            if (planToRemove && planToRemove.url.startsWith('blob:')) {
+                URL.revokeObjectURL(planToRemove.url);
+            }
             const remaining = prev.filter(p => p.id !== id);
 
             if (activePlanId === id) {
@@ -653,7 +786,10 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                                             className="open-full-viewer-btn-premium"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}&isolated=false`, '_blank');
+                                                {
+    const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
+    window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false`, '_blank');
+}
                                             }}
                                         >
                                             <ExternalLink size={14} />
@@ -680,7 +816,10 @@ export default function DecksView({ vesselName }: { vesselName: string }) {
                         onClick={() => {
                             if (!activePlanId) return;
                             const plan = uploadedPlans.find(p => p.id === activePlanId) || uploadedPlans[0];
-                            window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}&isolated=false`, '_blank');
+                            {
+    const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
+    window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false`, '_blank');
+}
                         }}
                     >
                         <Plus size={18} />
