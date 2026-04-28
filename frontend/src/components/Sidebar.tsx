@@ -26,6 +26,26 @@ interface MenuItem {
     }[];
 }
 
+/**
+ * Detail / wizard pages don't have their own sidebar entry, but they
+ * logically belong to one of the existing sub-items. When the user is
+ * on one of these routes, we keep the parent menu expanded and the
+ * matching sub-item highlighted as if they were on the list page.
+ *
+ *   key   = the sub-item path that should light up
+ *   value = predicate run against the current pathname
+ */
+const CHILD_ROUTE_ALIASES: Record<string, (path: string) => boolean> = {
+    '/administration/md-sdoc-audit': (p) => p.startsWith('/administration/document-audit/'),
+    '/administration/pending-reviews': (p) => p.startsWith('/administration/review-detail/'),
+};
+
+function matchesChildRoute(childPath: string, currentPath: string): boolean {
+    if (currentPath === childPath) return true;
+    const alias = CHILD_ROUTE_ALIASES[childPath];
+    return alias ? alias(currentPath) : false;
+}
+
 const menuItems: MenuItem[] = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Admin Dashboard' },
     {
@@ -89,7 +109,7 @@ export default function Sidebar() {
     useEffect(() => {
         const currentPath = location.pathname;
         const parentItem = menuItems.find(item =>
-            item.children?.some(child => currentPath === child.path)
+            item.children?.some(child => matchesChildRoute(child.path, currentPath)),
         );
         if (parentItem) {
             setExpandedItem(parentItem.label);
@@ -143,7 +163,7 @@ export default function Sidebar() {
                 {menuItems.map((item) => {
                     const isExpanded = expandedItem === item.label;
                     const hasChildren = !!(item.children && item.children.length > 0);
-                    const isOnChildRoute = hasChildren && item.children?.some(child => location.pathname === child.path);
+                    const isOnChildRoute = hasChildren && item.children?.some(child => matchesChildRoute(child.path, location.pathname));
                     const isActive = !hasChildren && location.pathname === item.path && activeFocus === null;
                     const isCategoryBlue = hasChildren && (activeFocus === item.label || isOnChildRoute);
 
@@ -181,7 +201,7 @@ export default function Sidebar() {
                                         <Link
                                             key={child.path}
                                             to={child.path}
-                                            className={`nav-item sub-item ${location.pathname === child.path || (child.label === 'Ship' && location.pathname === '/vessels') ? 'sub-active' : ''}`}
+                                            className={`nav-item sub-item ${matchesChildRoute(child.path, location.pathname) || (child.label === 'Ship' && location.pathname === '/vessels') ? 'sub-active' : ''}`}
                                             onClick={() => {
                                                 setActiveFocus(null);
                                                 if (isCollapsed) setIsCollapsed(false);
