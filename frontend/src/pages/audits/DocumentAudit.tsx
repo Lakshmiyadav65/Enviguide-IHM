@@ -426,36 +426,23 @@ IHM Audit Team`,
                                                         {item.status === 'reviewed' ? 'REVIEWED' : item.status === 'received' ? 'RECEIVED' : 'PENDING'}
                                                     </span>
                                                 </td>
-                                                <td style={{ textAlign: 'center' }}>
-                                                    <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+                                                <td>
+                                                    <div className="da-action-cell">
                                                         {item.status === 'reviewed' ? (
                                                             <span
+                                                                className="da-reviewed-badge"
                                                                 title={item.reviewedBy ? `Reviewed by ${item.reviewedBy}` : 'Reviewed'}
-                                                                style={{
-                                                                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                                                                    padding: '4px 10px', background: '#ECFDF5', color: '#065F46',
-                                                                    border: '1px solid #A7F3D0', borderRadius: 999,
-                                                                    fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-                                                                }}
                                                             >
                                                                 <CheckCircle2 size={12} /> Reviewed
                                                             </span>
                                                         ) : (
                                                             <button
                                                                 type="button"
+                                                                className="da-accept-btn"
                                                                 onClick={() => handleAccept(item)}
                                                                 disabled={item.status !== 'received' || acceptingKey === item.key}
                                                                 title={item.status !== 'received' ? 'Both MD and SDoC must be uploaded before this can be accepted.' : 'Accept — mark this item reviewed'}
-                                                                style={{
-                                                                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                                                                    padding: '6px 12px',
-                                                                    background: item.status === 'received' ? '#10B981' : '#F1F5F9',
-                                                                    color: item.status === 'received' ? 'white' : '#94A3B8',
-                                                                    border: 'none', borderRadius: 6,
-                                                                    fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-                                                                    cursor: item.status === 'received' ? 'pointer' : 'not-allowed',
-                                                                    opacity: acceptingKey === item.key ? 0.7 : 1,
-                                                                }}
+                                                                style={{ opacity: acceptingKey === item.key ? 0.7 : 1 }}
                                                             >
                                                                 {acceptingKey === item.key ? (
                                                                     <><Loader2 size={12} className="spin" /> Accepting…</>
@@ -466,19 +453,9 @@ IHM Audit Team`,
                                                         )}
                                                         <button
                                                             type="button"
+                                                            className="da-clarify-btn"
                                                             onClick={() => openClarificationMail(item)}
                                                             title="Request clarification — send a follow-up email to the supplier"
-                                                            style={{
-                                                                display: 'inline-flex', alignItems: 'center', gap: 4,
-                                                                padding: '6px 12px',
-                                                                background: 'white',
-                                                                color: '#0369A1',
-                                                                border: '1px solid #00B0FA',
-                                                                borderRadius: 6,
-                                                                fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
-                                                                cursor: 'pointer',
-                                                                whiteSpace: 'nowrap',
-                                                            }}
                                                         >
                                                             <MessageSquare size={12} /> Request Clarification
                                                         </button>

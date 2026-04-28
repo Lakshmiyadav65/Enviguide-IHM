@@ -366,6 +366,106 @@ body:has(.sidebar.collapsed) .doc-audit-main {
     vertical-align: middle;
 }
 
+/* Sticky ACTION column — same treatment as MD SDoC Audit Pending so the
+   manager can always reach Accept / Request Clarification regardless of
+   horizontal scroll position. The header keeps the F8FAFC bg, body cells
+   use white to mask scrolling content, and a subtle left-edge shadow
+   marks the pin. */
+.audit-table th:last-child,
+.audit-table td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    box-shadow: -4px 0 8px -6px rgba(15, 23, 42, 0.18);
+    min-width: 280px;
+    width: 280px;
+    text-align: center;
+}
+
+.audit-table th:last-child {
+    background: #F8FAFC;
+}
+
+.audit-table td:last-child {
+    background: white;
+}
+
+/* Per-row action buttons — class-based so they're insulated from any
+   global .accept-btn / .clar-btn rules elsewhere in the codebase. */
+.audit-table .da-accept-btn,
+.audit-table .da-clarify-btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: auto !important;
+    width: auto !important;
+    flex: none !important;
+    padding: 7px 14px !important;
+    border-radius: 8px !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    white-space: nowrap;
+    line-height: 1.2;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.audit-table .da-accept-btn {
+    background: #10B981 !important;
+    color: white !important;
+    border: 1px solid #10B981 !important;
+}
+
+.audit-table .da-accept-btn:hover:not(:disabled) {
+    background: #0EA371 !important;
+    border-color: #0EA371 !important;
+}
+
+.audit-table .da-accept-btn:disabled {
+    background: #F1F5F9 !important;
+    color: #94A3B8 !important;
+    border-color: #E2E8F0 !important;
+    cursor: not-allowed;
+}
+
+.audit-table .da-clarify-btn {
+    background: white !important;
+    color: #0369A1 !important;
+    border: 1px solid #00B0FA !important;
+}
+
+.audit-table .da-clarify-btn:hover {
+    background: #00B0FA !important;
+    color: white !important;
+}
+
+/* Reviewed badge, used in place of the Accept button once approved. */
+.audit-table .da-reviewed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 12px;
+    background: #ECFDF5;
+    color: #065F46;
+    border: 1px solid #A7F3D0;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.audit-table .da-action-cell {
+    display: inline-flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
 .po-ident {
     color: #00A3FF;
     font-weight: 700;
