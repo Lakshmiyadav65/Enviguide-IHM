@@ -182,17 +182,20 @@ body:has(.sidebar.collapsed) .md-sdoc-main {
 }
 
 /* Clarification */
+/* Last Submission Date */
 .md-table th:nth-child(7) {
-    width: 12%;
+    width: 14%;
+    white-space: nowrap;
 }
 
-/* Date */
+/* Action — needs room for the REVIEW pill (~120px). Without min-width
+   the percentage column collapses on narrow viewports and the pill
+   visually becomes a circle with the text crammed inside. */
 .md-table th:nth-child(8) {
-    width: 8%;
+    width: 12%;
+    min-width: 140px;
     text-align: center;
 }
-
-/* Action */
 
 .md-table td {
     padding: 20px 24px;
@@ -201,6 +204,13 @@ body:has(.sidebar.collapsed) .md-sdoc-main {
     font-size: 14px;
     color: #334155;
     vertical-align: middle;
+}
+
+/* Tighter horizontal padding on the action cell so the pill has
+   breathing room even when the column ends up at min-width. */
+.md-table td:nth-child(8) {
+    padding: 16px 12px;
+    text-align: center;
 }
 
 /* Column styles */
