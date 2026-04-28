@@ -841,27 +841,44 @@ export default function HazardousMaterialMapping() {
                                             {openDropdown === 'suspected_hm' && (
                                                 <div className="dropdown-v4">
                                                     {(() => {
-                                                        // Comprehensive IHM hazardous materials, filtered by selected IHM Part
-                                                        const HAZMAT_BY_PART: Record<string, string[]> = {
+                                                        // IHM Part I splits into Table A (prohibited), Table B
+                                                        // (regulated/restricted) and Annex II additions per the
+                                                        // Hong Kong Convention. Parts II / III stay flat.
+                                                        type Group = { title: string; items: string[] };
+                                                        type HazmatList = string[] | Group[];
+                                                        const HAZMAT_BY_PART: Record<string, HazmatList> = {
                                                             'I': [
-                                                                'Asbestos',
-                                                                'Polychlorinated Biphenyls (PCBs)',
-                                                                'Ozone Depleting Substances (ODS)',
-                                                                'Anti-fouling compounds (Organotin - TBT)',
-                                                                'Cybutryne',
-                                                                'Cadmium and its compounds',
-                                                                'Hexavalent Chromium and its compounds',
-                                                                'Lead and its compounds',
-                                                                'Mercury and its compounds',
-                                                                'Polybrominated Biphenyls (PBBs)',
-                                                                'Polybrominated Diphenyl Ethers (PBDEs)',
-                                                                'Polychlorinated Naphthalenes',
-                                                                'Radioactive substances',
-                                                                'Certain Short-chain Chlorinated Paraffins (SCCPs)',
-                                                                'Perfluorooctane Sulfonate (PFOS)',
-                                                                'Hexabromocyclododecane (HBCDD)',
-                                                                'Brominated Flame Retardants (HBCDD)',
-                                                                'Perfluorooctanoic Acid (PFOA)',
+                                                                {
+                                                                    title: 'Table A',
+                                                                    items: [
+                                                                        'Asbestos',
+                                                                        'Polychlorinated Biphenyls (PCB)',
+                                                                        'Ozone Depleting Substance',
+                                                                        'Organotin Compounds',
+                                                                        'Cybutryne',
+                                                                    ],
+                                                                },
+                                                                {
+                                                                    title: 'Table B',
+                                                                    items: [
+                                                                        'Cadmium (and compounds)',
+                                                                        'Chromium (and compounds)',
+                                                                        'Lead (and compounds)',
+                                                                        'Mercury (and compounds)',
+                                                                        'Polybrominated Biphenyl (PBB)',
+                                                                        'Polybrominated Diphenyl Ethers (PBDE)',
+                                                                        'Polychloronaphthalenes (Cl >= 3)',
+                                                                        'Radioactive Material',
+                                                                        'Certain Shortchain Chlorinated Paraffins',
+                                                                    ],
+                                                                },
+                                                                {
+                                                                    title: 'Annex II',
+                                                                    items: [
+                                                                        'Perfluorooctane Sulfonic Acid (PFOS)',
+                                                                        'Hexabromocyclododecane (HBCDD)',
+                                                                    ],
+                                                                },
                                                             ],
                                                             'II': [
                                                                 'Operational wastes - Sludges',
@@ -896,11 +913,66 @@ export default function HazardousMaterialMapping() {
                                                             : formData.ihmPart?.includes('Part II') ? 'II'
                                                             : formData.ihmPart?.includes('Part I') ? 'I'
                                                             : null;
-                                                        const list = partKey ? HAZMAT_BY_PART[partKey] : Object.values(HAZMAT_BY_PART).flat();
-                                                        return list;
-                                                    })().map(mat => (
-                                                        <div key={mat} className="drop-item" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, hazMaterials: [mat] }); setOpenDropdown(null); }}>{mat}</div>
-                                                    ))}
+                                                        const isGroupedList = (l: HazmatList): l is Group[] =>
+                                                            Array.isArray(l) && l.length > 0 && typeof l[0] === 'object' && 'items' in (l[0] as object);
+
+                                                        const pickItem = (mat: string) => {
+                                                            setFormData({ ...formData, hazMaterials: [mat] });
+                                                            setOpenDropdown(null);
+                                                        };
+
+                                                        const headerStyle: React.CSSProperties = {
+                                                            padding: '8px 12px 4px',
+                                                            fontSize: 11,
+                                                            fontWeight: 800,
+                                                            letterSpacing: '0.06em',
+                                                            textTransform: 'uppercase',
+                                                            color: '#94A3B8',
+                                                            background: '#F8FAFC',
+                                                            borderTop: '1px solid #E2E8F0',
+                                                            position: 'sticky',
+                                                            top: 0,
+                                                        };
+
+                                                        // Grouped render — Part I (and 'all' fallback gets flat).
+                                                        if (partKey === 'I') {
+                                                            const groups = HAZMAT_BY_PART['I'] as Group[];
+                                                            return (
+                                                                <>
+                                                                    {groups.map((g) => (
+                                                                        <React.Fragment key={g.title}>
+                                                                            <div style={headerStyle}>{g.title}</div>
+                                                                            {g.items.map((mat) => (
+                                                                                <div
+                                                                                    key={mat}
+                                                                                    className="drop-item"
+                                                                                    onClick={(e) => { e.stopPropagation(); pickItem(mat); }}
+                                                                                >
+                                                                                    {mat}
+                                                                                </div>
+                                                                            ))}
+                                                                        </React.Fragment>
+                                                                    ))}
+                                                                </>
+                                                            );
+                                                        }
+
+                                                        // Flat render for Part II / III, or all-parts fallback.
+                                                        const flat: string[] = partKey
+                                                            ? (HAZMAT_BY_PART[partKey] as string[])
+                                                            : Object.values(HAZMAT_BY_PART).flatMap((l) =>
+                                                                isGroupedList(l) ? l.flatMap((g) => g.items) : (l as string[]),
+                                                            );
+                                                        return flat.map((mat) => (
+                                                            <div
+                                                                key={mat}
+                                                                className="drop-item"
+                                                                onClick={(e) => { e.stopPropagation(); pickItem(mat); }}
+                                                            >
+                                                                {mat}
+                                                            </div>
+                                                        ));
+                                                    })()}
                                                 </div>
                                             )}
                                         </div>
