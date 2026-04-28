@@ -65,11 +65,10 @@ export const AuditService = {
   /**
    * Get audits with status 'In Progress' or 'Pending' (Pending Audits Registry).
    *
-   * Once a clarification email has been dispatched for the vessel, the audit
-   * has moved past the 'needs categorization' stage and now lives in MD/SDoC
-   * Audit Pending while we wait on suppliers — even if its status flips back
-   * to 'In Progress' (which it does, by design, post-Send). Filter those out
-   * here so they don't reappear next to fresh uploads.
+   * Status alone drives the registry — post-clarification audits live under
+   * the dedicated 'Awaiting Clarification' status (set by sendClarificationEmail)
+   * so they don't collide with fresh uploads, and a re-upload resets the
+   * audit back to 'In Progress'. No clarification-existence subquery needed.
    */
   async getPendingAudits(userId: string) {
     const r = await query(
@@ -77,10 +76,6 @@ export const AuditService = {
          JOIN vessels v ON a.vessel_id = v.id
         WHERE v.created_by_id = $1
           AND a.status IN ('In Progress', 'Pending')
-          AND NOT EXISTS (
-            SELECT 1 FROM clarification_requests cr
-             WHERE cr.vessel_id = a.vessel_id
-          )
         ORDER BY a.last_activity DESC`,
       [userId],
     );

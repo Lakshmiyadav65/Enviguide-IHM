@@ -181,13 +181,14 @@ export async function uploadPurchaseOrderBulk(req: Request, res: Response, next:
     const filePath = `/uploads/po/${req.file.filename}`;
 
     // 1. Upsert the audit summary. Any active audit for this vessel — whether
-     //    'In Progress' or 'Pending Review' — is replaced by this upload.
-     //    Completed audits are preserved (they are historical records).
-     //    If there are multiple active rows (legacy duplicates), we keep the
-     //    newest, reset it, and delete the rest.
+     //    'In Progress', 'Pending Review', or 'Awaiting Clarification' — is
+     //    replaced by this upload. Completed audits are preserved (they are
+     //    historical records). If there are multiple active rows (legacy
+     //    duplicates), we keep the newest, reset it, and delete the rest.
     const existingActive = await query(
       `SELECT id FROM audit_summaries
-         WHERE vessel_id = $1 AND status IN ('In Progress', 'Pending', 'Pending Review')
+         WHERE vessel_id = $1
+           AND status IN ('In Progress', 'Pending', 'Pending Review', 'Awaiting Clarification')
          ORDER BY created_at DESC`,
       [vesselId],
     );

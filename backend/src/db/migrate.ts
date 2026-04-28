@@ -461,6 +461,27 @@ CREATE INDEX IF NOT EXISTS idx_clarif_public_token ON "clarification_requests"(p
 CREATE INDEX IF NOT EXISTS idx_audit_lines_audit ON "audit_line_items"(audit_id);
 CREATE INDEX IF NOT EXISTS idx_audit_lines_vessel ON "audit_line_items"(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_audit_lines_po ON "audit_line_items"(po_number);
+
+-- Backfill (idempotent, safe for fresh uploads):
+-- Audits that were transitioned to 'In Progress' by the old send-mail code
+-- (before 'Awaiting Clarification' existed) should snap into the new status
+-- so they stop appearing in Pending Audits next to fresh uploads. We restrict
+-- the update to audits whose vessel has clarification_items showing real
+-- supplier activity (a received doc or at least one reminder fired) — that
+-- way a vessel that was re-uploaded after old clarifications still slots
+-- correctly into 'In Progress' as a fresh audit.
+UPDATE audit_summaries a
+   SET status = 'Awaiting Clarification', updated_at = NOW()
+ WHERE a.status = 'In Progress'
+   AND EXISTS (
+     SELECT 1
+       FROM clarification_requests cr
+       JOIN clarification_items   ci ON ci.clarification_id = cr.id
+      WHERE cr.vessel_id = a.vessel_id
+        AND (ci.mds_status = 'received'
+             OR ci.sdoc_status = 'received'
+             OR ci.reminder_count > 0)
+   );
 `;
 
 async function migrate() {

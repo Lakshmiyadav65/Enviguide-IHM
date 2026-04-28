@@ -381,16 +381,18 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
       ));
     }
 
-    // All batches sent successfully. The audit was sitting in 'Pending Review';
-    // now that the team has acted on it (clarifications dispatched), move it
-    // back to 'In Progress' so it leaves the Pending Reviews registry and
-    // re-appears in Pending Audits while we wait for supplier responses.
+    // All batches sent successfully. Move the audit into a dedicated
+    // 'Awaiting Clarification' state so it leaves Pending Reviews and
+    // shows up in MD SDoC Audit Pending — without colliding with fresh
+    // uploads that also have status = 'In Progress'. The PO upload
+    // controller resets this back to 'In Progress' on a re-upload.
     if (audit) {
       const auditRow = audit as Record<string, unknown>;
-      if (auditRow.status === 'Pending Review') {
+      const currentStatus = String(auditRow.status ?? '');
+      if (currentStatus === 'Pending Review' || currentStatus === 'In Progress' || currentStatus === 'Pending') {
         await query(
           `UPDATE audit_summaries
-              SET status = 'In Progress',
+              SET status = 'Awaiting Clarification',
                   last_activity = NOW(),
                   updated_at = NOW()
             WHERE id = $1`,
