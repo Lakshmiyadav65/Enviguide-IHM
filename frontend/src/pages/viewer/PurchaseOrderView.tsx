@@ -24,9 +24,16 @@ interface PurchaseOrderItem {
     // Clarification-item identifiers (needed to upload the MDS doc).
     clarificationId?: string;
     itemIndex?: number;
+    // Combined MDS status — 'received' iff both MD and SDoC are in.
     mdsStatus?: 'pending' | 'received' | string;
-    mdsFilePath?: string;
-    mdsFileName?: string;
+    // Per-doc state. mdStatus / sdocStatus default to 'pending' when an
+    // item has a clarification but the slot hasn't been uploaded yet.
+    mdStatus?: 'pending' | 'received' | string;
+    mdFilePath?: string;
+    mdFileName?: string;
+    sdocStatus?: 'pending' | 'received' | string;
+    sdocFilePath?: string;
+    sdocFileName?: string;
     reminderCount?: number;
     // 'red' | 'green' | 'pchm' | null — set by the HM categorization flow.
     hmStatus?: string | null;
@@ -70,8 +77,12 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                 const items: PurchaseOrderItem[] = rows.map((r, i) => {
                     const mdsStatus = String(r.mds_status ?? 'none');
                     const isSuspected = String(r.is_suspected ?? 'No') === 'Yes';
-                    const mdsFilePath = r.mds_file_path ? String(r.mds_file_path) : undefined;
-                    const mdsFileName = r.mds_file_name ? String(r.mds_file_name) : undefined;
+                    const mdStatus = String(r.md_status ?? r.mds_status ?? 'none');
+                    const mdFilePath = r.md_file_path ? String(r.md_file_path) : (r.mds_file_path ? String(r.mds_file_path) : undefined);
+                    const mdFileName = r.md_file_name ? String(r.md_file_name) : (r.mds_file_name ? String(r.mds_file_name) : undefined);
+                    const sdocStatus = String(r.sdoc_status ?? 'none');
+                    const sdocFilePath = r.sdoc_file_path ? String(r.sdoc_file_path) : undefined;
+                    const sdocFileName = r.sdoc_file_name ? String(r.sdoc_file_name) : undefined;
                     const mdsReceivedAt = typeof r.mds_received_at === 'string' ? r.mds_received_at.split('T')[0] : '';
                     const poSentDate = typeof r.po_sent_date === 'string' ? r.po_sent_date.split('T')[0] : String(r.po_sent_date ?? '');
                     const mdReqDate = typeof r.md_requested_date === 'string' ? r.md_requested_date.split('T')[0] : String(r.md_requested_date ?? '');
@@ -104,8 +115,12 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                         isSuspected,
                         selected: false,
                         mdsStatus,
-                        mdsFilePath,
-                        mdsFileName,
+                        mdStatus,
+                        mdFilePath,
+                        mdFileName,
+                        sdocStatus,
+                        sdocFilePath,
+                        sdocFileName,
                         reminderCount,
                         hmStatus: hmStatusRaw,
                         vendorName: String(r.vendor_name ?? ''),
@@ -119,19 +134,23 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
 
     useEffect(loadClarifications, [vesselId]);
 
-    // Upload an MDS document for one clarification item, then refresh.
-    const uploadMdsDocument = async (item: PurchaseOrderItem, file: File) => {
+    // Upload one document slot (MD or SDoC) for a clarification item, then refresh.
+    const uploadMdsDocument = async (
+        item: PurchaseOrderItem,
+        kind: 'md' | 'sdoc',
+        file: File,
+    ) => {
         if (!item.clarificationId || item.itemIndex === undefined) return;
         const fd = new FormData();
         fd.append('file', file);
         try {
             await api.upload(
-                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_DOC(item.clarificationId, item.itemIndex),
+                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_DOC(item.clarificationId, item.itemIndex, kind),
                 fd,
             );
             loadClarifications();
         } catch (err) {
-            console.error('MDS upload failed:', err);
+            console.error(`${kind.toUpperCase()} upload failed:`, err);
         }
     };
     const [searchTerm, setSearchTerm] = useState('');
@@ -538,36 +557,48 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                                 </div>
                                                             </td>
                                                             <td className="doc-col">
-                                                                {item.mdsFilePath ? (
-                                                                    <a
-                                                                        href={item.mdsFilePath}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="po-v4-action-icon-btn-v4 doc"
-                                                                        title={`View uploaded MDS (${item.mdsFileName || 'document'})`}
-                                                                        style={{ display: 'inline-flex', color: '#10B981' }}
-                                                                    >
-                                                                        <FileText size={14} />
-                                                                    </a>
-                                                                ) : (
-                                                                    <label
-                                                                        className="po-v4-action-icon-btn-v4 doc"
-                                                                        title="Upload MDS / SDoC document"
-                                                                        style={{ cursor: 'pointer', display: 'inline-flex' }}
-                                                                    >
-                                                                        <FileText size={14} />
-                                                                        <input
-                                                                            type="file"
-                                                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                                                                            style={{ display: 'none' }}
-                                                                            onChange={(e) => {
-                                                                                const f = e.target.files?.[0];
-                                                                                if (f) uploadMdsDocument(item, f);
-                                                                                e.target.value = '';
-                                                                            }}
-                                                                        />
-                                                                    </label>
-                                                                )}
+                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                                    {(['md', 'sdoc'] as const).map((kind) => {
+                                                                        const filePath = kind === 'md' ? item.mdFilePath : item.sdocFilePath;
+                                                                        const fileName = kind === 'md' ? item.mdFileName : item.sdocFileName;
+                                                                        const label = kind.toUpperCase();
+                                                                        return filePath ? (
+                                                                            <a
+                                                                                key={kind}
+                                                                                href={filePath}
+                                                                                target="_blank"
+                                                                                rel="noopener noreferrer"
+                                                                                className="po-v4-action-icon-btn-v4 doc"
+                                                                                title={`View uploaded ${label} (${fileName || 'document'})`}
+                                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: '#10B981', fontSize: 10, fontWeight: 700 }}
+                                                                            >
+                                                                                <FileText size={14} />
+                                                                                {label}
+                                                                            </a>
+                                                                        ) : (
+                                                                            <label
+                                                                                key={kind}
+                                                                                className="po-v4-action-icon-btn-v4 doc"
+                                                                                title={`Upload ${label} document`}
+                                                                                style={{ cursor: item.clarificationId ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 2, color: '#94A3B8', fontSize: 10, fontWeight: 700, opacity: item.clarificationId ? 1 : 0.4 }}
+                                                                            >
+                                                                                <FileText size={14} />
+                                                                                {label}
+                                                                                <input
+                                                                                    type="file"
+                                                                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                                                                                    style={{ display: 'none' }}
+                                                                                    disabled={!item.clarificationId}
+                                                                                    onChange={(e) => {
+                                                                                        const f = e.target.files?.[0];
+                                                                                        if (f) uploadMdsDocument(item, kind, f);
+                                                                                        e.target.value = '';
+                                                                                    }}
+                                                                                />
+                                                                            </label>
+                                                                        );
+                                                                    })}
+                                                                </div>
                                                             </td>
                                                             <td className="em-col">{item.emailStatus}</td>
                                                             <td className="ihm-col">{item.ihmProductCode}</td>

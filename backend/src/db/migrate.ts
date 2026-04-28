@@ -421,6 +421,16 @@ CREATE TABLE IF NOT EXISTS "clarification_items" (
 ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS uploaded_by_email VARCHAR(255);
 ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS uploaded_by_ip VARCHAR(64);
 
+-- Each clarification item now tracks two distinct supplier documents:
+--   * MD   (Material Declaration)        — stored in mds_status / mds_file_*
+--   * SDoC (Supplier Declaration of      — stored in sdoc_status / sdoc_file_*
+--           Conformity)
+-- The legacy mds_* columns are reused as the MD slot (no migration needed).
+ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS sdoc_status VARCHAR(20) NOT NULL DEFAULT 'pending';
+ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS sdoc_file_path VARCHAR(500);
+ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS sdoc_file_name VARCHAR(255);
+ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS sdoc_received_at TIMESTAMPTZ;
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_vessels_created_by ON "vessels"(created_by_id);
 CREATE INDEX IF NOT EXISTS idx_ga_plans_vessel ON "ga_plans"(vessel_id);

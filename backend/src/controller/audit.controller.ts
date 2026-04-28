@@ -568,6 +568,12 @@ export async function uploadClarificationItemDocument(
     if (!Number.isFinite(itemIndex) || itemIndex < 0) {
       return next(createError('Invalid item index', 400));
     }
+    const rawKind = String(req.params.kind ?? '').trim().toLowerCase();
+    const kind: 'md' | 'sdoc' | null =
+      rawKind === 'md' || rawKind === 'mds' ? 'md'
+      : rawKind === 'sdoc' || rawKind === 'sdocs' ? 'sdoc'
+      : null;
+    if (!kind) return next(createError("Invalid document kind. Expected 'md' or 'sdoc'.", 400));
 
     const item = await AuditService.getClarificationItem(clarificationId, itemIndex);
     if (!item) return next(createError('Clarification item not found', 404));
@@ -577,10 +583,11 @@ export async function uploadClarificationItemDocument(
     const parent = await AuditService.getAuditByImo(imo, req.user!.userId);
     if (!parent) return next(createError('Audit not found for this user', 404));
 
-    const stored = await persistUploadedFile(req.file.path, req.file.originalname, 'mds');
+    const stored = await persistUploadedFile(req.file.path, req.file.originalname, kind);
     const updated = await AuditService.setClarificationItemDocument(
       clarificationId,
       itemIndex,
+      kind,
       stored.url,
       stored.name,
     );

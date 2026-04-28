@@ -8,17 +8,33 @@ import { useParams } from 'react-router-dom';
 import { CheckCircle2, FileText, Upload, AlertTriangle, Loader2, Trash2 } from 'lucide-react';
 import { API_CONFIG } from '../../config/api.config';
 
+interface DocSlot {
+    status: 'pending' | 'received' | string;
+    fileName: string | null;
+    filePath: string | null;
+    receivedAt: string | null;
+}
+
 interface SupplierItem {
     index: number;
     poNumber: string;
     itemDescription: string;
     equipmentName: string;
     quantity: string;
+    md: DocSlot;
+    sdoc: DocSlot;
+    // Legacy fields (mirror of MD slot) — kept for back-compat with older builds.
     mdsStatus: 'pending' | 'received' | string;
     mdsFileName: string | null;
     mdsFilePath: string | null;
     mdsReceivedAt: string | null;
 }
+
+type DocKind = 'md' | 'sdoc';
+const DOC_LABEL: Record<DocKind, string> = {
+    md: 'Material Declaration (MD)',
+    sdoc: 'Supplier Declaration of Conformity (SDoC)',
+};
 
 interface SupplierPayload {
     vesselName: string | null;
@@ -44,9 +60,9 @@ export default function SupplierUpload() {
     const [supplierContactName, setSupplierContactName] = useState('');
     const [supplierComments, setSupplierComments] = useState('');
     const [preparedDate, setPreparedDate] = useState('');
-    const [uploadingIdx, setUploadingIdx] = useState<number | null>(null);
-    const [deletingIdx, setDeletingIdx] = useState<number | null>(null);
-    const [rowError, setRowError] = useState<{ idx: number; msg: string } | null>(null);
+    const [uploadingSlot, setUploadingSlot] = useState<{ idx: number; kind: DocKind } | null>(null);
+    const [deletingSlot, setDeletingSlot] = useState<{ idx: number; kind: DocKind } | null>(null);
+    const [rowError, setRowError] = useState<{ idx: number; kind: DocKind; msg: string } | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [formSubmitted, setFormSubmitted] = useState(false);
@@ -84,13 +100,13 @@ export default function SupplierUpload() {
         && supplierContactName.trim(),
     );
 
-    const uploadFile = async (idx: number, file: File) => {
+    const uploadFile = async (idx: number, kind: DocKind, file: File) => {
         if (!canUpload) {
-            setRowError({ idx, msg: 'Fill in your email, company, and contact name above first.' });
+            setRowError({ idx, kind, msg: 'Fill in your email, company, and contact name above first.' });
             return;
         }
         if (!token) return;
-        setUploadingIdx(idx);
+        setUploadingSlot({ idx, kind });
         setRowError(null);
         try {
             const fd = new FormData();
@@ -101,7 +117,7 @@ export default function SupplierUpload() {
             if (supplierComments) fd.append('supplierComments', supplierComments);
             if (preparedDate) fd.append('preparedDate', preparedDate);
             const res = await fetch(
-                `${API_CONFIG.BASE_URL}/public/clarifications/${token}/items/${idx}/document`,
+                `${API_CONFIG.BASE_URL}/public/clarifications/${token}/items/${idx}/document/${kind}`,
                 { method: 'POST', body: fd },
             );
             if (!res.ok) {
@@ -111,19 +127,19 @@ export default function SupplierUpload() {
             setEmailLocked(true);
             loadData();
         } catch (e) {
-            setRowError({ idx, msg: e instanceof Error ? e.message : 'Upload failed' });
+            setRowError({ idx, kind, msg: e instanceof Error ? e.message : 'Upload failed' });
         } finally {
-            setUploadingIdx(null);
+            setUploadingSlot(null);
         }
     };
 
-    const deleteFile = async (idx: number) => {
+    const deleteFile = async (idx: number, kind: DocKind) => {
         if (!token || !email) return;
-        setDeletingIdx(idx);
+        setDeletingSlot({ idx, kind });
         setRowError(null);
         try {
             const res = await fetch(
-                `${API_CONFIG.BASE_URL}/public/clarifications/${token}/items/${idx}/document`,
+                `${API_CONFIG.BASE_URL}/public/clarifications/${token}/items/${idx}/document/${kind}`,
                 {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
@@ -136,9 +152,9 @@ export default function SupplierUpload() {
             }
             loadData();
         } catch (e) {
-            setRowError({ idx, msg: e instanceof Error ? e.message : 'Delete failed' });
+            setRowError({ idx, kind, msg: e instanceof Error ? e.message : 'Delete failed' });
         } finally {
-            setDeletingIdx(null);
+            setDeletingSlot(null);
         }
     };
 
@@ -203,7 +219,15 @@ export default function SupplierUpload() {
         );
     }
 
-    const totalReceived = data.items.filter((i) => i.mdsStatus === 'received').length;
+    // An item is "complete" only when BOTH its MD and SDoC slots are received.
+    const isItemComplete = (it: SupplierItem) =>
+        it.md.status === 'received' && it.sdoc.status === 'received';
+    const totalReceived = data.items.filter(isItemComplete).length;
+    const totalSlots = data.items.length * 2;
+    const filledSlots = data.items.reduce(
+        (n, it) => n + (it.md.status === 'received' ? 1 : 0) + (it.sdoc.status === 'received' ? 1 : 0),
+        0,
+    );
 
     return (
         <div style={{ minHeight: '100vh', background: '#F8FAFC', padding: '32px 16px' }}>
@@ -298,85 +322,43 @@ export default function SupplierUpload() {
                 )}
 
                 <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E2E8F0', overflow: 'hidden' }}>
-                    <div style={{ padding: '12px 20px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-                        Items ({totalReceived} / {data.items.length} uploaded)
+                    <div style={{ padding: '12px 20px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>Items ({totalReceived} / {data.items.length} fully complete)</span>
+                        <span style={{ fontSize: 11, color: '#64748B', fontWeight: 600 }}>
+                            {filledSlots} / {totalSlots} files uploaded
+                        </span>
+                    </div>
+                    <div style={{ padding: '10px 20px', background: '#FFFBEB', borderBottom: '1px solid #FDE68A', fontSize: 12, color: '#92400E' }}>
+                        Each item needs <strong>both</strong> a Material Declaration (MD) <strong>and</strong> a Supplier Declaration of Conformity (SDoC). Upload them separately below.
                     </div>
                     {data.items.map((item) => {
-                        const received = item.mdsStatus === 'received';
-                        const isUploading = uploadingIdx === item.index;
-                        const isDeleting = deletingIdx === item.index;
+                        const itemComplete = isItemComplete(item);
                         return (
-                            <div key={item.index} style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: 16 }}>
-                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: received ? '#ECFDF5' : '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                    {received ? <CheckCircle2 size={18} color="#10B981" /> : <FileText size={16} color="#94A3B8" />}
+                            <div key={item.index} style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                                <div style={{ width: 28, height: 28, borderRadius: '50%', background: itemComplete ? '#ECFDF5' : '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                                    {itemComplete ? <CheckCircle2 size={18} color="#10B981" /> : <FileText size={16} color="#94A3B8" />}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontWeight: 600, color: '#0F172A', fontSize: 14 }}>{item.itemDescription || '(no description)'}</div>
                                     <div style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
                                         PO {item.poNumber || '—'} · {item.equipmentName || 'Unspecified'} · Qty {item.quantity || '—'}
                                     </div>
-                                    {received && item.mdsFileName && (
-                                        <div style={{ marginTop: 6, fontSize: 12, color: '#059669', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            <span>Uploaded: {item.mdsFileName}</span>
-                                        </div>
-                                    )}
-                                    {rowError && rowError.idx === item.index && (
-                                        <div style={{ marginTop: 6, fontSize: 12, color: '#DC2626' }}>{rowError.msg}</div>
-                                    )}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    {received ? (
-                                        <>
-                                            <button disabled style={{ padding: '8px 14px', border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#065F46', borderRadius: 8, fontWeight: 600, fontSize: 13 }}>
-                                                Received
-                                            </button>
-                                            {!formSubmitted && (
-                                                <button
-                                                    onClick={() => deleteFile(item.index)}
-                                                    disabled={isDeleting}
-                                                    title="Remove this file"
-                                                    style={{ padding: 8, border: '1px solid #FECACA', background: '#FEF2F2', color: '#B91C1C', borderRadius: 8, cursor: isDeleting ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center' }}
-                                                >
-                                                    {isDeleting ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
-                                                </button>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <label
-                                            title={!canUpload ? 'Fill in your email, supplier company, and contact person first' : ''}
-                                            style={{
-                                                padding: '8px 14px',
-                                                border: `1px solid ${canUpload ? '#00B0FA' : '#CBD5E1'}`,
-                                                background: isUploading ? '#BAE6FD' : (canUpload ? '#F0F9FF' : '#F1F5F9'),
-                                                color: canUpload ? '#0369A1' : '#94A3B8',
-                                                borderRadius: 8,
-                                                fontWeight: 600,
-                                                fontSize: 13,
-                                                cursor: !canUpload ? 'not-allowed' : (isUploading ? 'wait' : 'pointer'),
-                                                display: 'inline-flex',
-                                                alignItems: 'center',
-                                                gap: 6,
-                                                opacity: canUpload ? 1 : 0.7,
-                                            }}
-                                        >
-                                            {isUploading ? (
-                                                <><Loader2 size={14} className="spin" /> Uploading…</>
-                                            ) : (
-                                                <><Upload size={14} /> Upload</>
-                                            )}
-                                            <input
-                                                type="file"
-                                                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                                                style={{ display: 'none' }}
-                                                disabled={!canUpload || isUploading || formSubmitted}
-                                                onChange={(e) => {
-                                                    const f = e.target.files?.[0];
-                                                    if (f) uploadFile(item.index, f);
-                                                    e.target.value = '';
-                                                }}
+                                    <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+                                        {(['md', 'sdoc'] as DocKind[]).map((kind) => (
+                                            <DocSlotRow
+                                                key={kind}
+                                                kind={kind}
+                                                slot={item[kind]}
+                                                canUpload={canUpload}
+                                                formSubmitted={formSubmitted}
+                                                isUploading={uploadingSlot?.idx === item.index && uploadingSlot.kind === kind}
+                                                isDeleting={deletingSlot?.idx === item.index && deletingSlot.kind === kind}
+                                                error={rowError && rowError.idx === item.index && rowError.kind === kind ? rowError.msg : null}
+                                                onUpload={(file) => uploadFile(item.index, kind, file)}
+                                                onDelete={() => deleteFile(item.index, kind)}
                                             />
-                                        </label>
-                                    )}
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -463,4 +445,111 @@ function inputStyle(disabled: boolean): React.CSSProperties {
         background: disabled ? '#F1F5F9' : 'white',
         color: disabled ? '#64748B' : '#0F172A',
     };
+}
+
+/** A single Upload/Received slot inside a per-item row (MD or SDoC). */
+function DocSlotRow({
+    kind,
+    slot,
+    canUpload,
+    formSubmitted,
+    isUploading,
+    isDeleting,
+    error,
+    onUpload,
+    onDelete,
+}: {
+    kind: DocKind;
+    slot: DocSlot;
+    canUpload: boolean;
+    formSubmitted: boolean;
+    isUploading: boolean;
+    isDeleting: boolean;
+    error: string | null;
+    onUpload: (f: File) => void;
+    onDelete: () => void;
+}) {
+    const received = slot.status === 'received';
+    return (
+        <div
+            style={{
+                border: `1px solid ${received ? '#A7F3D0' : '#E2E8F0'}`,
+                background: received ? '#F0FDF4' : '#FAFCFF',
+                borderRadius: 10,
+                padding: 10,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: received ? '#065F46' : '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {DOC_LABEL[kind]}
+                </div>
+                {received && <CheckCircle2 size={16} color="#10B981" />}
+            </div>
+            {received && slot.fileName && (
+                <div style={{ fontSize: 12, color: '#059669', wordBreak: 'break-all' }}>
+                    Uploaded: {slot.fileName}
+                </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {received ? (
+                    <>
+                        <button disabled style={{ padding: '6px 12px', border: '1px solid #A7F3D0', background: '#ECFDF5', color: '#065F46', borderRadius: 8, fontWeight: 600, fontSize: 12 }}>
+                            Received
+                        </button>
+                        {!formSubmitted && (
+                            <button
+                                onClick={onDelete}
+                                disabled={isDeleting}
+                                title={`Remove this ${kind.toUpperCase()} file`}
+                                style={{ padding: 6, border: '1px solid #FECACA', background: '#FEF2F2', color: '#B91C1C', borderRadius: 8, cursor: isDeleting ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center' }}
+                            >
+                                {isDeleting ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
+                            </button>
+                        )}
+                    </>
+                ) : (
+                    <label
+                        title={!canUpload ? 'Fill in your email, supplier company, and contact person first' : ''}
+                        style={{
+                            padding: '6px 12px',
+                            border: `1px solid ${canUpload ? '#00B0FA' : '#CBD5E1'}`,
+                            background: isUploading ? '#BAE6FD' : (canUpload ? '#F0F9FF' : '#F1F5F9'),
+                            color: canUpload ? '#0369A1' : '#94A3B8',
+                            borderRadius: 8,
+                            fontWeight: 600,
+                            fontSize: 12,
+                            cursor: !canUpload ? 'not-allowed' : (isUploading ? 'wait' : 'pointer'),
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            opacity: canUpload ? 1 : 0.7,
+                        }}
+                    >
+                        {isUploading ? (
+                            <><Loader2 size={14} className="spin" /> Uploading…</>
+                        ) : (
+                            <><Upload size={14} /> Upload {kind.toUpperCase()}</>
+                        )}
+                        <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
+                            style={{ display: 'none' }}
+                            disabled={!canUpload || isUploading || formSubmitted}
+                            onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) onUpload(f);
+                                e.target.value = '';
+                            }}
+                        />
+                    </label>
+                )}
+            </div>
+            {error && (
+                <div style={{ fontSize: 12, color: '#DC2626' }}>{error}</div>
+            )}
+        </div>
+    );
 }

@@ -65,7 +65,7 @@ router.patch('/:imo/line-items',             replaceAuditLineItems);
 router.get('/:imo/clarifications',           getAuditClarifications);
 
 router.post(
-  '/clarifications/:clarId/items/:idx/document',
+  '/clarifications/:clarId/items/:idx/document/:kind',
   mdsUpload.single('file'),
   uploadClarificationItemDocument,
 );

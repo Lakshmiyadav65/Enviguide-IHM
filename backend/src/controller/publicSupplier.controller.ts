@@ -68,7 +68,10 @@ export async function getPublicClarification(req: Request, res: Response, next: 
       : [];
 
     const itemsRes = await query(
-      `SELECT item_index, mds_status, mds_file_name, mds_file_path, mds_received_at, uploaded_by_email
+      `SELECT item_index,
+              mds_status,  mds_file_name,  mds_file_path,  mds_received_at,
+              sdoc_status, sdoc_file_name, sdoc_file_path, sdoc_received_at,
+              uploaded_by_email
          FROM clarification_items
         WHERE clarification_id = $1
         ORDER BY item_index ASC`,
@@ -80,17 +83,35 @@ export async function getPublicClarification(req: Request, res: Response, next: 
     }
 
     // Return only the fields the supplier needs. Don't leak emails, internal
-    // IDs, or full audit context.
+    // IDs, or full audit context. Each item now carries TWO independent doc
+    // slots: md (Material Declaration) and sdoc (Supplier Declaration of
+    // Conformity). The legacy mds* fields remain for back-compat and mirror
+    // the MD slot.
     const items = suspected.map((row, idx) => {
       const r = Array.isArray(row) ? row : [];
       const state = stateByIdx.get(idx) ?? {};
+      const mdStatus = String(state.mds_status ?? 'pending');
+      const sdocStatus = String(state.sdoc_status ?? 'pending');
       return {
         index: idx,
         poNumber: String(r[2] ?? ''),
         itemDescription: String(r[6] ?? ''),
         equipmentName: String(r[11] ?? ''),
         quantity: String(r[16] ?? ''),
-        mdsStatus: String(state.mds_status ?? 'pending'),
+        md: {
+          status: mdStatus,
+          fileName: state.mds_file_name ? String(state.mds_file_name) : null,
+          filePath: state.mds_file_path ? String(state.mds_file_path) : null,
+          receivedAt: state.mds_received_at ? String(state.mds_received_at) : null,
+        },
+        sdoc: {
+          status: sdocStatus,
+          fileName: state.sdoc_file_name ? String(state.sdoc_file_name) : null,
+          filePath: state.sdoc_file_path ? String(state.sdoc_file_path) : null,
+          receivedAt: state.sdoc_received_at ? String(state.sdoc_received_at) : null,
+        },
+        // Legacy mirrors of MD slot — older clients still read these.
+        mdsStatus: mdStatus,
         mdsFileName: state.mds_file_name ? String(state.mds_file_name) : null,
         mdsFilePath: state.mds_file_path ? String(state.mds_file_path) : null,
         mdsReceivedAt: state.mds_received_at ? String(state.mds_received_at) : null,
@@ -115,15 +136,31 @@ export async function getPublicClarification(req: Request, res: Response, next: 
   } catch (err) { next(err); }
 }
 
+/** Coerce a path/body kind value to one of the two supported document slots. */
+function parseKind(raw: unknown): 'md' | 'sdoc' | null {
+  const s = String(raw ?? '').trim().toLowerCase();
+  if (s === 'md' || s === 'mds') return 'md';
+  if (s === 'sdoc' || s === 'sdocs') return 'sdoc';
+  return null;
+}
+
+/** Column tuple for the requested document slot. MD reuses legacy mds_*. */
+function colsForKind(kind: 'md' | 'sdoc') {
+  return kind === 'sdoc'
+    ? { status: 'sdoc_status', path: 'sdoc_file_path', name: 'sdoc_file_name', at: 'sdoc_received_at' }
+    : { status: 'mds_status',  path: 'mds_file_path',  name: 'mds_file_name',  at: 'mds_received_at' };
+}
+
 /**
- * POST /api/v1/public/clarifications/:token/items/:idx/document
+ * POST /api/v1/public/clarifications/:token/items/:idx/document/:kind
+ * kind ∈ { 'md', 'sdoc' }
  * multipart: file (PDF/image/office doc), email (must match recipients),
  *            supplierCompany (required), supplierContactName (required),
  *            supplierComments (optional), preparedDate (optional)
  *
  * Upload is blocked until supplierCompany + supplierContactName are set.
- * Also persists those fields on the clarification_requests row so any
- * subsequent upload on the same link carries the context.
+ * Each item carries two independent doc slots — MD and SDoC — populated
+ * separately by the supplier. The slot is selected by the :kind segment.
  */
 export async function uploadPublicMdsDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -134,6 +171,8 @@ export async function uploadPublicMdsDocument(req: Request, res: Response, next:
     if (!Number.isFinite(itemIndex) || itemIndex < 0) {
       return next(createError('Invalid item index', 400));
     }
+    const kind = parseKind(req.params.kind);
+    if (!kind) return next(createError("Invalid document kind. Expected 'md' or 'sdoc'.", 400));
 
     const clarification = await getByTokenIfValid(token);
     if (!clarification) return next(createError('Link not found or expired', 404));
@@ -154,7 +193,7 @@ export async function uploadPublicMdsDocument(req: Request, res: Response, next:
     const supplierComments = body.supplierComments?.trim() || null;
     const preparedDate = body.preparedDate?.trim() || null;
 
-    const stored = await persistUploadedFile(req.file.path, req.file.originalname, 'mds');
+    const stored = await persistUploadedFile(req.file.path, req.file.originalname, kind);
     const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
       || req.socket.remoteAddress
       || null;
@@ -170,17 +209,20 @@ export async function uploadPublicMdsDocument(req: Request, res: Response, next:
       [clarification.id, supplierCompany, supplierContactName, supplierComments, preparedDate],
     );
 
+    const c = colsForKind(kind);
     const upd = await query(
       `UPDATE clarification_items
-          SET mds_status = 'received',
-              mds_file_path = $3,
-              mds_file_name = $4,
-              mds_received_at = NOW(),
+          SET ${c.status} = 'received',
+              ${c.path}   = $3,
+              ${c.name}   = $4,
+              ${c.at}     = NOW(),
               uploaded_by_email = $5,
-              uploaded_by_ip = $6,
-              updated_at = NOW()
+              uploaded_by_ip    = $6,
+              updated_at        = NOW()
         WHERE clarification_id = $1 AND item_index = $2
-      RETURNING item_index, mds_status, mds_file_name, mds_file_path, mds_received_at`,
+      RETURNING item_index,
+                mds_status,  mds_file_name,  mds_file_path,  mds_received_at,
+                sdoc_status, sdoc_file_name, sdoc_file_path, sdoc_received_at`,
       [clarification.id, itemIndex, stored.url, stored.name, uploaderEmail, ip],
     );
     if (upd.rows.length === 0) return next(createError('Item not found for this link', 404));
@@ -190,9 +232,10 @@ export async function uploadPublicMdsDocument(req: Request, res: Response, next:
 }
 
 /**
- * DELETE /api/v1/public/clarifications/:token/items/:idx/document
- * Removes the uploaded document for one item so the supplier can re-upload.
- * Requires the matching email in the request body.
+ * DELETE /api/v1/public/clarifications/:token/items/:idx/document/:kind
+ * kind ∈ { 'md', 'sdoc' }
+ * Removes the uploaded document for one slot of one item so the supplier
+ * can re-upload. Requires the matching email in the request body.
  */
 export async function deletePublicMdsDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -201,6 +244,8 @@ export async function deletePublicMdsDocument(req: Request, res: Response, next:
     if (!Number.isFinite(itemIndex) || itemIndex < 0) {
       return next(createError('Invalid item index', 400));
     }
+    const kind = parseKind(req.params.kind);
+    if (!kind) return next(createError("Invalid document kind. Expected 'md' or 'sdoc'.", 400));
 
     const clarification = await getByTokenIfValid(token);
     if (!clarification) return next(createError('Link not found or expired', 404));
@@ -210,27 +255,27 @@ export async function deletePublicMdsDocument(req: Request, res: Response, next:
       return next(createError('Email does not match the address this link was sent to', 403));
     }
 
+    const c = colsForKind(kind);
     const existing = await query(
-      `SELECT mds_file_path FROM clarification_items
+      `SELECT ${c.path} AS file_path FROM clarification_items
         WHERE clarification_id = $1 AND item_index = $2`,
       [clarification.id, itemIndex],
     );
-    const filePath = existing.rows[0]?.mds_file_path as string | undefined;
+    const filePath = existing.rows[0]?.file_path as string | undefined;
 
     // Best-effort remove from R2/Supabase. Skip if we can't derive a key.
     if (filePath) {
-      // For our uploads the key is everything after the bucket prefix.
-      const key = filePath.split('/').slice(-2).join('/'); // e.g. "mds/xxx.pdf"
+      const key = filePath.split('/').slice(-2).join('/'); // e.g. "md/xxx.pdf" or "sdoc/xxx.pdf"
       await deleteStoredFile(key);
     }
 
     await query(
       `UPDATE clarification_items
-          SET mds_status = 'pending',
-              mds_file_path = NULL,
-              mds_file_name = NULL,
-              mds_received_at = NULL,
-              updated_at = NOW()
+          SET ${c.status} = 'pending',
+              ${c.path}   = NULL,
+              ${c.name}   = NULL,
+              ${c.at}     = NULL,
+              updated_at  = NOW()
         WHERE clarification_id = $1 AND item_index = $2`,
       [clarification.id, itemIndex],
     );

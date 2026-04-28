@@ -53,14 +53,15 @@ router.use((req, res, next) => {
 });
 
 router.get('/clarifications/:token', getPublicClarification);
+// Each item now carries two doc slots: :kind ∈ { 'md', 'sdoc' }.
 router.post(
-  '/clarifications/:token/items/:idx/document',
+  '/clarifications/:token/items/:idx/document/:kind',
   upload.single('file'),
   uploadPublicMdsDocument,
 );
 // Delete + Submit accept JSON bodies (no file upload) — parse JSON inline.
 router.delete(
-  '/clarifications/:token/items/:idx/document',
+  '/clarifications/:token/items/:idx/document/:kind',
   express.json(),
   deletePublicMdsDocument,
 );

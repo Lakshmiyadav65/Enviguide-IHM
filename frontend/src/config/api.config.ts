@@ -58,8 +58,8 @@ export const ENDPOINTS = {
     LINE_ITEMS: (imo: string) => `/audits/${imo}/line-items`,
     LINE_ITEMS_BY_ID: (auditId: string) => `/audits/by-id/${auditId}/line-items`,
     CLARIFICATIONS: (imo: string) => `/audits/${imo}/clarifications`,
-    CLARIFICATION_ITEM_DOC: (clarId: string, idx: number | string) =>
-      `/audits/clarifications/${clarId}/items/${idx}/document`,
+    CLARIFICATION_ITEM_DOC: (clarId: string, idx: number | string, kind: 'md' | 'sdoc') =>
+      `/audits/clarifications/${clarId}/items/${idx}/document/${kind}`,
     CLARIFICATION_ITEM_REMIND: (clarId: string, idx: number | string) =>
       `/audits/clarifications/${clarId}/items/${idx}/remind`,
     DELETE: (id: string) => `/audits/${id}`,

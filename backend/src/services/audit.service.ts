@@ -340,12 +340,26 @@ export const AuditService = {
           a.vessel_name,
           a.total_po,
           a.id AS audit_id,
-          COUNT(ci.id) FILTER (WHERE ci.mds_status = 'pending') AS pending_mds,
-          COUNT(ci.id) FILTER (WHERE ci.mds_status = 'received') AS received_mds,
+          -- Per-doc counts (MD = legacy mds_*, SDoC = new sdoc_*).
+          COUNT(ci.id) FILTER (WHERE ci.mds_status  = 'pending')  AS pending_md,
+          COUNT(ci.id) FILTER (WHERE ci.mds_status  = 'received') AS received_md,
+          COUNT(ci.id) FILTER (WHERE ci.sdoc_status = 'pending')  AS pending_sdoc,
+          COUNT(ci.id) FILTER (WHERE ci.sdoc_status = 'received') AS received_sdoc,
+          -- Combined "MDS" counts: pending if either doc is pending,
+          -- received only when both are in. Drives the legacy header tiles.
+          COUNT(ci.id) FILTER (
+            WHERE ci.mds_status = 'pending' OR ci.sdoc_status = 'pending'
+          ) AS pending_mds,
+          COUNT(ci.id) FILTER (
+            WHERE ci.mds_status = 'received' AND ci.sdoc_status = 'received'
+          ) AS received_mds,
           COUNT(ci.id)                                          AS total_clarification_items,
           COUNT(DISTINCT cr.id)                                 AS clarification_count,
           BOOL_OR(cr.submitted_at IS NOT NULL)                  AS any_submitted,
-          MAX(ci.mds_received_at)                               AS last_received_at,
+          GREATEST(
+            MAX(ci.mds_received_at),
+            MAX(ci.sdoc_received_at)
+          )                                                     AS last_received_at,
           MAX(cr.submitted_at)                                  AS last_submitted_at
         FROM audit_summaries a
         JOIN vessels v ON v.id = a.vessel_id
@@ -411,8 +425,10 @@ export const AuditService = {
     const clarRes = await query(
       `SELECT cr.id AS clarification_id, cr.created_at,
               cr.suspected_items, cr.submitted_at, cr.status AS cr_status,
-              ci.item_index, ci.mds_status, ci.mds_file_name, ci.mds_file_path,
-              ci.mds_received_at, ci.reminder_count, ci.hm_status
+              ci.item_index,
+              ci.mds_status,  ci.mds_file_name,  ci.mds_file_path,  ci.mds_received_at,
+              ci.sdoc_status, ci.sdoc_file_name, ci.sdoc_file_path, ci.sdoc_received_at,
+              ci.reminder_count, ci.hm_status
          FROM clarification_requests cr
          LEFT JOIN clarification_items ci ON ci.clarification_id = cr.id
         WHERE cr.vessel_id = $1
@@ -431,16 +447,24 @@ export const AuditService = {
       mds_file_name: string | null;
       mds_file_path: string | null;
       mds_received_at: string | null;
+      sdoc_status: string | null;
+      sdoc_file_name: string | null;
+      sdoc_file_path: string | null;
+      sdoc_received_at: string | null;
       reminder_count: number | null;
       hm_status: string | null;
     };
     const stateByPO = new Map<string, {
       clarificationId: string;
       itemIndex: number;
-      mdsStatus: string;
-      mdsFileName: string | null;
-      mdsFilePath: string | null;
-      mdsReceivedAt: string | null;
+      mdStatus: string;
+      mdFileName: string | null;
+      mdFilePath: string | null;
+      mdReceivedAt: string | null;
+      sdocStatus: string;
+      sdocFileName: string | null;
+      sdocFilePath: string | null;
+      sdocReceivedAt: string | null;
       reminderCount: number;
       submittedAt: string | null;
       hmStatus: string | null;
@@ -456,15 +480,26 @@ export const AuditService = {
       stateByPO.set(poNumber, {
         clarificationId: row.clarification_id,
         itemIndex: row.item_index,
-        mdsStatus: row.mds_status ?? 'pending',
-        mdsFileName: row.mds_file_name,
-        mdsFilePath: row.mds_file_path,
-        mdsReceivedAt: row.mds_received_at,
+        mdStatus: row.mds_status ?? 'pending',
+        mdFileName: row.mds_file_name,
+        mdFilePath: row.mds_file_path,
+        mdReceivedAt: row.mds_received_at,
+        sdocStatus: row.sdoc_status ?? 'pending',
+        sdocFileName: row.sdoc_file_name,
+        sdocFilePath: row.sdoc_file_path,
+        sdocReceivedAt: row.sdoc_received_at,
         reminderCount: row.reminder_count ?? 0,
         submittedAt: row.submitted_at,
         hmStatus: row.hm_status,
       });
     }
+
+    // Combined "MDS" status: 'received' only when BOTH MD and SDoC are in.
+    // 'pending' if either is still missing. 'none' when there is no
+    // clarification at all for the row.
+    const combinedStatus = (md: string, sdoc: string): string => (
+      md === 'received' && sdoc === 'received' ? 'received' : 'pending'
+    );
 
     const items: Array<Record<string, unknown>> = itemsRes.rows.map((row) => {
       const r = row as Record<string, unknown>;
@@ -474,10 +509,24 @@ export const AuditService = {
         ...r,
         clarification_id: state?.clarificationId ?? null,
         clarification_item_index: state?.itemIndex ?? null,
-        mds_status: state?.mdsStatus ?? 'none',
-        mds_file_name: state?.mdsFileName ?? null,
-        mds_file_path: state?.mdsFilePath ?? null,
-        mds_received_at: state?.mdsReceivedAt ?? null,
+        // Per-doc state
+        md_status: state?.mdStatus ?? 'none',
+        md_file_name: state?.mdFileName ?? null,
+        md_file_path: state?.mdFilePath ?? null,
+        md_received_at: state?.mdReceivedAt ?? null,
+        sdoc_status: state?.sdocStatus ?? 'none',
+        sdoc_file_name: state?.sdocFileName ?? null,
+        sdoc_file_path: state?.sdocFilePath ?? null,
+        sdoc_received_at: state?.sdocReceivedAt ?? null,
+        // Combined "MDS" status (back-compat field used by the PO viewer's
+        // Received Mds / Pending Mds filters).
+        mds_status: state ? combinedStatus(state.mdStatus, state.sdocStatus) : 'none',
+        // Legacy aliases — point at the MD slot. These are only read by older
+        // code paths still using the single-doc model; new code should consume
+        // md_*/sdoc_* explicitly.
+        mds_file_name: state?.mdFileName ?? null,
+        mds_file_path: state?.mdFilePath ?? null,
+        mds_received_at: state?.mdReceivedAt ?? null,
         reminder_count: state?.reminderCount ?? 0,
         submitted_at: state?.submittedAt ?? null,
         hm_status: state?.hmStatus ?? null,
@@ -506,12 +555,24 @@ export const AuditService = {
       const po = String(r[2] ?? '').trim();
       if (!po || existingPOs.has(po) || orphanMap.has(po)) continue;
 
+      const mdSt = row.mds_status ?? 'pending';
+      const sdocSt = row.sdoc_status ?? 'pending';
       const synth: Record<string, unknown> = {
         row_index: -1,
         extra_data: {},
         clarification_id: row.clarification_id,
         clarification_item_index: row.item_index,
-        mds_status: row.mds_status ?? 'pending',
+        // Per-doc state
+        md_status: mdSt,
+        md_file_name: row.mds_file_name,
+        md_file_path: row.mds_file_path,
+        md_received_at: row.mds_received_at,
+        sdoc_status: sdocSt,
+        sdoc_file_name: row.sdoc_file_name,
+        sdoc_file_path: row.sdoc_file_path,
+        sdoc_received_at: row.sdoc_received_at,
+        // Combined back-compat fields (received iff both arrived).
+        mds_status: mdSt === 'received' && sdocSt === 'received' ? 'received' : 'pending',
         mds_file_name: row.mds_file_name,
         mds_file_path: row.mds_file_path,
         mds_received_at: row.mds_received_at,
@@ -586,24 +647,68 @@ export const AuditService = {
     return r.rows[0] as Record<string, unknown> | undefined;
   },
 
-  /** Attach an uploaded MDS document to a clarification item. */
+  /**
+   * Attach an uploaded supplier document to a clarification item.
+   * @param kind 'md' (Material Declaration) or 'sdoc' (Supplier Declaration of
+   *             Conformity). MD is stored in mds_* columns (legacy slot reused),
+   *             SDoC in the dedicated sdoc_* columns.
+   */
   async setClarificationItemDocument(
     clarificationId: string,
     itemIndex: number,
+    kind: 'md' | 'sdoc',
     filePath: string,
     fileName: string,
   ) {
+    const cols = kind === 'sdoc'
+      ? { status: 'sdoc_status', path: 'sdoc_file_path', name: 'sdoc_file_name', at: 'sdoc_received_at' }
+      : { status: 'mds_status',  path: 'mds_file_path',  name: 'mds_file_name',  at: 'mds_received_at' };
+
     const r = await query(
       `UPDATE clarification_items
-          SET mds_status = 'received',
-              mds_file_path = $3,
-              mds_file_name = $4,
-              mds_received_at = NOW(),
-              updated_at = NOW()
+          SET ${cols.status} = 'received',
+              ${cols.path}   = $3,
+              ${cols.name}   = $4,
+              ${cols.at}     = NOW(),
+              updated_at     = NOW()
         WHERE clarification_id = $1 AND item_index = $2
       RETURNING *`,
       [clarificationId, itemIndex, filePath, fileName],
     );
     return r.rows[0] as Record<string, unknown> | undefined;
+  },
+
+  /**
+   * Clear the uploaded document for a kind (MD or SDoC) so the supplier can
+   * re-upload. Returns the file path that was previously stored so the caller
+   * can delete it from object storage.
+   */
+  async clearClarificationItemDocument(
+    clarificationId: string,
+    itemIndex: number,
+    kind: 'md' | 'sdoc',
+  ): Promise<string | null> {
+    const cols = kind === 'sdoc'
+      ? { status: 'sdoc_status', path: 'sdoc_file_path', name: 'sdoc_file_name', at: 'sdoc_received_at' }
+      : { status: 'mds_status',  path: 'mds_file_path',  name: 'mds_file_name',  at: 'mds_received_at' };
+
+    const existing = await query(
+      `SELECT ${cols.path} AS file_path FROM clarification_items
+        WHERE clarification_id = $1 AND item_index = $2`,
+      [clarificationId, itemIndex],
+    );
+    const filePath = (existing.rows[0]?.file_path as string | undefined) ?? null;
+
+    await query(
+      `UPDATE clarification_items
+          SET ${cols.status} = 'pending',
+              ${cols.path}   = NULL,
+              ${cols.name}   = NULL,
+              ${cols.at}     = NULL,
+              updated_at     = NOW()
+        WHERE clarification_id = $1 AND item_index = $2`,
+      [clarificationId, itemIndex],
+    );
+    return filePath;
   },
 };
