@@ -179,39 +179,6 @@ export default function MDSdocAudit() {
                     </div>
                 </div>
 
-                {/* Metrics Summary footer (Bottom photograph area) */}
-                <div className="metrics-footer-bar">
-                    <div className="metric-items">
-                        <div className="metric-item">
-                            <span className="metric-label">TOTAL POS:</span>
-                            <span className="metric-value">57</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">MDS REQUESTED:</span>
-                            <span className="metric-value">202</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">MDS RECEIVED:</span>
-                            <span className="metric-value">187</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">MDS PENDING:</span>
-                            <span className="metric-value">15</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">HM GREEN:</span>
-                            <span className="metric-value green">172</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">HM RED:</span>
-                            <span className="metric-value red">11</span>
-                        </div>
-                        <div className="metric-item">
-                            <span className="metric-label">PCHM QTY:</span>
-                            <span className="metric-value">18</span>
-                        </div>
-                    </div>
-                </div>
             </main>
         </div>
     );
