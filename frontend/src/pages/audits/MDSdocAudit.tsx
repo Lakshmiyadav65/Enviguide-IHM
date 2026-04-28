@@ -85,7 +85,7 @@ export default function MDSdocAudit() {
                                         <th style={{ whiteSpace: 'nowrap' }}>PENDING SDOCS</th>
                                         <th>CLARIFICATION STATUS</th>
                                         <th>LAST SUBMISSION DATE</th>
-                                        <th style={{ textAlign: 'center' }}>ACTION</th>
+                                        <th style={{ textAlign: 'center', minWidth: 130, whiteSpace: 'nowrap' }}>ACTION</th>
                                     </tr>
                                 </thead>
                                 <tbody>

@@ -302,8 +302,11 @@ export const AuditService = {
 
     const ids = clarifications.map((c) => c.id);
     const itemsRes = await query(
-      `SELECT clarification_id, item_index, mds_status, mds_file_path, mds_file_name,
-              mds_received_at, reminder_count, hm_status, notes, updated_at
+      `SELECT clarification_id, item_index,
+              mds_status,  mds_file_path,  mds_file_name,  mds_received_at,
+              sdoc_status, sdoc_file_path, sdoc_file_name, sdoc_received_at,
+              reminder_count, hm_status, reviewed_at, reviewed_by,
+              notes, updated_at
          FROM clarification_items
         WHERE clarification_id = ANY($1::uuid[])
         ORDER BY item_index ASC`,

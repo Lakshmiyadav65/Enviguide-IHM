@@ -1,4 +1,16 @@
-﻿import { useState, useEffect } from 'react';
+// Document Audit page
+// -----------------------------------------------------------------------------
+// Opens when the manager clicks REVIEW on the MD SDoC Audit Pending registry.
+// Lists every clarification item for the IMO with its uploaded MD / SDoC, and
+// gives two per-row actions:
+//   - Accept              → POST /clarifications/:clarId/items/:idx/review
+//                            (flips the item into Reviewed Mds in the PO viewer)
+//   - Request Clarification → opens the mail composer; Send fires a reminder
+//                              (POST /clarifications/:clarId/items/:idx/remind)
+//
+// No mock data — everything is fetched from the audit's clarifications.
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import './DocumentAudit.css';
 import Sidebar from '../../components/Sidebar';
@@ -9,142 +21,258 @@ import {
     FileText,
     MessageSquare,
     CheckCircle2,
-    Flag,
     FileSpreadsheet,
     X,
-    Download,
     Mail,
-    Bold,
-    Italic,
-    Underline,
-    List,
-    ListOrdered,
-    Link2,
-    Image as ImageIcon,
-    Paperclip,
-    Clock,
-    AlertTriangle
+    Send,
+    Loader2,
 } from 'lucide-react';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
 
-interface AuditItem {
+interface ClarificationItemRow {
+    clarification_id: string;
+    item_index: number;
+    mds_status: string | null;
+    mds_file_path: string | null;
+    mds_file_name: string | null;
+    mds_received_at: string | null;
+    sdoc_status: string | null;
+    sdoc_file_path: string | null;
+    sdoc_file_name: string | null;
+    sdoc_received_at: string | null;
+    reminder_count: number | null;
+    reviewed_at: string | null;
+    reviewed_by: string | null;
+}
+
+interface ClarificationRow {
     id: string;
-    supplier: string;
-    docType: 'MD' | 'SDOC';
-    fileLink: string;
+    imo_number: string;
+    vessel_name: string | null;
+    recipient_emails: string;
+    cc_emails: string | null;
+    subject: string;
+    suspected_items: unknown;
+    created_at: string;
+    items: ClarificationItemRow[];
+}
+
+interface FlatItem {
+    key: string;
+    clarificationId: string;
+    itemIndex: number;
+    poNumber: string;
+    itemDescription: string;
+    supplierEmails: string;
+    vendorEmail: string;
+    vendorName: string;
+    mdFilePath: string | null;
+    mdFileName: string | null;
+    sdocFilePath: string | null;
+    sdocFileName: string | null;
     dateReceived: string;
-    clarificationStatus: 'AWAITING CLARIFICATION' | 'RESOLVED' | 'NOT STARTED' | 'ACCEPTED';
-    auditDecision?: 'APPROVED' | 'FLAGGED' | 'CLARIFICATION';
+    reviewedAt: string | null;
+    reviewedBy: string | null;
+    /** 'reviewed' wins over 'received' wins over 'pending'. */
+    status: 'pending' | 'received' | 'reviewed';
+    /** Original subject — used to prefill the clarification mail. */
+    clarificationSubject: string;
+}
+
+function formatDate(iso: string | null): string {
+    if (!iso) return '—';
+    try {
+        return new Date(iso).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch {
+        return iso.split('T')[0] ?? iso;
+    }
 }
 
 export default function DocumentAudit() {
     const { imo } = useParams();
     const [searchQuery, setSearchQuery] = useState('');
-    const [isVerified, setIsVerified] = useState(false);
-    const [isSubmitted, setIsSubmitted] = useState(false);
-    const [selectedDoc, setSelectedDoc] = useState<AuditItem | null>(null);
-    const [isClarificationOpen, setIsClarificationOpen] = useState(false);
-    const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
-    const [clarificationItem, setClarificationItem] = useState<AuditItem | null>(null);
+    const [clarifications, setClarifications] = useState<ClarificationRow[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [acceptingKey, setAcceptingKey] = useState<string | null>(null);
     const [showToast, setShowToast] = useState(false);
-    const [toastData, setToastData] = useState({ title: '', message: '' });
-    const [mailTo, setMailTo] = useState('compliance@globalmaritime.com');
+    const [toastData, setToastData] = useState({ title: '', message: '', tone: 'success' as 'success' | 'error' });
+
+    // Clarification mail modal state
+    const [mailItem, setMailItem] = useState<FlatItem | null>(null);
+    const [mailTo, setMailTo] = useState('');
     const [mailSubject, setMailSubject] = useState('');
     const [mailBody, setMailBody] = useState('');
+    const [sendingMail, setSendingMail] = useState(false);
 
-    const initialAuditItems: AuditItem[] = [
-        { id: 'PO-2023-8842', supplier: 'Global Maritime Supplies Ltd', docType: 'MD', fileLink: 'MD_PV_8842.pdf', dateReceived: '24 Oct 2023', clarificationStatus: 'AWAITING CLARIFICATION' },
-        { id: 'PO-2023-8845', supplier: 'Nordic Star Engineering', docType: 'SDOC', fileLink: 'SDoC_NS_8845.pdf', dateReceived: '22 Oct 2023', clarificationStatus: 'RESOLVED' },
-        { id: 'PO-2023-8901', supplier: 'Oceanic Parts Corp', docType: 'MD', fileLink: 'MD_OP_8901.pdf', dateReceived: '25 Oct 2023', clarificationStatus: 'NOT STARTED' },
-        { id: 'PO-2023-8910', supplier: 'Marine Logistics Hub', docType: 'MD', fileLink: 'MD_ML_8910.pdf', dateReceived: '26 Oct 2023', clarificationStatus: 'RESOLVED' },
-        { id: 'PO-2023-8922', supplier: 'SeaStar Equipment', docType: 'SDOC', fileLink: 'SDoC_SS_8922.pdf', dateReceived: '27 Oct 2023', clarificationStatus: 'AWAITING CLARIFICATION' },
-        { id: 'PO-2023-8935', supplier: 'Horizon Vessels Ltd', docType: 'MD', fileLink: 'MD_HV_8935.pdf', dateReceived: '28 Oct 2023', clarificationStatus: 'NOT STARTED' },
-        { id: 'PO-2023-8948', supplier: 'Anchor Marine Services', docType: 'SDOC', fileLink: 'SDoC_AM_8948.pdf', dateReceived: '29 Oct 2023', clarificationStatus: 'RESOLVED' },
-        { id: 'PO-2023-8955', supplier: 'BlueOcean Spares', docType: 'MD', fileLink: 'MD_BO_8955.pdf', dateReceived: '30 Oct 2023', clarificationStatus: 'NOT STARTED' },
-        { id: 'PO-2023-8962', supplier: 'DeepWater Logistics', docType: 'SDOC', fileLink: 'SDoC_DW_8962.pdf', dateReceived: '01 Nov 2023', clarificationStatus: 'AWAITING CLARIFICATION' },
-        { id: 'PO-2023-8975', supplier: 'Portside Supplies', docType: 'MD', fileLink: 'MD_PS_8975.pdf', dateReceived: '02 Nov 2023', clarificationStatus: 'RESOLVED' }
-    ];
+    const loadClarifications = useCallback(() => {
+        if (!imo) return;
+        setLoading(true);
+        api.get<{ success: boolean; data: ClarificationRow[] }>(ENDPOINTS.AUDITS.CLARIFICATIONS(imo))
+            .then((res) => {
+                setClarifications(res.data || []);
+                setError(null);
+            })
+            .catch((err) => {
+                setClarifications([]);
+                setError(err instanceof Error ? err.message : 'Failed to load clarifications');
+            })
+            .finally(() => setLoading(false));
+    }, [imo]);
 
-    const [auditItems, setAuditItems] = useState<AuditItem[]>(initialAuditItems);
+    useEffect(loadClarifications, [loadClarifications]);
 
     useEffect(() => {
-        if (showToast) {
-            const timer = setTimeout(() => setShowToast(false), 5000);
-            return () => clearTimeout(timer);
-        }
+        if (!showToast) return;
+        const t = setTimeout(() => setShowToast(false), 4000);
+        return () => clearTimeout(t);
     }, [showToast]);
 
-    const handleAcceptDocument = (item: AuditItem) => {
-        setAuditItems(prev => prev.map(i => i.id === item.id ? { ...i, clarificationStatus: 'ACCEPTED' } : i));
-        setToastData({
-            title: 'Document Accepted Successfully',
-            message: `${item.fileLink} has been verified and added to the vessel registry.`
-        });
-        setShowToast(true);
-        if (selectedDoc) setSelectedDoc(null);
+    const vesselName = clarifications[0]?.vessel_name ?? `Vessel ${imo ?? ''}`;
+
+    /** Flatten clarifications into one row per (clarification_id, item_index). */
+    const flatItems: FlatItem[] = useMemo(() => {
+        const out: FlatItem[] = [];
+        for (const c of clarifications) {
+            const suspected = Array.isArray(c.suspected_items)
+                ? (c.suspected_items as unknown[][])
+                : [];
+            for (const it of c.items) {
+                const row = Array.isArray(suspected[it.item_index]) ? suspected[it.item_index] as unknown[] : [];
+                const poNumber = String(row[2] ?? '');
+                const itemDescription = String(row[6] ?? '');
+                const vendorEmail = String(row[18] ?? '');
+                const vendorName = String(row[19] ?? '');
+
+                const status: FlatItem['status'] = it.reviewed_at
+                    ? 'reviewed'
+                    : (it.mds_status === 'received' && it.sdoc_status === 'received')
+                        ? 'received'
+                        : 'pending';
+
+                out.push({
+                    key: `${it.clarification_id}-${it.item_index}`,
+                    clarificationId: it.clarification_id,
+                    itemIndex: it.item_index,
+                    poNumber,
+                    itemDescription,
+                    supplierEmails: c.recipient_emails || '',
+                    vendorEmail,
+                    vendorName,
+                    mdFilePath: it.mds_file_path,
+                    mdFileName: it.mds_file_name,
+                    sdocFilePath: it.sdoc_file_path,
+                    sdocFileName: it.sdoc_file_name,
+                    dateReceived: formatDate(it.mds_received_at || it.sdoc_received_at),
+                    reviewedAt: it.reviewed_at,
+                    reviewedBy: it.reviewed_by,
+                    status,
+                    clarificationSubject: c.subject || '',
+                });
+            }
+        }
+        return out;
+    }, [clarifications]);
+
+    const filteredItems = useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return flatItems;
+        return flatItems.filter((i) =>
+            i.poNumber.toLowerCase().includes(q)
+            || i.itemDescription.toLowerCase().includes(q)
+            || i.supplierEmails.toLowerCase().includes(q)
+            || i.vendorName.toLowerCase().includes(q),
+        );
+    }, [flatItems, searchQuery]);
+
+    const stats = useMemo(() => {
+        let pending = 0, received = 0, reviewed = 0;
+        for (const i of flatItems) {
+            if (i.status === 'reviewed') reviewed++;
+            else if (i.status === 'received') received++;
+            else pending++;
+        }
+        return { total: flatItems.length, pending, received, reviewed };
+    }, [flatItems]);
+
+    const handleAccept = async (item: FlatItem) => {
+        if (item.status === 'reviewed' || item.status === 'pending') return;
+        setAcceptingKey(item.key);
+        try {
+            await api.post(
+                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_REVIEW(item.clarificationId, item.itemIndex),
+                {},
+            );
+            setToastData({
+                title: 'Item Accepted',
+                message: `${item.poNumber} marked as reviewed. It now appears in Reviewed Mds.`,
+                tone: 'success',
+            });
+            setShowToast(true);
+            loadClarifications();
+        } catch (err) {
+            setToastData({
+                title: 'Accept Failed',
+                message: err instanceof Error ? err.message : 'Could not mark this item reviewed.',
+                tone: 'error',
+            });
+            setShowToast(true);
+        } finally {
+            setAcceptingKey(null);
+        }
     };
 
-    const handleVerifyAll = () => {
-        setIsVerified(true);
-        setAuditItems(prev => prev.map(item => ({
-            ...item,
-            clarificationStatus: 'ACCEPTED'
-        })));
-        setToastData({
-            title: 'Bulk Verification Complete',
-            message: 'All pending documents have been successfully verified and accepted.'
-        });
-        setShowToast(true);
+    const openClarificationMail = (item: FlatItem) => {
+        const reminderNumber = 1;
+        setMailItem(item);
+        setMailTo(item.vendorEmail || (item.supplierEmails.split(/[,;]/)[0] || '').trim());
+        setMailSubject(`Clarification needed: ${item.clarificationSubject || `PO ${item.poNumber}`}`);
+        setMailBody(
+`Dear ${item.vendorName || 'Supplier'},
+
+We have reviewed your submission for PO ${item.poNumber} (${item.itemDescription}) and need additional clarification on the uploaded MD / SDoC documents.
+
+Please review the documents and re-submit corrected versions via the secure link from our previous email at your earliest convenience.
+
+This is reminder ${reminderNumber}.
+
+Best regards,
+IHM Audit Team`,
+        );
     };
 
-    const handleSubmitAudit = () => {
-        setIsSubmitted(true);
-        setToastData({
-            title: 'Audit Submission Complete',
-            message: 'Your audit report has been submitted for final review.'
-        });
-        setShowToast(true);
-    };
-
-    const handleOpenClarification = (item: AuditItem | null) => {
-        if (!item) return;
-        setClarificationItem(item);
-        setMailSubject(`Clarification Required: ${item.fileLink.replace('.pdf', '')} for ${item.id}`);
-        setMailBody(`Dear ${item.supplier.split(' ')[0]} Team,\n\nWe have reviewed the Material Declaration for ${item.id} and require further clarification on Table A: PCBs.\n\nThe submitted documentation does not clearly specify the concentration of polychlorinated biphenyls for the electrical components listed in Annex II. Specifically, we noted that the threshold levels reported for the 'Main Control Unit' (GMS-MCU-102) seem inconsistent with international regulatory requirements for this class of maritime hardware.\n\nPlease provide additional supporting documentation from the component manufacturer or re-verify the threshold levels against current IHM guidelines. Failure to provide this clarification may delay the certification process for the vessel 'Pacific Venture'.`);
-        setIsClarificationOpen(true);
-        if (selectedDoc) setSelectedDoc(null);
-    };
-
-    const handleSendClarification = () => {
-        if (!clarificationItem) return;
-        setIsClarificationOpen(false);
-        setAuditItems(prev => prev.map(i => i.id === clarificationItem.id ? { ...i, clarificationStatus: 'AWAITING CLARIFICATION' } : i));
-        setToastData({
-            title: 'Clarification Request Sent',
-            message: `An email has been sent to ${clarificationItem.supplier} regarding ${clarificationItem.id}`
-        });
-        setShowToast(true);
-    };
-
-    const handleDownload = (filename: string) => {
-        const blob = new Blob(['%PDF-1.4\n1 0 obj\n<< /Title (Audit Report) /Body (Sample content for ' + filename + ') >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF'], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    };
-
-    const handleConfirmDiscard = () => {
-        setIsDiscardConfirmOpen(false);
-        setIsClarificationOpen(false);
-        setToastData({
-            title: 'Request Discarded',
-            message: 'Evidence of the draft clarification request has been cleared.'
-        });
-        setShowToast(true);
+    const sendClarificationMail = async () => {
+        if (!mailItem) return;
+        if (!mailTo.trim()) {
+            setToastData({ title: 'Missing recipient', message: 'Please add a recipient email.', tone: 'error' });
+            setShowToast(true);
+            return;
+        }
+        setSendingMail(true);
+        try {
+            await api.post(
+                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_REMIND(mailItem.clarificationId, mailItem.itemIndex),
+                { to: mailTo, subject: mailSubject, body: mailBody },
+            );
+            setToastData({
+                title: 'Clarification Sent',
+                message: `Mail dispatched to ${mailTo}.`,
+                tone: 'success',
+            });
+            setShowToast(true);
+            setMailItem(null);
+            loadClarifications();
+        } catch (err) {
+            setToastData({
+                title: 'Send Failed',
+                message: err instanceof Error ? err.message : 'Could not send the clarification mail.',
+                tone: 'error',
+            });
+            setShowToast(true);
+        } finally {
+            setSendingMail(false);
+        }
     };
 
     return (
@@ -153,40 +281,30 @@ export default function DocumentAudit() {
             <main className="doc-audit-main">
                 <Header />
 
-                {/* Design-Accurate Notification Toast */}
                 {showToast && (
                     <div className="audit-success-toast">
                         <div className="toast-content-wrapper">
-                            <div className="toast-icon-green">
-                                <CheckCircle2 size={24} fill="#10B981" color="white" />
+                            <div className="toast-icon-green" style={{ background: toastData.tone === 'error' ? '#EF4444' : '#10B981' }}>
+                                <CheckCircle2 size={24} fill={toastData.tone === 'error' ? '#EF4444' : '#10B981'} color="white" />
                             </div>
                             <div className="toast-text-area">
                                 <h3>{toastData.title}</h3>
                                 <p>{toastData.message}</p>
                             </div>
                         </div>
-                        <button className="undo-action-btn" onClick={() => setShowToast(false)}>UNDO</button>
+                        <button className="undo-action-btn" onClick={() => setShowToast(false)}>CLOSE</button>
                     </div>
                 )}
 
                 <div className="doc-audit-content">
-                    {/* Compact Dark Header */}
                     <div className="audit-sub-header">
                         <div className="audit-header-main">
                             <div className="header-title-section" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                                 <div>
-                                    <h1>Document Audit - Pacific Venture</h1>
-                                    <div className="imo-badge">IMO: <span>{imo || '9448748'}</span></div>
+                                    <h1>Document Audit{vesselName ? ` - ${vesselName}` : ''}</h1>
+                                    <div className="imo-badge">IMO: <span>{imo || '—'}</span></div>
                                 </div>
                             </div>
-                            <button
-                                className={`verify-all-documents-btn ${isVerified ? 'verified' : ''}`}
-                                onClick={handleVerifyAll}
-                                disabled={isVerified}
-                            >
-                                <CheckCircle2 size={18} />
-                                {isVerified ? 'Documents Verified' : 'Verify All Documents'}
-                            </button>
                         </div>
                     </div>
 
@@ -194,39 +312,31 @@ export default function DocumentAudit() {
                         <div className="metrics-grid">
                             <div className="metric-card">
                                 <div className="metric-info">
-                                    <span className="metric-label">TOTAL POS</span>
-                                    <span className="metric-number">42</span>
+                                    <span className="metric-label">TOTAL ITEMS</span>
+                                    <span className="metric-number">{stats.total}</span>
                                 </div>
-                                <div className="metric-icon-box cart">
-                                    <ShoppingCart size={20} />
-                                </div>
+                                <div className="metric-icon-box cart"><ShoppingCart size={20} /></div>
                             </div>
                             <div className="metric-card">
                                 <div className="metric-info">
-                                    <span className="metric-label">PENDING MDS</span>
-                                    <span className="metric-number">{isVerified ? '0' : '07'}</span>
+                                    <span className="metric-label">PENDING</span>
+                                    <span className="metric-number">{stats.pending}</span>
                                 </div>
-                                <div className="metric-icon-box doc">
-                                    <FileText size={20} />
-                                </div>
+                                <div className="metric-icon-box doc"><FileText size={20} /></div>
                             </div>
                             <div className="metric-card">
                                 <div className="metric-info">
-                                    <span className="metric-label">PENDING SDOCS</span>
-                                    <span className="metric-number">{isVerified ? '0' : '12'}</span>
+                                    <span className="metric-label">RECEIVED</span>
+                                    <span className="metric-number">{stats.received}</span>
                                 </div>
-                                <div className="metric-icon-box sdoc">
-                                    <FileSpreadsheet size={20} />
-                                </div>
+                                <div className="metric-icon-box sdoc"><FileSpreadsheet size={20} /></div>
                             </div>
                             <div className="metric-card">
                                 <div className="metric-info">
-                                    <span className="metric-label">FLAGGED FOR CLARIFICATION</span>
-                                    <span className="metric-number highlight">{isVerified ? '0' : '05'}</span>
+                                    <span className="metric-label">REVIEWED</span>
+                                    <span className="metric-number highlight">{stats.reviewed}</span>
                                 </div>
-                                <div className="metric-icon-box msg">
-                                    <MessageSquare size={20} />
-                                </div>
+                                <div className="metric-icon-box msg"><CheckCircle2 size={20} /></div>
                             </div>
                         </div>
 
@@ -237,7 +347,7 @@ export default function DocumentAudit() {
                                     <Search size={16} />
                                     <input
                                         type="text"
-                                        placeholder="Search POs or Suppliers..."
+                                        placeholder="Search PO numbers, items, or suppliers..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                     />
@@ -249,61 +359,128 @@ export default function DocumentAudit() {
                                     <thead>
                                         <tr>
                                             <th>PO ID</th>
+                                            <th>ITEM</th>
                                             <th>SUPPLIER</th>
-                                            <th>MD FILE LINK</th>
-                                            <th>SDOC FILE LINK</th>
-                                            <th>DATE RECEIVED</th>
-                                            <th>CLARIFICATION STATUS</th>
-                                            <th style={{ textAlign: 'center' }}>AUDIT DECISION</th>
+                                            <th>MD</th>
+                                            <th>SDOC</th>
+                                            <th>RECEIVED</th>
+                                            <th>STATUS</th>
+                                            <th style={{ textAlign: 'center' }}>ACTION</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {auditItems.map((item) => (
-                                            <tr key={item.id}>
-                                                <td className="po-ident">{item.id}</td>
-                                                <td className="supplier-name">{item.supplier}</td>
+                                        {loading && (
+                                            <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
+                                                <Loader2 size={20} className="spin" style={{ marginRight: 8, verticalAlign: 'middle' }} />
+                                                Loading clarifications…
+                                            </td></tr>
+                                        )}
+                                        {!loading && error && (
+                                            <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#DC2626' }}>{error}</td></tr>
+                                        )}
+                                        {!loading && !error && filteredItems.length === 0 && (
+                                            <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
+                                                No clarification items yet. Send a clarification email from the Pending Reviews step to populate this queue.
+                                            </td></tr>
+                                        )}
+                                        {!loading && filteredItems.map((item) => (
+                                            <tr key={item.key}>
+                                                <td className="po-ident">{item.poNumber || '—'}</td>
+                                                <td className="supplier-name" style={{ maxWidth: 280 }}>{item.itemDescription || '—'}</td>
+                                                <td className="supplier-name">{item.vendorName || item.supplierEmails || '—'}</td>
                                                 <td>
-                                                    {item.docType === 'MD' ? (
-                                                        <div className="file-link-v3" onClick={() => setSelectedDoc(item)}>
+                                                    {item.mdFilePath ? (
+                                                        <a
+                                                            href={item.mdFilePath}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="file-link-v3"
+                                                            title={`View MD — ${item.mdFileName || 'document'}`}
+                                                        >
                                                             <FileText size={16} className="pdf-icon-v3" />
-                                                            MD File Link
-                                                        </div>
+                                                            View
+                                                        </a>
                                                     ) : (
-                                                        <span className="not-available">-</span>
+                                                        <span className="not-available">—</span>
                                                     )}
                                                 </td>
                                                 <td>
-                                                    {item.docType === 'SDOC' ? (
-                                                        <div className="file-link-v3" onClick={() => setSelectedDoc(item)}>
+                                                    {item.sdocFilePath ? (
+                                                        <a
+                                                            href={item.sdocFilePath}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="file-link-v3"
+                                                            title={`View SDoC — ${item.sdocFileName || 'document'}`}
+                                                        >
                                                             <FileText size={16} className="pdf-icon-v3" />
-                                                            SDoC File Link
-                                                        </div>
+                                                            View
+                                                        </a>
                                                     ) : (
-                                                        <span className="not-available">-</span>
+                                                        <span className="not-available">—</span>
                                                     )}
                                                 </td>
-                                                <td>{item.dateReceived}</td>
+                                                <td style={{ whiteSpace: 'nowrap' }}>{item.dateReceived}</td>
                                                 <td>
-                                                    <span className={`status-pill-v3 ${item.clarificationStatus.toLowerCase().replace(' ', '-')}`}>
-                                                        {item.clarificationStatus}
+                                                    <span className={`status-pill-v3 ${item.status === 'reviewed' ? 'resolved' : item.status === 'received' ? 'awaiting-clarification' : 'not-started'}`}>
+                                                        {item.status === 'reviewed' ? 'REVIEWED' : item.status === 'received' ? 'RECEIVED' : 'PENDING'}
                                                     </span>
                                                 </td>
-                                                <td>
-                                                    <div className="decision-cell-v3">
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+                                                        {item.status === 'reviewed' ? (
+                                                            <span
+                                                                title={item.reviewedBy ? `Reviewed by ${item.reviewedBy}` : 'Reviewed'}
+                                                                style={{
+                                                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                                                    padding: '4px 10px', background: '#ECFDF5', color: '#065F46',
+                                                                    border: '1px solid #A7F3D0', borderRadius: 999,
+                                                                    fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                                                                }}
+                                                            >
+                                                                <CheckCircle2 size={12} /> Reviewed
+                                                            </span>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleAccept(item)}
+                                                                disabled={item.status !== 'received' || acceptingKey === item.key}
+                                                                title={item.status !== 'received' ? 'Both MD and SDoC must be uploaded before this can be accepted.' : 'Accept — mark this item reviewed'}
+                                                                style={{
+                                                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                                                    padding: '6px 12px',
+                                                                    background: item.status === 'received' ? '#10B981' : '#F1F5F9',
+                                                                    color: item.status === 'received' ? 'white' : '#94A3B8',
+                                                                    border: 'none', borderRadius: 6,
+                                                                    fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                                                                    cursor: item.status === 'received' ? 'pointer' : 'not-allowed',
+                                                                    opacity: acceptingKey === item.key ? 0.7 : 1,
+                                                                }}
+                                                            >
+                                                                {acceptingKey === item.key ? (
+                                                                    <><Loader2 size={12} className="spin" /> Accepting…</>
+                                                                ) : (
+                                                                    <><CheckCircle2 size={12} /> Accept</>
+                                                                )}
+                                                            </button>
+                                                        )}
                                                         <button
-                                                            className={`decision-icon-v3 check ${item.clarificationStatus === 'ACCEPTED' ? 'completed' : ''}`}
-                                                            onClick={() => handleAcceptDocument(item)}
+                                                            type="button"
+                                                            onClick={() => openClarificationMail(item)}
+                                                            title="Request clarification — send a follow-up email to the supplier"
+                                                            style={{
+                                                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                                                                padding: '6px 12px',
+                                                                background: 'white',
+                                                                color: '#0369A1',
+                                                                border: '1px solid #00B0FA',
+                                                                borderRadius: 6,
+                                                                fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+                                                                cursor: 'pointer',
+                                                                whiteSpace: 'nowrap',
+                                                            }}
                                                         >
-                                                            <CheckCircle2 size={18} />
-                                                        </button>
-                                                        <button className="decision-icon-v3 flag">
-                                                            <Flag size={18} />
-                                                        </button>
-                                                        <button
-                                                            className="decision-icon-v3 message"
-                                                            onClick={() => handleOpenClarification(item)}
-                                                        >
-                                                            <MessageSquare size={18} />
+                                                            <MessageSquare size={12} /> Request Clarification
                                                         </button>
                                                     </div>
                                                 </td>
@@ -312,170 +489,12 @@ export default function DocumentAudit() {
                                     </tbody>
                                 </table>
                             </div>
-
-                            <div className="pagination">
-                                <span className="pagination-info">Showing {auditItems.length} of 42 pending PO audits for Pacific Venture</span>
-                                <div className="pagination-buttons">
-                                    <button className="page-btn" style={{ width: 'auto', padding: '0 16px' }}>Previous</button>
-                                    <button className="page-btn active">1</button>
-                                    <button className="page-btn">2</button>
-                                    <button className="page-btn" style={{ width: 'auto', padding: '0 16px' }}>Next</button>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="audit-progress-footer-fixed">
-                    <div className="progress-info-v3">
-                        <span className="label-v3">AUDIT PROGRESS:</span>
-                        <div className="bar-bg-v3">
-                            <div className="bar-fill-v3" style={{ width: isVerified ? '100%' : '73.5%' }}></div>
-                        </div>
-                        <span className="percent-v3">{isVerified ? '100%' : '73.5%'}</span>
-                    </div>
-                    <div className="metrics-info-v3">
-                        <div className="metric-v3">
-                            <span className="label-v3">AUDITED:</span>
-                            <span className="val-v3">{isVerified ? '42' : '30'}</span>
-                        </div>
-                        <div className="metric-v3">
-                            <span className="label-v3">REMAINING:</span>
-                            <span className={`val-v3 ${!isVerified ? 'orange' : ''}`}>{isVerified ? '0' : '12'}</span>
-                        </div>
-                    </div>
-                    <div className="footer-actions-v3">
-                        <button className="discard-btn-v3">DISCARD DRAFT</button>
-                        <button
-                            className={`submit-report-btn-v3 ${isSubmitted ? 'submitted' : ''}`}
-                            onClick={handleSubmitAudit}
-                            disabled={isSubmitted}
-                        >
-                            {isSubmitted ? 'SUBMITTED' : 'Submit Audit Report'}
-                        </button>
-                    </div>
-                </div>
-
-                {/* Material Declaration Viewer Modal */}
-                {selectedDoc && (
-                    <div className="doc-modal-overlay">
-                        <div className="doc-modal-container">
-                            <div className="doc-modal-header">
-                                <div className="header-doc-info">
-                                    <div className="pdf-icon-box">
-                                        <FileText size={20} color="#EF4444" />
-                                    </div>
-                                    <div className="doc-meta">
-                                        <h3>{selectedDoc.fileLink}</h3>
-                                        <p>Material Declaration &bull; {selectedDoc.id}</p>
-                                    </div>
-                                </div>
-                                <button className="close-modal-btn" onClick={() => setSelectedDoc(null)}>
-                                    <X size={20} />
-                                </button>
-                            </div>
-
-                            <div className="doc-modal-body">
-                                <div className="md-document-page">
-                                    <div className="document-inner-header">
-                                        <div className="main-title">
-                                            <h1>MATERIAL DECLARATION</h1>
-                                            <p>In accordance with IMO Resolution MEPC.269(68)</p>
-                                        </div>
-                                        <div className="doc-number">
-                                            <span>DOCUMENT NO.</span>
-                                            <strong>MD-GMS-2023-8842</strong>
-                                        </div>
-                                    </div>
-
-                                    <div className="info-grid">
-                                        <div className="info-section">
-                                            <h4>SUPPLIER INFORMATION</h4>
-                                            <div className="info-content">
-                                                <strong>Global Maritime Supplies Ltd</strong>
-                                                <p>124 Harbour Front Way, Suite 400<br />Rotterdam, 3011 AA<br />Netherlands</p>
-                                            </div>
-                                        </div>
-                                        <div className="info-section">
-                                            <h4>PRODUCT INFORMATION</h4>
-                                            <div className="info-content">
-                                                <strong>Marine Grade Valve Assembly - 400 Series</strong>
-                                                <p>Part Number: VLV-A-421-XB</p>
-                                                <p>Weight: 42.5 kg</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="md-table-section">
-                                        <h5>TABLE A: MATERIALS LISTED IN APPENDIX 1 OF THE CONVENTION</h5>
-                                        <table className="md-inner-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Material Name</th>
-                                                    <th>Threshold Level</th>
-                                                    <th>Present Above Threshold?</th>
-                                                    <th>Details</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr>
-                                                    <td>Asbestos</td>
-                                                    <td>No Threshold</td>
-                                                    <td className="status-no">No</td>
-                                                    <td className="italic">None present</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Ozone Depleting Substances</td>
-                                                    <td>No Threshold</td>
-                                                    <td className="status-no">No</td>
-                                                    <td className="italic">None present</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Organotin Compounds</td>
-                                                    <td>2,500 mg/kg</td>
-                                                    <td className="status-no">No</td>
-                                                    <td>-</td>
-                                                </tr>
-                                                <tr>
-                                                    <td>Polychlorinated Biphenyls (PCBs)</td>
-                                                    <td>50 mg/kg</td>
-                                                    <td className="status-pending">PENDING REVIEW</td>
-                                                    <td>Trace amounts noted in sealants</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    <div className="declaration-section">
-                                        <h5>DECLARATION OF CONFORMITY</h5>
-                                        <p>
-                                            We, Global Maritime Supplies Ltd, hereby declare that the information provided in this Material Declaration is true and correct to the best of our knowledge. We further certify that the products supplied are in full compliance with the relevant environmental regulations as specified in the IMO Hong Kong Convention for the Safe and Environmentally Sound Recycling of Ships.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="doc-modal-footer">
-                                <div className="footer-left">
-                                    <button className="btn-accept" onClick={() => handleAcceptDocument(selectedDoc)}>
-                                        <CheckCircle2 size={18} />
-                                        Accept
-                                    </button>
-                                    <button className="btn-clarification" onClick={() => handleOpenClarification(selectedDoc)}>
-                                        <MessageSquare size={18} />
-                                        Clarification
-                                    </button>
-                                </div>
-                                <button className="btn-download" onClick={() => handleDownload(selectedDoc.fileLink)}>
-                                    <Download size={18} />
-                                    Download
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                {/* Send Clarification Request Modal */}
-                {isClarificationOpen && clarificationItem && (
+                {/* Clarification mail modal */}
+                {mailItem && (
                     <div className="doc-modal-overlay">
                         <div className="clarification-modal-container">
                             <div className="doc-modal-header">
@@ -484,11 +503,11 @@ export default function DocumentAudit() {
                                         <Mail size={20} color="#00A3FF" />
                                     </div>
                                     <div className="doc-meta">
-                                        <h3>Send Clarification Request</h3>
-                                        <p>Finalizing communication for {clarificationItem.id}</p>
+                                        <h3>Request Clarification</h3>
+                                        <p>Re-send a clarification email for {mailItem.poNumber}</p>
                                     </div>
                                 </div>
-                                <button className="close-modal-btn" onClick={() => setIsClarificationOpen(false)}>
+                                <button className="close-modal-btn" onClick={() => setMailItem(null)}>
                                     <X size={20} />
                                 </button>
                             </div>
@@ -496,15 +515,13 @@ export default function DocumentAudit() {
                             <div className="clarification-body">
                                 <div className="mail-field">
                                     <span className="field-label">TO</span>
-                                    <div className="field-value-pill editable">
-                                        <input
-                                            type="text"
-                                            value={mailTo}
-                                            onChange={(e) => setMailTo(e.target.value)}
-                                            className="mail-input-premium"
-                                        />
-                                        <span className="supplier-ref-label">{clarificationItem.supplier}</span>
-                                    </div>
+                                    <input
+                                        type="text"
+                                        value={mailTo}
+                                        onChange={(e) => setMailTo(e.target.value)}
+                                        className="mail-input-premium"
+                                        placeholder="supplier@example.com"
+                                    />
                                 </div>
                                 <div className="mail-field">
                                     <span className="field-label">SUBJECT</span>
@@ -515,28 +532,6 @@ export default function DocumentAudit() {
                                         className="mail-input-premium subject"
                                     />
                                 </div>
-
-                                <div className="mail-toolbar">
-                                    <div className="toolbar-group">
-                                        <button className="tool-btn"><Bold size={16} /></button>
-                                        <button className="tool-btn"><Italic size={16} /></button>
-                                        <button className="tool-btn"><Underline size={16} /></button>
-                                    </div>
-                                    <div className="toolbar-divider" />
-                                    <div className="toolbar-group">
-                                        <button className="tool-btn"><List size={16} /></button>
-                                        <button className="tool-btn"><ListOrdered size={16} /></button>
-                                    </div>
-                                    <div className="toolbar-divider" />
-                                    <div className="toolbar-group">
-                                        <button className="tool-btn"><Link2 size={16} /></button>
-                                        <button className="tool-btn"><ImageIcon size={16} /></button>
-                                    </div>
-                                    <div className="toolbar-group right">
-                                        <button className="tool-btn"><Paperclip size={16} /></button>
-                                    </div>
-                                </div>
-
                                 <div className="mail-editor-area">
                                     <textarea
                                         value={mailBody}
@@ -544,67 +539,33 @@ export default function DocumentAudit() {
                                         className="mail-textarea-premium"
                                         placeholder="Type your clarification request here..."
                                     />
-
-                                    <div
-                                        className="upload-docs-center-btn"
-                                        onClick={() => window.open('/administration/upload-docs', '_blank')}
-                                    >
-                                        UPLOAD DOCUMENTS
-                                    </div>
-
-                                    <div className="signature-area">
-                                        <p>Regards,</p>
-                                        <strong>IHM Administrator</strong>
-                                    </div>
                                 </div>
                             </div>
 
                             <div className="doc-modal-footer">
                                 <div className="footer-left">
-                                    <button className="btn-send-request" onClick={handleSendClarification}>
-                                        <Mail size={18} />
-                                        Send Request
+                                    <button
+                                        className="btn-send-request"
+                                        onClick={sendClarificationMail}
+                                        disabled={sendingMail}
+                                        style={{ opacity: sendingMail ? 0.7 : 1, cursor: sendingMail ? 'wait' : 'pointer' }}
+                                    >
+                                        {sendingMail ? (
+                                            <><Loader2 size={18} className="spin" /> Sending…</>
+                                        ) : (
+                                            <><Send size={18} /> Send Request</>
+                                        )}
                                     </button>
-                                    <button className="btn-discard" onClick={() => setIsDiscardConfirmOpen(true)}>
-                                        Discard
+                                    <button className="btn-discard" onClick={() => setMailItem(null)}>
+                                        Cancel
                                     </button>
                                 </div>
-                                <div className="auto-save-info">
-                                    <div className="save-text">
-                                        <span>AUTO-SAVED</span>
-                                        <p>2:45 PM today</p>
-                                    </div>
-                                    <Clock size={16} color="#94A3B8" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                {/* Discard Confirmation Modal */}
-                {isDiscardConfirmOpen && (
-                    <div className="confirm-overlay-v3">
-                        <div className="discard-confirm-card">
-                            <div className="confirm-header">
-                                <div className="warn-icon">
-                                    <AlertTriangle size={20} color="#F59E0B" />
-                                </div>
-                                <h2>Discard Request</h2>
-                            </div>
-                            <div className="confirm-body">
-                                <p>Are you sure you want to discard this clarification request? Any unsaved changes will be lost.</p>
-                            </div>
-                            <div className="confirm-footer">
-                                <button className="btn-cancel-discard" onClick={() => setIsDiscardConfirmOpen(false)}>
-                                    No, Keep Draft
-                                </button>
-                                <button className="btn-confirm-discard" onClick={handleConfirmDiscard}>
-                                    Yes, Discard
-                                </button>
                             </div>
                         </div>
                     </div>
                 )}
             </main>
+            <style>{`.spin { animation: doc-audit-spin 0.8s linear infinite } @keyframes doc-audit-spin { to { transform: rotate(360deg) } }`}</style>
         </div>
     );
 }
