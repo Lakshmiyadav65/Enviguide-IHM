@@ -76,11 +76,21 @@ export const AuditService = {
 
   /** Get audits with status 'Pending Review' (Pending Reviews Registry) */
   async getPendingReviews(userId: string) {
+    // Once a clarification email has been dispatched for a vessel, the audit
+    // is past the "needs admin review" stage — it lives in MD/SDoC Audit
+    // Pending while we wait on suppliers. Filter those out here so the
+    // registry self-heals even for rows whose status transition didn't fire
+    // (e.g. audits sent before the controller-side update was deployed).
     const r = await query(
       `SELECT a.* FROM audit_summaries a
-       JOIN vessels v ON a.vessel_id = v.id
-       WHERE v.created_by_id = $1 AND a.status = 'Pending Review'
-       ORDER BY a.last_activity DESC`,
+         JOIN vessels v ON a.vessel_id = v.id
+        WHERE v.created_by_id = $1
+          AND a.status = 'Pending Review'
+          AND NOT EXISTS (
+            SELECT 1 FROM clarification_requests cr
+             WHERE cr.vessel_id = a.vessel_id
+          )
+        ORDER BY a.last_activity DESC`,
       [userId],
     );
     return r.rows.map((row: Record<string, unknown>) => toApi(row));
