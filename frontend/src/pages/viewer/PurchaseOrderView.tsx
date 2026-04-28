@@ -134,25 +134,9 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
 
     useEffect(loadClarifications, [vesselId]);
 
-    // Upload one document slot (MD or SDoC) for a clarification item, then refresh.
-    const uploadMdsDocument = async (
-        item: PurchaseOrderItem,
-        kind: 'md' | 'sdoc',
-        file: File,
-    ) => {
-        if (!item.clarificationId || item.itemIndex === undefined) return;
-        const fd = new FormData();
-        fd.append('file', file);
-        try {
-            await api.upload(
-                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_DOC(item.clarificationId, item.itemIndex, kind),
-                fd,
-            );
-            loadClarifications();
-        } catch (err) {
-            console.error(`${kind.toUpperCase()} upload failed:`, err);
-        }
-    };
+    // Admin is view-only on supplier documents — uploads happen exclusively
+    // through the public supplier link (handled by the public controller).
+
     const [searchTerm, setSearchTerm] = useState('');
     const [isFilterBarOpen, setIsFilterBarOpen] = useState(false);
 
@@ -562,6 +546,10 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                                         const filePath = kind === 'md' ? item.mdFilePath : item.sdocFilePath;
                                                                         const fileName = kind === 'md' ? item.mdFileName : item.sdocFileName;
                                                                         const label = kind.toUpperCase();
+                                                                        // Admin is view-only. Suppliers upload via the public
+                                                                        // link; here we just render a clickable pill when the
+                                                                        // doc has arrived, or a greyed-out placeholder while
+                                                                        // we're still waiting for the supplier.
                                                                         return filePath ? (
                                                                             <a
                                                                                 key={kind}
@@ -569,33 +557,22 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                                                 target="_blank"
                                                                                 rel="noopener noreferrer"
                                                                                 className="po-v4-action-icon-btn-v4 doc"
-                                                                                title={`View uploaded ${label} (${fileName || 'document'})`}
+                                                                                title={`View ${label} — ${fileName || 'document'}`}
                                                                                 style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: '#10B981', fontSize: 10, fontWeight: 700 }}
                                                                             >
                                                                                 <FileText size={14} />
                                                                                 {label}
                                                                             </a>
                                                                         ) : (
-                                                                            <label
+                                                                            <span
                                                                                 key={kind}
                                                                                 className="po-v4-action-icon-btn-v4 doc"
-                                                                                title={`Upload ${label} document`}
-                                                                                style={{ cursor: item.clarificationId ? 'pointer' : 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 2, color: '#94A3B8', fontSize: 10, fontWeight: 700, opacity: item.clarificationId ? 1 : 0.4 }}
+                                                                                title={`Awaiting supplier ${label} upload`}
+                                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: '#CBD5E1', fontSize: 10, fontWeight: 700, cursor: 'not-allowed', opacity: 0.6 }}
                                                                             >
                                                                                 <FileText size={14} />
                                                                                 {label}
-                                                                                <input
-                                                                                    type="file"
-                                                                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"
-                                                                                    style={{ display: 'none' }}
-                                                                                    disabled={!item.clarificationId}
-                                                                                    onChange={(e) => {
-                                                                                        const f = e.target.files?.[0];
-                                                                                        if (f) uploadMdsDocument(item, kind, f);
-                                                                                        e.target.value = '';
-                                                                                    }}
-                                                                                />
-                                                                            </label>
+                                                                            </span>
                                                                         );
                                                                     })}
                                                                 </div>
