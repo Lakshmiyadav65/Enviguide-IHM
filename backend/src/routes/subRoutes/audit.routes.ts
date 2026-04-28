@@ -25,6 +25,7 @@ import {
   getAuditLineItemsById, replaceAuditLineItemsById,
   uploadClarificationItemDocument,
   sendClarificationItemReminder,
+  markClarificationItemReviewed,
   getMdsPendingOverview, getVesselPoItems,
   deleteAudit,
 } from '../../controller/audit.controller.js';
@@ -73,6 +74,11 @@ router.post(
 router.post(
   '/clarifications/:clarId/items/:idx/remind',
   sendClarificationItemReminder,
+);
+
+router.post(
+  '/clarifications/:clarId/items/:idx/review',
+  markClarificationItemReviewed,
 );
 
 router.get('/:imo',                          getAuditDetail);

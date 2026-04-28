@@ -703,6 +703,43 @@ export async function sendClarificationItemReminder(
   } catch (err) { next(err); }
 }
 
+/**
+ * POST /api/v1/audits/clarifications/:clarId/items/:idx/review
+ * Marks a clarification item as reviewed by the admin. Sets reviewed_at = NOW()
+ * and stores the reviewer's email/userId. The PO viewer's 'Reviewed Mds'
+ * filter pill keys off this column.
+ */
+export async function markClarificationItemReviewed(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const clarificationId = req.params.clarId as string;
+    const itemIndex = Number(req.params.idx);
+    if (!Number.isFinite(itemIndex) || itemIndex < 0) {
+      return next(createError('Invalid item index', 400));
+    }
+
+    const item = await AuditService.getClarificationItem(clarificationId, itemIndex);
+    if (!item) return next(createError('Clarification item not found', 404));
+
+    // Verify user owns the vessel this clarification belongs to.
+    const imo = String(item.imo_number);
+    const parent = await AuditService.getAuditByImo(imo, req.user!.userId);
+    if (!parent) return next(createError('Audit not found for this user', 404));
+
+    const reviewedBy = req.user!.email || req.user!.userId;
+    const updated = await AuditService.markClarificationItemReviewed(
+      clarificationId,
+      itemIndex,
+      reviewedBy,
+    );
+
+    res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
+}
+
 /** DELETE /api/v1/audits/:id — hard-delete an audit and its line items */
 export async function deleteAudit(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {

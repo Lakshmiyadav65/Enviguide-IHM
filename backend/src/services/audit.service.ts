@@ -426,7 +426,7 @@ export const AuditService = {
               ci.item_index,
               ci.mds_status,  ci.mds_file_name,  ci.mds_file_path,  ci.mds_received_at,
               ci.sdoc_status, ci.sdoc_file_name, ci.sdoc_file_path, ci.sdoc_received_at,
-              ci.reminder_count, ci.hm_status
+              ci.reminder_count, ci.hm_status, ci.reviewed_at, ci.reviewed_by
          FROM clarification_requests cr
          LEFT JOIN clarification_items ci ON ci.clarification_id = cr.id
         WHERE cr.vessel_id = $1
@@ -451,6 +451,8 @@ export const AuditService = {
       sdoc_received_at: string | null;
       reminder_count: number | null;
       hm_status: string | null;
+      reviewed_at: string | null;
+      reviewed_by: string | null;
     };
     const stateByPO = new Map<string, {
       clarificationId: string;
@@ -466,6 +468,8 @@ export const AuditService = {
       reminderCount: number;
       submittedAt: string | null;
       hmStatus: string | null;
+      reviewedAt: string | null;
+      reviewedBy: string | null;
     }>();
 
     for (const row of clarRes.rows as Clar[]) {
@@ -489,6 +493,8 @@ export const AuditService = {
         reminderCount: row.reminder_count ?? 0,
         submittedAt: row.submitted_at,
         hmStatus: row.hm_status,
+        reviewedAt: row.reviewed_at,
+        reviewedBy: row.reviewed_by,
       });
     }
 
@@ -528,6 +534,9 @@ export const AuditService = {
         reminder_count: state?.reminderCount ?? 0,
         submitted_at: state?.submittedAt ?? null,
         hm_status: state?.hmStatus ?? null,
+        // Per-item admin review (drives the 'Reviewed Mds' filter pill).
+        reviewed_at: state?.reviewedAt ?? null,
+        reviewed_by: state?.reviewedBy ?? null,
       };
     });
 
@@ -577,6 +586,8 @@ export const AuditService = {
         reminder_count: row.reminder_count ?? 0,
         submitted_at: row.submitted_at,
         hm_status: row.hm_status ?? null,
+        reviewed_at: row.reviewed_at ?? null,
+        reviewed_by: row.reviewed_by ?? null,
       };
       standardHeaderCols.forEach((col, idx) => {
         synth[col] = col === 'is_suspected' ? 'Yes' : (r[idx] ?? null);
@@ -672,6 +683,28 @@ export const AuditService = {
         WHERE clarification_id = $1 AND item_index = $2
       RETURNING *`,
       [clarificationId, itemIndex, filePath, fileName],
+    );
+    return r.rows[0] as Record<string, unknown> | undefined;
+  },
+
+  /**
+   * Mark a clarification item as reviewed by the admin. Sets reviewed_at to
+   * NOW() and stores the reviewer identity. Returns the updated row so the
+   * controller can echo the review timestamp to the frontend.
+   */
+  async markClarificationItemReviewed(
+    clarificationId: string,
+    itemIndex: number,
+    reviewedBy: string,
+  ) {
+    const r = await query(
+      `UPDATE clarification_items
+          SET reviewed_at = NOW(),
+              reviewed_by = $3,
+              updated_at  = NOW()
+        WHERE clarification_id = $1 AND item_index = $2
+      RETURNING item_index, reviewed_at, reviewed_by`,
+      [clarificationId, itemIndex, reviewedBy],
     );
     return r.rows[0] as Record<string, unknown> | undefined;
   },

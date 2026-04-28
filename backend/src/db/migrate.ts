@@ -431,6 +431,12 @@ ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS sdoc_file_path VARCHA
 ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS sdoc_file_name VARCHAR(255);
 ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS sdoc_received_at TIMESTAMPTZ;
 
+-- Per-item admin review timestamp. NULL until the manager reviews the
+-- uploaded MD / SDoC; set to NOW() once approved. Drives the
+-- 'Reviewed Mds' filter pill in the PO viewer.
+ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS reviewed_by VARCHAR(255);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_vessels_created_by ON "vessels"(created_by_id);
 CREATE INDEX IF NOT EXISTS idx_ga_plans_vessel ON "ga_plans"(vessel_id);

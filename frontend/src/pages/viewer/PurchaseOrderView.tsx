@@ -37,12 +37,16 @@ interface PurchaseOrderItem {
     reminderCount?: number;
     // 'red' | 'green' | 'pchm' | null — set by the HM categorization flow.
     hmStatus?: string | null;
+    // Set when the admin has marked this item reviewed. Drives the
+    // 'Reviewed Mds' filter pill and the Reviewed badge.
+    reviewedAt?: string | null;
+    reviewedBy?: string | null;
     vendorName?: string;
     vendorEmail?: string;
 }
 
 const FILTER_TAGS = [
-    'Pending Mds', 'Received Mds', 'Tracked Items', 'Non Tracked Items',
+    'Pending Mds', 'Received Mds', 'Reviewed Mds', 'Tracked Items', 'Non Tracked Items',
     'Request Pending', 'Reminder 1', 'Reminder 2', 'Non-Responsive Supplier',
     'HM Red', 'HM Green', 'PCHM', 'Non HM', 'Review Repeated Items', 'Suspected Items', 'All'
 ];
@@ -88,10 +92,13 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                     const mdReqDate = typeof r.md_requested_date === 'string' ? r.md_requested_date.split('T')[0] : String(r.md_requested_date ?? '');
                     const reminderCount = Number(r.reminder_count ?? 0);
                     const hmStatusRaw = r.hm_status ? String(r.hm_status).toLowerCase() : null;
+                    const reviewedAt = r.reviewed_at ? String(r.reviewed_at) : null;
+                    const reviewedBy = r.reviewed_by ? String(r.reviewed_by) : null;
 
                     let emailStatus: string;
                     if (!isSuspected) emailStatus = 'NOT SENT';
                     else if (!r.clarification_id) emailStatus = 'NOT SENT';
+                    else if (reviewedAt) emailStatus = 'REVIEWED';
                     else if (mdsStatus === 'received') emailStatus = 'REPLIED';
                     else if (reminderCount >= 3) emailStatus = 'NON-RESPONSIVE';
                     else if (reminderCount >= 1) emailStatus = `REMINDER ${reminderCount}`;
@@ -123,6 +130,8 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                         sdocFileName,
                         reminderCount,
                         hmStatus: hmStatusRaw,
+                        reviewedAt,
+                        reviewedBy,
                         vendorName: String(r.vendor_name ?? ''),
                         vendorEmail: String(r.vendor_email ?? ''),
                     };
@@ -136,6 +145,21 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
 
     // Admin is view-only on supplier documents — uploads happen exclusively
     // through the public supplier link (handled by the public controller).
+
+    // Mark a clarification item as reviewed by the admin. Moves the row from
+    // 'Received Mds' to 'Reviewed Mds' on next refresh.
+    const markItemReviewed = async (item: PurchaseOrderItem) => {
+        if (!item.clarificationId || item.itemIndex === undefined) return;
+        try {
+            await api.post(
+                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_REVIEW(item.clarificationId, item.itemIndex),
+                {},
+            );
+            loadClarifications();
+        } catch (err) {
+            console.error('Mark reviewed failed:', err);
+        }
+    };
 
     const [searchTerm, setSearchTerm] = useState('');
     const [isFilterBarOpen, setIsFilterBarOpen] = useState(false);
@@ -201,7 +225,13 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                 case 'Non-Responsive Supplier':
                     return item.isSuspected === true && hasClar && !isReceived && reminders >= 3;
                 case 'Received Mds':
-                    return isReceived;
+                    // Vendor uploaded both docs but the admin hasn't
+                    // approved yet — once approved the row moves to
+                    // 'Reviewed Mds' instead.
+                    return isReceived && !item.reviewedAt;
+                case 'Reviewed Mds':
+                    // Admin has signed off on the documents.
+                    return Boolean(item.reviewedAt);
                 case 'Tracked Items':
                     // Anything we've taken action on (request sent at least once).
                     return hasClar;
@@ -536,6 +566,39 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                                     >
                                                                         <Mail size={14} />
                                                                     </button>
+                                                                    {item.isSuspected && item.clarificationId && item.mdsStatus === 'received' && !item.reviewedAt && (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="po-v4-action-icon-btn-v4"
+                                                                            onClick={() => markItemReviewed(item)}
+                                                                            title="Approve — mark this item reviewed"
+                                                                            style={{ color: '#10B981', cursor: 'pointer' }}
+                                                                        >
+                                                                            <CheckCircle2 size={14} />
+                                                                        </button>
+                                                                    )}
+                                                                    {item.reviewedAt && (
+                                                                        <span
+                                                                            title={item.reviewedBy ? `Reviewed by ${item.reviewedBy}` : 'Reviewed'}
+                                                                            style={{
+                                                                                display: 'inline-flex',
+                                                                                alignItems: 'center',
+                                                                                gap: 4,
+                                                                                padding: '2px 8px',
+                                                                                background: '#ECFDF5',
+                                                                                color: '#065F46',
+                                                                                border: '1px solid #A7F3D0',
+                                                                                borderRadius: 999,
+                                                                                fontSize: 10,
+                                                                                fontWeight: 700,
+                                                                                letterSpacing: '0.04em',
+                                                                                textTransform: 'uppercase',
+                                                                            }}
+                                                                        >
+                                                                            <CheckCircle2 size={12} />
+                                                                            Reviewed
+                                                                        </span>
+                                                                    )}
                                                                     <button type="button" className="po-v4-action-icon-btn-v4 edit" title="Edit Item"><Edit2 size={14} /></button>
                                                                     <button type="button" className="po-v4-action-icon-btn-v4 delete" title="Delete Item"><Trash2 size={14} /></button>
                                                                 </div>
