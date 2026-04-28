@@ -16,7 +16,8 @@ import {
     Image,
     Trash2,
     FileUp,
-    CheckCircle2
+    CheckCircle2,
+    Loader2
 } from 'lucide-react';
 
 interface ReviewWizardProps {
@@ -53,6 +54,10 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
     // Toast state
     const [showToast, setShowToast] = useState(false);
     const [toastData, setToastData] = useState({ title: '', message: '' });
+
+    // Send-in-flight state. Prevents double-submit while the clarification
+    // email POST is on the wire and feeds the spinner UI on the Send button.
+    const [isSending, setIsSending] = useState(false);
 
     // Parse emails into chips when modal opens
     const initChips = (emailStr: string) => {
@@ -413,8 +418,19 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
     };
 
     const handleSendMail = async () => {
+        if (isSending) return; // prevent double-submit
         if (toChips.length === 0) {
             setToastData({ title: 'Missing recipients', message: 'Please add at least one recipient.' });
+            setShowToast(true);
+            return;
+        }
+        if (!mailContent.subject.trim()) {
+            setToastData({ title: 'Missing subject', message: 'Please add a subject before sending.' });
+            setShowToast(true);
+            return;
+        }
+        if (!mailContent.body.trim()) {
+            setToastData({ title: 'Missing body', message: 'Please add a body before sending.' });
             setShowToast(true);
             return;
         }
@@ -423,6 +439,7 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
             s.split(/[,;]\s*/).map(x => x.trim()).filter(Boolean);
         const ccList = parseList(ccVal);
 
+        setIsSending(true);
         try {
             await api.post(ENDPOINTS.AUDITS.CLARIFICATION_EMAIL, {
                 imo,
@@ -442,12 +459,15 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
 
             setToastData({
                 title: 'Mail Sent Successfully',
-                message: `Clarification request has been sent to ${toChips.join(', ')}`
+                message: `Clarification request has been sent to ${toChips.join(', ')}. The audit has moved out of Pending Reviews.`
             });
             setShowToast(true);
             setShowMailModal(false);
 
-            setTimeout(() => { onComplete(); }, 3000);
+            // The backend transitions the audit from Pending Review → In Progress
+            // when the email succeeds, so calling onComplete reloads the parent
+            // list and the row drops off the Pending Reviews registry.
+            setTimeout(() => { onComplete(); }, 1500);
         } catch (err) {
             const msg = err instanceof Error ? err.message : 'Unknown error';
             setToastData({
@@ -455,6 +475,8 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
                 message: msg,
             });
             setShowToast(true);
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -843,9 +865,21 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
                         {/* Footer toolbar */}
                         <div className="gmail-footer">
                             <div className="footer-left">
-                                <button className="gmail-send-btn" onClick={handleSendMail}>
-                                    <Send size={15} style={{ marginRight: 6 }} />
-                                    Send
+                                <button
+                                    className="gmail-send-btn"
+                                    onClick={handleSendMail}
+                                    disabled={isSending}
+                                    style={{
+                                        opacity: isSending ? 0.7 : 1,
+                                        cursor: isSending ? 'wait' : 'pointer',
+                                    }}
+                                >
+                                    {isSending ? (
+                                        <Loader2 size={15} style={{ marginRight: 6 }} className="rw-spin" />
+                                    ) : (
+                                        <Send size={15} style={{ marginRight: 6 }} />
+                                    )}
+                                    {isSending ? 'Sending…' : 'Send'}
                                 </button>
                                 <div className="gmail-tool-icons">
                                     <span className="tool-icon-btn"><Type size={22} /></span>

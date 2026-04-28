@@ -381,6 +381,24 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
       ));
     }
 
+    // All batches sent successfully. The audit was sitting in 'Pending Review';
+    // now that the team has acted on it (clarifications dispatched), move it
+    // back to 'In Progress' so it leaves the Pending Reviews registry and
+    // re-appears in Pending Audits while we wait for supplier responses.
+    if (audit) {
+      const auditRow = audit as Record<string, unknown>;
+      if (auditRow.status === 'Pending Review') {
+        await query(
+          `UPDATE audit_summaries
+              SET status = 'In Progress',
+                  last_activity = NOW(),
+                  updated_at = NOW()
+            WHERE id = $1`,
+          [auditRow.id],
+        );
+      }
+    }
+
     res.json({ success: true, data: { batches: results } });
   } catch (err) { next(err); }
 }

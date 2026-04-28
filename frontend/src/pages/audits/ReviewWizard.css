@@ -1398,3 +1398,12 @@
 .undo-action-btn:hover {
     color: #00A3FF;
 }
+
+/* Spinner used on the Send button while the clarification email is in flight. */
+@keyframes rw-spin {
+    to { transform: rotate(360deg); }
+}
+
+.rw-spin {
+    animation: rw-spin 0.8s linear infinite;
+}
