@@ -134,6 +134,9 @@ body:has(.sidebar.collapsed) .md-sdoc-main {
 
 .md-table {
     width: 100%;
+    /* Hard floor so percentage columns can't squeeze into each other on
+       narrow viewports — the wrapper scrolls horizontally below this. */
+    min-width: 1180px;
     border-collapse: collapse;
     table-layout: fixed;
 }
@@ -190,11 +193,27 @@ body:has(.sidebar.collapsed) .md-sdoc-main {
 }
 
 /* Action — fixed, generous width so the REVIEW pill never collapses
-   into a circle and the column header doesn't overlap with the date. */
+   into a circle and the column header doesn't overlap with the date.
+   Pinned to the right edge of the scroll wrapper so the manager can
+   always reach the REVIEW button no matter how far the table is
+   scrolled horizontally. */
+.md-table th:nth-child(8),
+.md-table td:nth-child(8) {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    box-shadow: -4px 0 8px -6px rgba(15, 23, 42, 0.18);
+}
+
 .md-table th:nth-child(8) {
     min-width: 140px;
     width: 140px;
     text-align: center;
+    background: #F8FAFC; /* matches the rest of the header */
+}
+
+.md-table td:nth-child(8) {
+    background: white; /* mask the scrolling content underneath */
 }
 
 .md-table td {
