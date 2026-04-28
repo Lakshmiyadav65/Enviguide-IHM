@@ -545,6 +545,14 @@ export default function GAPlanViewer({
                                                 transform: `scale(${100 / zoom})`,
                                                 transformOrigin: 'top left'
                                             }}
+                                            // Stop mouse events from bubbling to the canvas. Without
+                                            // this, clicking inside the popup fires the canvas's
+                                            // onMouseDown (crop tool is still active), which clears
+                                            // currentSelection + title before the click handler can
+                                            // run — so Enter saved but clicking the disk did not.
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onMouseMove={(e) => e.stopPropagation()}
+                                            onMouseUp={(e) => e.stopPropagation()}
                                         >
                                             <input
                                                 type="text"
@@ -555,7 +563,13 @@ export default function GAPlanViewer({
                                                 autoFocus
                                                 onKeyDown={(e) => e.key === 'Enter' && addSelection()}
                                             />
-                                            <button className="input-save-btn" onClick={(e) => { e.stopPropagation(); addSelection(); }} title="Save Deck Selection">
+                                            <button
+                                                type="button"
+                                                className="input-save-btn"
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                onClick={(e) => { e.stopPropagation(); addSelection(); }}
+                                                title="Save Deck Selection"
+                                            >
                                                 <Save size={14} />
                                             </button>
                                         </div>
