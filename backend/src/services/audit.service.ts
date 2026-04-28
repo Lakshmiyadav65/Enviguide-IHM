@@ -389,10 +389,13 @@ export const AuditService = {
     }
 
     // Pick the newest non-Completed audit for the vessel — may be null.
+    // 'Awaiting Clarification' is a live audit too (clarifications dispatched,
+    // waiting on supplier responses); the PO viewer must still show its line
+    // items so the admin can see Received MDS / Pending MDS rows.
     const auditRes = await query(
       `SELECT a.id FROM audit_summaries a
         WHERE a.vessel_id = $1
-          AND a.status IN ('In Progress', 'Pending', 'Pending Review', 'submitted')
+          AND a.status IN ('In Progress', 'Pending', 'Pending Review', 'Awaiting Clarification', 'submitted')
         ORDER BY a.created_at DESC
         LIMIT 1`,
       [vesselId],
