@@ -116,14 +116,31 @@ export default function MDSdocAudit() {
                                                     {record.clarificationStatus === 'Awaiting Clarification' ? 'AWAITING CLARIFICATION' : 'RESOLVED'}
                                                 </span>
                                             </td>
-                                            <td>{record.lastSubmissionDate}</td>
-                                            <td style={{ textAlign: 'center' }}>
+                                            <td style={{ whiteSpace: 'nowrap' }}>{record.lastSubmissionDate}</td>
+                                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                                                 <button
+                                                    type="button"
                                                     className="action-btn"
-                                                    style={{ background: 'none', border: 'none', color: '#0088CC', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}
+                                                    style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 6,
+                                                        padding: '6px 14px',
+                                                        background: '#E0F2FE',
+                                                        border: '1px solid #00B0FA',
+                                                        color: '#0369A1',
+                                                        borderRadius: 999,
+                                                        fontSize: 12,
+                                                        fontWeight: 700,
+                                                        letterSpacing: '0.04em',
+                                                        textTransform: 'uppercase',
+                                                        cursor: 'pointer',
+                                                    }}
                                                     onClick={() => navigate(`/administration/document-audit/${record.imoNumber}`)}
+                                                    title="Review uploaded MD / SDoC documents"
                                                 >
-                                                    <Eye size={18} />
+                                                    <Eye size={14} />
+                                                    Review
                                                 </button>
                                             </td>
                                         </tr>
