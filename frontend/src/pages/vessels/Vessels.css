@@ -1594,7 +1594,7 @@ body:has(.sidebar.collapsed) .vessel-page-main {
 .upload-text .sub-text {
     font-size: 12px;
     color: #94A3B8;
-    margin: 0 0 12px 0;
+    margin: 0;
 }
 
 .browse-text {
@@ -2216,12 +2216,12 @@ body:has(.sidebar.collapsed) .vessel-page-main {
 
 /* Custom Inverted-V Animation */
 .custom-upload-animation {
-    width: 100px;
-    height: 100px;
+    width: 80px;
+    height: 80px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
 }
 
 .animated-circle {
