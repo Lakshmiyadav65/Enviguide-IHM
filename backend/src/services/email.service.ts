@@ -1,25 +1,56 @@
-// -- Email Service (nodemailer, SMTP) ---------------------
+// -- Email Service ----------------------------------------
+// Two delivery transports, picked at runtime:
+//
+//   1. Resend (HTTPS, port 443) — used when RESEND_API_KEY is set.
+//      Works on hosts that block outbound SMTP (e.g. Render Free).
+//      This is the recommended path for production.
+//
+//   2. Nodemailer SMTP — fallback when SMTP_HOST/USER/PASS are set
+//      and Resend is not. Useful for local development against a
+//      Mailtrap instance, etc.
+//
+// Both paths share the same SendMailInput contract and the same
+// "self-send Bcc reroute" rule (any To/Cc address that matches the
+// authenticated sender is moved to Bcc, so Gmail / Workspace don't
+// silently file the mail under Sent only).
+//
+// Switching transports just means flipping env vars. No callsite
+// changes needed anywhere else in the app.
+
 import nodemailer, { type Transporter } from 'nodemailer';
+import { Resend } from 'resend';
 import { env } from '../config/env.js';
 
-let transporter: Transporter | null = null;
+// ─── Transport selection ────────────────────────────────────────────────
 
-function getTransporter(): Transporter {
+let resendClient: Resend | null = null;
+function getResendClient(): Resend {
+  if (!env.RESEND_API_KEY) {
+    throw new Error('Email not configured. Set RESEND_API_KEY in environment.');
+  }
+  if (!resendClient) resendClient = new Resend(env.RESEND_API_KEY);
+  return resendClient;
+}
+
+let smtpTransporter: Transporter | null = null;
+function getSmtpTransporter(): Transporter {
   if (!env.SMTP_HOST || !env.SMTP_PORT || !env.SMTP_USER || !env.SMTP_PASS) {
     throw new Error(
-      'Email not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in environment.',
+      'Email not configured. Set RESEND_API_KEY (preferred) or SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS in environment.',
     );
   }
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
+  if (!smtpTransporter) {
+    smtpTransporter = nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_PORT === 465,
       auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
     });
   }
-  return transporter;
+  return smtpTransporter;
 }
+
+// ─── Public API ─────────────────────────────────────────────────────────
 
 export interface SendMailInput {
   to: string | string[];
@@ -29,6 +60,12 @@ export interface SendMailInput {
   text?: string;
   html?: string;
   replyTo?: string;
+}
+
+export interface SendMailResult {
+  messageId: string;
+  /** 'resend' | 'smtp' — useful for logs / debugging which path ran. */
+  transport: 'resend' | 'smtp';
 }
 
 /** Normalise a to/cc/bcc field into a trimmed, de-duped array. */
@@ -48,13 +85,13 @@ function toList(v: string | string[] | undefined): string[] {
   return out;
 }
 
-export async function sendMail(input: SendMailInput) {
-  const t = getTransporter();
-
-  // Self-send workaround: Gmail / Google Workspace SMTP deliver a message
-  // addressed to the authenticated sender into the Sent folder ONLY — no
-  // Inbox copy. Any recipient in To/Cc that matches EMAIL_FROM / SMTP_USER
-  // is rerouted to Bcc so the mail actually lands in that Inbox.
+/**
+ * Reroute any recipient that matches the authenticated sender (EMAIL_FROM
+ * or SMTP_USER) into Bcc — Gmail / Workspace deliver self-addressed mail
+ * to the Sent folder only, so without this the sender wouldn't see their
+ * own copy in their Inbox.
+ */
+function applySelfSendBcc(input: SendMailInput) {
   const senderAliases = new Set(
     [env.EMAIL_FROM, env.SMTP_USER]
       .filter((v): v is string => Boolean(v))
@@ -73,23 +110,56 @@ export async function sendMail(input: SendMailInput) {
     ...ccRaw.filter(isSelf),
   ];
 
-  // Guard: if every recipient was the sender, keep the original To intact so
-  // we don't send to nobody. Gmail will still file it under Sent, but at
-  // least we're not silently dropping the only address the caller gave us.
   const to = toKept.length === 0 && ccKept.length === 0 && bccExtras.length === 0
     ? toRaw
     : toKept;
-
   const bcc = toList([...bccRaw, ...bccExtras]);
 
-  return t.sendMail({
-    from: env.EMAIL_FROM || env.SMTP_USER,
-    replyTo: input.replyTo || env.SMTP_USER,
+  return { to, cc: ccKept, bcc };
+}
+
+export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
+  const { to, cc, bcc } = applySelfSendBcc(input);
+  const fromAddr = env.EMAIL_FROM || env.SMTP_USER || 'onboarding@resend.dev';
+  const replyTo = input.replyTo || env.EMAIL_FROM || env.SMTP_USER;
+
+  // Prefer Resend when configured. Render Free blocks outbound SMTP, so
+  // SMTP is only useful for local dev against Mailtrap-style services.
+  if (env.RESEND_API_KEY) {
+    const r = getResendClient();
+    const { data, error } = await r.emails.send({
+      from: fromAddr,
+      to: to.length > 0 ? to : [fromAddr],
+      cc: cc.length > 0 ? cc : undefined,
+      bcc: bcc.length > 0 ? bcc : undefined,
+      replyTo,
+      subject: input.subject,
+      text: input.text ?? '',
+      html: input.html ?? input.text ?? '',
+    });
+    if (error) {
+      // Resend SDK returns errors via the destructured `error` rather than
+      // throwing — surface them as a thrown Error so callers handle a
+      // single shape regardless of transport.
+      const msg = (error as { message?: string })?.message
+        ?? (error as { name?: string })?.name
+        ?? 'Resend send failed';
+      throw new Error(msg);
+    }
+    return { messageId: data?.id ?? '', transport: 'resend' };
+  }
+
+  // SMTP fallback (local dev / non-Render environments).
+  const t = getSmtpTransporter();
+  const result = await t.sendMail({
+    from: fromAddr,
+    replyTo,
     to: to.length > 0 ? to : undefined,
-    cc: ccKept.length > 0 ? ccKept : undefined,
+    cc: cc.length > 0 ? cc : undefined,
     bcc: bcc.length > 0 ? bcc : undefined,
     subject: input.subject,
     text: input.text,
     html: input.html,
   });
+  return { messageId: (result as { messageId?: string }).messageId ?? '', transport: 'smtp' };
 }

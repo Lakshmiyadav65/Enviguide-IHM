@@ -29,11 +29,17 @@ export const env = {
   CORS_ORIGIN:  optional('CORS_ORIGIN', 'http://localhost:5173'),
   UPLOAD_DIR:   optional('UPLOAD_DIR', './uploads'),
   MAX_FILE_SIZE_MB: Number(optional('MAX_FILE_SIZE_MB', '10')),
+  // SMTP config — kept as a fallback. On hosts that block outbound SMTP
+  // (e.g. Render Free) prefer Resend by setting RESEND_API_KEY instead.
   SMTP_HOST:    process.env.SMTP_HOST,
   SMTP_PORT:    process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined,
   SMTP_USER:    process.env.SMTP_USER,
   SMTP_PASS:    process.env.SMTP_PASS,
   EMAIL_FROM:   process.env.EMAIL_FROM,
+  // Resend transactional email API (HTTPS — works on hosts where SMTP
+  // is blocked). When set, sendMail uses Resend; otherwise it falls
+  // back to nodemailer/SMTP.
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
   // S3-compatible object storage for persistent file uploads.
   // Works with Supabase Storage, Cloudflare R2, AWS S3, MinIO, etc.
   // All optional — if unset, uploads stay on local disk and we serve them
