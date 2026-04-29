@@ -514,14 +514,18 @@ IHM Audit Team`,
                                                                 )}
                                                             </button>
                                                         )}
-                                                        <button
-                                                            type="button"
-                                                            className="da-clarify-btn"
-                                                            onClick={() => openClarificationMail(item)}
-                                                            title="Request clarification — send a follow-up email to the supplier"
-                                                        >
-                                                            <MessageSquare size={12} /> Request Clarification
-                                                        </button>
+                                                        {/* Once an item is reviewed, the audit decision is locked
+                                                            in — no follow-up clarification needed. Hide the button. */}
+                                                        {item.status !== 'reviewed' && (
+                                                            <button
+                                                                type="button"
+                                                                className="da-clarify-btn"
+                                                                onClick={() => openClarificationMail(item)}
+                                                                title="Request clarification — send a follow-up email to the supplier"
+                                                            >
+                                                                <MessageSquare size={12} /> Request Clarification
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
