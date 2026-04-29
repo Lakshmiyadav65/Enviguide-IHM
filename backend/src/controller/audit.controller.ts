@@ -395,13 +395,21 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
       },
     });
 
-    // Fire-and-forget the SMTP sends. Each completion patches its
-    // clarification_requests row to 'sent' or 'failed'. We don't await
-    // — the response has already gone out.
-    void (async () => {
-      for (const p of persisted) {
+    // Fire-and-forget the SMTP sends in parallel. Each completion patches
+    // its clarification_requests row to 'sent' or 'failed'. Verbose logs
+    // so the operator can confirm in the host logs that the dispatch
+    // actually ran.
+    console.log(
+      `[clarification-email] queued ${persisted.length} batch(es) for IMO ${imo} — dispatching in background`,
+    );
+
+    void Promise.allSettled(
+      persisted.map(async (p) => {
+        const label = `[clarification-email] ${p.clarificationId} → ${p.to.join(', ')}`;
+        const t0 = Date.now();
         try {
-          await sendMail({
+          console.log(`${label}: sending`);
+          const result = await sendMail({
             to: p.to,
             cc,
             bcc: p.bcc,
@@ -409,22 +417,29 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
             text: p.bodyWithLink,
             html: p.html,
           });
+          const elapsed = Date.now() - t0;
+          console.log(
+            `${label}: OK (${elapsed}ms) messageId=${(result as { messageId?: string })?.messageId ?? '?'}`,
+          );
           await query(
             `UPDATE clarification_requests SET status = 'sent', error_message = NULL WHERE id = $1`,
             [p.clarificationId],
           );
         } catch (mailErr) {
           const errorMessage = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
-          console.error(`[clarification-email] send failed for ${p.to.join(', ')}: ${errorMessage}`);
+          const elapsed = Date.now() - t0;
+          console.error(`${label}: FAILED after ${elapsed}ms — ${errorMessage}`);
           await query(
             `UPDATE clarification_requests SET status = 'failed', error_message = $2 WHERE id = $1`,
             [p.clarificationId, errorMessage],
           ).catch((dbErr) => {
-            console.error('[clarification-email] failed to record failure:', dbErr);
+            console.error(`${label}: also failed to record failure:`, dbErr);
           });
         }
-      }
-    })();
+      }),
+    ).then(() => {
+      console.log(`[clarification-email] all batches finished for IMO ${imo}`);
+    });
   } catch (err) { next(err); }
 }
 
