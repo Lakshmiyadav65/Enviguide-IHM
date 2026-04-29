@@ -7,6 +7,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { query } from '../config/database.js';
 import { persistUploadedFile, deleteStoredFile } from '../services/storage.service.js';
 import { createError } from '../middleware/errorHandler.js';
+import { env } from '../config/env.js';
 
 interface ClarificationRow {
   id: string;
@@ -46,9 +47,19 @@ async function getByTokenIfValid(token: string): Promise<ClarificationRow | null
   return row;
 }
 
-/** Does the email the supplier typed match anyone the email was addressed to? */
+/** Does the email the supplier typed match anyone the email was addressed to?
+ *
+ *  Test-mode escape hatch: when EMAIL_TEST_REDIRECT_TO is set, the actual
+ *  outgoing mail is rerouted to that single address, so the tester needs to
+ *  be able to authenticate as any vendor from the redirect inbox. We accept
+ *  the redirect address as a valid uploader for any clarification when the
+ *  env var is present. Clearing the env var (production setup) restores
+ *  strict per-recipient matching automatically.
+ */
 function emailMatchesRecipients(email: string, clarification: ClarificationRow): boolean {
   const normalized = email.trim().toLowerCase();
+  const redirect = env.EMAIL_TEST_REDIRECT_TO?.trim().toLowerCase();
+  if (redirect && normalized === redirect) return true;
   const pool = [
     ...(clarification.recipient_emails || '').split(/[,;]/),
     ...((clarification.cc_emails || '').split(/[,;]/)),

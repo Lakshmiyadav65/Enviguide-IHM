@@ -118,10 +118,56 @@ function applySelfSendBcc(input: SendMailInput) {
   return { to, cc: ccKept, bcc };
 }
 
+/**
+ * If EMAIL_TEST_REDIRECT_TO is set, reroute the outgoing mail to that
+ * single address — useful while the email provider's sandbox blocks
+ * sends to anyone other than the signup address. The original to/cc
+ * are preserved in the subject and a banner at the top of the body so
+ * the tester can still tell which vendor each mail was meant for.
+ */
+function applyTestRedirect(
+  to: string[],
+  cc: string[],
+  bcc: string[],
+  subject: string,
+  text: string | undefined,
+  html: string | undefined,
+): { to: string[]; cc: string[]; bcc: string[]; subject: string; text: string | undefined; html: string | undefined } {
+  const redirect = env.EMAIL_TEST_REDIRECT_TO?.trim();
+  if (!redirect) return { to, cc, bcc, subject, text, html };
+
+  const originalTo = to.join(', ');
+  const originalCc = cc.length > 0 ? cc.join(', ') : '';
+  const newSubject = `[TEST → ${originalTo}]${originalCc ? ` (cc: ${originalCc})` : ''} ${subject}`;
+  const banner =
+    '⚠️ TEST REDIRECT — this email was meant for:\n'
+    + `  To:  ${originalTo}\n`
+    + (originalCc ? `  Cc:  ${originalCc}\n` : '')
+    + 'Set EMAIL_TEST_REDIRECT_TO to "" in the host env vars to deliver real recipients.\n'
+    + '──────────────────────────────────────────────────\n\n';
+  const htmlBanner =
+    '<div style="background:#FEF3C7;border:1px solid #F59E0B;color:#92400E;padding:12px 16px;border-radius:8px;margin-bottom:16px;font-family:system-ui,sans-serif;font-size:13px;">'
+    + '<strong>⚠️ TEST REDIRECT</strong><br/>'
+    + `<div style="margin-top:6px"><strong>To:</strong> ${originalTo}</div>`
+    + (originalCc ? `<div><strong>Cc:</strong> ${originalCc}</div>` : '')
+    + '<div style="margin-top:6px;font-size:11px;opacity:0.8">Clear <code>EMAIL_TEST_REDIRECT_TO</code> in the host env vars to deliver real recipients.</div>'
+    + '</div>';
+
+  return {
+    to: [redirect],
+    cc: [],
+    bcc: [],
+    subject: newSubject,
+    text: text ? banner + text : undefined,
+    html: html ? htmlBanner + html : undefined,
+  };
+}
+
 export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   const { to, cc, bcc } = applySelfSendBcc(input);
   const fromAddr = env.EMAIL_FROM || env.SMTP_USER || 'onboarding@resend.dev';
   const replyTo = input.replyTo || env.EMAIL_FROM || env.SMTP_USER;
+  const redirected = applyTestRedirect(to, cc, bcc, input.subject, input.text, input.html);
 
   // Prefer Resend when configured. Render Free blocks outbound SMTP, so
   // SMTP is only useful for local dev against Mailtrap-style services.
@@ -129,13 +175,13 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     const r = getResendClient();
     const { data, error } = await r.emails.send({
       from: fromAddr,
-      to: to.length > 0 ? to : [fromAddr],
-      cc: cc.length > 0 ? cc : undefined,
-      bcc: bcc.length > 0 ? bcc : undefined,
+      to: redirected.to.length > 0 ? redirected.to : [fromAddr],
+      cc: redirected.cc.length > 0 ? redirected.cc : undefined,
+      bcc: redirected.bcc.length > 0 ? redirected.bcc : undefined,
       replyTo,
-      subject: input.subject,
-      text: input.text ?? '',
-      html: input.html ?? input.text ?? '',
+      subject: redirected.subject,
+      text: redirected.text ?? '',
+      html: redirected.html ?? redirected.text ?? '',
     });
     if (error) {
       // Resend SDK returns errors via the destructured `error` rather than
@@ -154,12 +200,12 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   const result = await t.sendMail({
     from: fromAddr,
     replyTo,
-    to: to.length > 0 ? to : undefined,
-    cc: cc.length > 0 ? cc : undefined,
-    bcc: bcc.length > 0 ? bcc : undefined,
-    subject: input.subject,
-    text: input.text,
-    html: input.html,
+    to: redirected.to.length > 0 ? redirected.to : undefined,
+    cc: redirected.cc.length > 0 ? redirected.cc : undefined,
+    bcc: redirected.bcc.length > 0 ? redirected.bcc : undefined,
+    subject: redirected.subject,
+    text: redirected.text,
+    html: redirected.html,
   });
   return { messageId: (result as { messageId?: string }).messageId ?? '', transport: 'smtp' };
 }

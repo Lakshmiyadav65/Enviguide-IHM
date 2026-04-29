@@ -40,6 +40,14 @@ export const env = {
   // is blocked). When set, sendMail uses Resend; otherwise it falls
   // back to nodemailer/SMTP.
   RESEND_API_KEY: process.env.RESEND_API_KEY,
+  // Dev/staging escape hatch: when set, every outgoing mail is
+  // rerouted to this single address instead of its real recipient.
+  // The original to/cc are preserved in the subject + body banner,
+  // and the public upload page accepts this address as a recipient
+  // so the supplier portal flow is fully testable without verifying
+  // a sending domain on the email provider. Leave unset in
+  // production; clearing it restores normal per-recipient delivery.
+  EMAIL_TEST_REDIRECT_TO: process.env.EMAIL_TEST_REDIRECT_TO,
   // S3-compatible object storage for persistent file uploads.
   // Works with Supabase Storage, Cloudflare R2, AWS S3, MinIO, etc.
   // All optional — if unset, uploads stay on local disk and we serve them
