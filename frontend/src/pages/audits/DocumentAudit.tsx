@@ -116,6 +116,37 @@ export default function DocumentAudit() {
         url: string;
         fileName: string;
     } | null>(null);
+    const [openingPreview, setOpeningPreview] = useState<string | null>(null);
+
+    /** Fetch a short-lived signed URL with Content-Disposition: inline so
+     *  the iframe previews the file instead of triggering a download.
+     *  Falls back to the raw URL if the backend isn't on cloud storage. */
+    const openDocPreview = async (item: FlatItem, kind: 'md' | 'sdoc') => {
+        const rawUrl = kind === 'md' ? item.mdFilePath : item.sdocFilePath;
+        const rawName = kind === 'md' ? item.mdFileName : item.sdocFileName;
+        if (!rawUrl) return;
+        const slot = `${item.key}-${kind}`;
+        setOpeningPreview(slot);
+        try {
+            const res = await api.get<{ success: boolean; data: { url: string; fileName: string } }>(
+                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_DOC_PREVIEW(item.clarificationId, item.itemIndex, kind),
+            );
+            setViewingDoc({
+                item, kind,
+                url: res.data?.url ?? rawUrl,
+                fileName: res.data?.fileName ?? rawName ?? 'document',
+            });
+        } catch (err) {
+            console.error('Preview URL fetch failed, falling back to raw URL:', err);
+            setViewingDoc({
+                item, kind,
+                url: rawUrl,
+                fileName: rawName ?? 'document',
+            });
+        } finally {
+            setOpeningPreview(null);
+        }
+    };
 
     const loadClarifications = useCallback(() => {
         if (!imo) return;
@@ -405,16 +436,15 @@ IHM Audit Team`,
                                                             type="button"
                                                             className="file-link-v3"
                                                             title={`View MD — ${item.mdFileName || 'document'}`}
-                                                            onClick={() => setViewingDoc({
-                                                                item,
-                                                                kind: 'md',
-                                                                url: item.mdFilePath!,
-                                                                fileName: item.mdFileName ?? 'MD document',
-                                                            })}
-                                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit' }}
+                                                            onClick={() => openDocPreview(item, 'md')}
+                                                            disabled={openingPreview === `${item.key}-md`}
+                                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', opacity: openingPreview === `${item.key}-md` ? 0.6 : 1 }}
                                                         >
-                                                            <FileText size={16} className="pdf-icon-v3" />
-                                                            View
+                                                            {openingPreview === `${item.key}-md` ? (
+                                                                <><Loader2 size={16} className="spin" /> Opening…</>
+                                                            ) : (
+                                                                <><FileText size={16} className="pdf-icon-v3" /> View</>
+                                                            )}
                                                         </button>
                                                     ) : (
                                                         <span className="not-available">—</span>
@@ -426,16 +456,15 @@ IHM Audit Team`,
                                                             type="button"
                                                             className="file-link-v3"
                                                             title={`View SDoC — ${item.sdocFileName || 'document'}`}
-                                                            onClick={() => setViewingDoc({
-                                                                item,
-                                                                kind: 'sdoc',
-                                                                url: item.sdocFilePath!,
-                                                                fileName: item.sdocFileName ?? 'SDoC document',
-                                                            })}
-                                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit' }}
+                                                            onClick={() => openDocPreview(item, 'sdoc')}
+                                                            disabled={openingPreview === `${item.key}-sdoc`}
+                                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit', opacity: openingPreview === `${item.key}-sdoc` ? 0.6 : 1 }}
                                                         >
-                                                            <FileText size={16} className="pdf-icon-v3" />
-                                                            View
+                                                            {openingPreview === `${item.key}-sdoc` ? (
+                                                                <><Loader2 size={16} className="spin" /> Opening…</>
+                                                            ) : (
+                                                                <><FileText size={16} className="pdf-icon-v3" /> View</>
+                                                            )}
                                                         </button>
                                                     ) : (
                                                         <span className="not-available">—</span>

@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import { AuditService } from '../services/audit.service.js';
 import { DocumentService } from '../services/document.service.js';
 import { sendMail } from '../services/email.service.js';
-import { persistUploadedFile } from '../services/storage.service.js';
+import { persistUploadedFile, getInlinePreviewUrl } from '../services/storage.service.js';
 import { query } from '../config/database.js';
 import { env } from '../config/env.js';
 import { createError } from '../middleware/errorHandler.js';
@@ -736,6 +736,56 @@ export async function sendClarificationItemReminder(
         sentTo: toField,
         publicLink: supplierLink,
         expiresAt: newExpiresAt,
+      },
+    });
+  } catch (err) { next(err); }
+}
+
+/**
+ * GET /api/v1/audits/clarifications/:clarId/items/:idx/document/:kind/preview-url
+ * Returns a short-lived signed URL the admin can drop into an iframe.
+ * The signed URL forces Content-Disposition: inline so the file previews
+ * in the browser (PDF / image) instead of being auto-downloaded by the
+ * bucket's default headers.
+ */
+export async function getDocumentPreviewUrl(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const clarificationId = req.params.clarId as string;
+    const itemIndex = Number(req.params.idx);
+    if (!Number.isFinite(itemIndex) || itemIndex < 0) {
+      return next(createError('Invalid item index', 400));
+    }
+    const rawKind = String(req.params.kind ?? '').trim().toLowerCase();
+    const kind: 'md' | 'sdoc' | null =
+      rawKind === 'md' || rawKind === 'mds' ? 'md'
+      : rawKind === 'sdoc' || rawKind === 'sdocs' ? 'sdoc'
+      : null;
+    if (!kind) return next(createError("Invalid document kind. Expected 'md' or 'sdoc'.", 400));
+
+    const item = await AuditService.getClarificationItem(clarificationId, itemIndex);
+    if (!item) return next(createError('Clarification item not found', 404));
+
+    // Verify caller owns the parent vessel.
+    const parent = await AuditService.getAuditByImo(String(item.imo_number), req.user!.userId);
+    if (!parent) return next(createError('Audit not found for this user', 404));
+
+    const filePath = kind === 'sdoc' ? item.sdoc_file_path : item.mds_file_path;
+    const fileName = kind === 'sdoc' ? item.sdoc_file_name : item.mds_file_name;
+    if (!filePath) return next(createError('Document not uploaded yet', 404));
+
+    const previewUrl = await getInlinePreviewUrl(String(filePath));
+    res.json({
+      success: true,
+      data: {
+        // When we're not on cloud storage, fall back to the stored URL
+        // (typically a local /uploads/* path served by the express static
+        // handler — already inline by default).
+        url: previewUrl ?? String(filePath),
+        fileName: fileName ? String(fileName) : 'document',
       },
     });
   } catch (err) { next(err); }

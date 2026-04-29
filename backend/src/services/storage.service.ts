@@ -3,7 +3,8 @@
 // return a public URL. Otherwise uploads stay on local disk (dev
 // fallback; ephemeral on Render free tier).
 
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -89,6 +90,47 @@ export async function persistUploadedFile(
     name: originalName,
     key,
   };
+}
+
+/**
+ * Generate a short-lived URL the browser can fetch with
+ * Content-Disposition: inline — so PDFs / images render inside an
+ * iframe instead of triggering a download. Supabase (and most S3-
+ * compatible buckets) honour ResponseContentDisposition on signed
+ * URL requests regardless of the object's stored disposition.
+ *
+ * @param filePathOrUrl  Either a full URL we returned from
+ *                       persistUploadedFile() OR the bare S3 key.
+ *                       We strip the public base prefix when present.
+ * @returns The signed URL, or null when storage isn't S3-backed
+ *          (local-disk dev mode — caller should serve the file via
+ *          the express static handler instead).
+ */
+export async function getInlinePreviewUrl(
+  filePathOrUrl: string,
+  expiresInSeconds = 300,
+): Promise<string | null> {
+  if (!s3Configured) return null;
+
+  // If the caller passed a full URL we built earlier, strip the base
+  // prefix to get back to the S3 key.
+  let key = filePathOrUrl;
+  const base = (env.S3_PUBLIC_BASE_URL
+    ?? `${env.S3_ENDPOINT!.replace(/\/$/, '')}/${env.S3_BUCKET}`
+  ).replace(/\/$/, '');
+  if (key.startsWith(`${base}/`)) {
+    key = key.substring(base.length + 1);
+  }
+  // If we still have a full URL (different domain), bail out and let
+  // the caller fall back to serving it directly.
+  if (/^https?:\/\//i.test(key)) return null;
+
+  const cmd = new GetObjectCommand({
+    Bucket: env.S3_BUCKET!,
+    Key: key,
+    ResponseContentDisposition: 'inline',
+  });
+  return getSignedUrl(getClient(), cmd, { expiresIn: expiresInSeconds });
 }
 
 /** Delete a stored file by its S3 key. No-op for local files. */

@@ -74,6 +74,8 @@ export const ENDPOINTS = {
     CLARIFICATIONS: (imo: string) => `/audits/${imo}/clarifications`,
     CLARIFICATION_ITEM_DOC: (clarId: string, idx: number | string, kind: 'md' | 'sdoc') =>
       `/audits/clarifications/${clarId}/items/${idx}/document/${kind}`,
+    CLARIFICATION_ITEM_DOC_PREVIEW: (clarId: string, idx: number | string, kind: 'md' | 'sdoc') =>
+      `/audits/clarifications/${clarId}/items/${idx}/document/${kind}/preview-url`,
     CLARIFICATION_ITEM_REMIND: (clarId: string, idx: number | string) =>
       `/audits/clarifications/${clarId}/items/${idx}/remind`,
     CLARIFICATION_ITEM_REVIEW: (clarId: string, idx: number | string) =>
