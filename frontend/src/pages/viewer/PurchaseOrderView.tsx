@@ -169,8 +169,6 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
     const [selectedMail, setSelectedMail] = useState<{ subject: string; body: string; to: string } | null>(null);
     const [reminderItem, setReminderItem] = useState<PurchaseOrderItem | null>(null);
     const [sendingReminder, setSendingReminder] = useState(false);
-    const [showDocView, setShowDocView] = useState(false);
-    const [selectedDocName, setSelectedDocName] = useState('');
     const [showToast, setShowToast] = useState(false);
     const [toastMessage, setToastMessage] = useState({
         title: 'Mail Sent Successfully',
@@ -473,17 +471,6 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
         setShowMailView(true);
     };
 
-    const handleBulkDocs = () => {
-        const selected = allItems.filter(i => i.selected);
-        if (selected.length === 0) return;
-
-        setSelectedDocName(`${selected.length} Selected Documents Bundle`);
-        setShowDocView(true);
-
-        // Deselect
-        setAllItems(prev => prev.map(i => ({ ...i, selected: false })));
-    };
-
     return (
         <div className="po-v4-main-wrapper">
             <div className="po-v4-top-controls-p">
@@ -542,20 +529,12 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                         <div className="po-v4-table-toolbar-localized">
                                             <div className="po-v4-action-icons-localized">
                                                 {selectedCount > 0 && (
-                                                    <>
-                                                        <div className="po-v4-action-item-local tooltip-p" onClick={handleBulkEmail}>
-                                                            <div className="po-v4-circle-btn-v4 mail-bulk">
-                                                                <Mail size={18} />
-                                                            </div>
-                                                            <span className="po-v4-tooltip-text">Send Reminders</span>
+                                                    <div className="po-v4-action-item-local tooltip-p" onClick={handleBulkEmail}>
+                                                        <div className="po-v4-circle-btn-v4 mail-bulk">
+                                                            <Mail size={18} />
                                                         </div>
-                                                        <div className="po-v4-action-item-local tooltip-p" onClick={handleBulkDocs}>
-                                                            <div className="po-v4-circle-btn-v4 docs-bulk">
-                                                                <FileText size={18} />
-                                                            </div>
-                                                            <span className="po-v4-tooltip-text">View All Selected Docs</span>
-                                                        </div>
-                                                    </>
+                                                        <span className="po-v4-tooltip-text">Send Reminders</span>
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
@@ -830,72 +809,6 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                         </div>
                     </div>
                     <button className="undo-action-btn" onClick={() => setShowToast(false)}>CLOSE</button>
-                </div>
-            )}
-            {/* Document Preview Modal */}
-            {showDocView && (
-                <div className="mail-view-overlay-clean" onClick={() => setShowDocView(false)}>
-                    <div className="mail-view-modal-clean doc-preview" onClick={e => e.stopPropagation()}>
-                        <div className="mail-view-header-clean">
-                            <div className="header-left-clean">
-                                <FileText size={20} className="mail-blue" />
-                                <h3>Document Preview - {selectedDocName}</h3>
-                            </div>
-                            <button className="mail-close-btn-clean" onClick={() => setShowDocView(false)}>
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="doc-preview-body-clean">
-                            <div className="dummy-pdf-viewer">
-                                <div className="pdf-page-mock">
-                                    <div className="pdf-header-mock">
-                                        <div className="pdf-logo-box">IHM</div>
-                                        <div className="pdf-title-box">
-                                            <h4>MATERIAL DECLARATION</h4>
-                                            <span>Document No: MD-2024-00129</span>
-                                        </div>
-                                    </div>
-                                    <div className="pdf-content-mock">
-                                        <div className="pdf-section-v4">
-                                            <h5>Supplier Information</h5>
-                                            <p>Name: Henry Marine A/S</p>
-                                            <p>Address: Skudehavnsvej 25, DK-2100 Copenhagen</p>
-                                        </div>
-                                        <div className="pdf-section-v4">
-                                            <h5>Product Information</h5>
-                                            <p>Description: {selectedDocName}</p>
-                                            <p>IHM Code: PCHM-2024-X</p>
-                                        </div>
-                                        <div className="pdf-table-mock">
-                                            <div className="pdf-table-header">
-                                                <span>Hazardous Material</span>
-                                                <span>Threshold</span>
-                                                <span>Status</span>
-                                            </div>
-                                            <div className="pdf-table-row">
-                                                <span>Asbestos</span>
-                                                <span>No Threshold</span>
-                                                <span>NOT PRESENT</span>
-                                            </div>
-                                            <div className="pdf-table-row">
-                                                <span>Ozone Depleting Substances</span>
-                                                <span>No Threshold</span>
-                                                <span>NOT PRESENT</span>
-                                            </div>
-                                        </div>
-                                        <div className="pdf-footer-signature">
-                                            <div className="sig-line">Digital Signature Confirmed</div>
-                                            <span>Date: 01/01/2024</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="mail-view-footer-clean">
-                            <button className="mail-cancel-btn-final" onClick={() => setShowDocView(false)}>Cancel</button>
-                            <button className="mail-close-final" onClick={() => setShowDocView(false)}>Close Preview</button>
-                        </div>
-                    </div>
                 </div>
             )}
         </div>
