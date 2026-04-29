@@ -441,15 +441,23 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
 
         setIsSending(true);
         try {
-            await api.post(ENDPOINTS.AUDITS.CLARIFICATION_EMAIL, {
-                imo,
-                vesselName,
-                to: toChips,
-                cc: ccList,
-                subject: mailContent.subject,
-                body: mailContent.body,
-                suspectedItems,
-            });
+            // SMTP through Gmail can take 5-10s per recipient, and the
+            // backend splits per-vendor — one mail per vendor + an orphan
+            // batch. Allow up to 2 minutes before giving up so a clean send
+            // through 5+ recipients doesn't trip the default 15s timeout.
+            await api.post(
+                ENDPOINTS.AUDITS.CLARIFICATION_EMAIL,
+                {
+                    imo,
+                    vesselName,
+                    to: toChips,
+                    cc: ccList,
+                    subject: mailContent.subject,
+                    body: mailContent.body,
+                    suspectedItems,
+                },
+                { timeout: 120_000 },
+            );
 
             // Do NOT strip suspected rows from audit_line_items after sending.
             // They need to stay so the PO viewer can show them in Suspected

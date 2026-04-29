@@ -8,6 +8,8 @@ import { API_CONFIG } from '../config/api.config';
 
 interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean>;
+  /** Per-call timeout in ms. Defaults to API_CONFIG.TIMEOUT. */
+  timeout?: number;
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean>): string {
@@ -41,10 +43,10 @@ export async function httpClient<T>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { params, ...fetchOptions } = options;
+  const { params, timeout, ...fetchOptions } = options;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), timeout ?? API_CONFIG.TIMEOUT);
 
   try {
     const response = await fetch(buildUrl(path, params), {
@@ -81,26 +83,30 @@ export async function httpClient<T>(
   }
 }
 
-// Convenience wrappers
+// Convenience wrappers. Each accepts an optional `opts` with a per-call
+// timeout override (in ms) — useful for slow endpoints like SMTP-bound
+// clarification email sends.
+interface CallOptions { timeout?: number }
+
 export const api = {
-  get: <T>(path: string, params?: RequestOptions['params']) =>
-    httpClient<T>(path, { method: 'GET', params }),
+  get: <T>(path: string, params?: RequestOptions['params'], opts: CallOptions = {}) =>
+    httpClient<T>(path, { method: 'GET', params, timeout: opts.timeout }),
 
-  post: <T>(path: string, body: unknown) =>
-    httpClient<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+  post: <T>(path: string, body: unknown, opts: CallOptions = {}) =>
+    httpClient<T>(path, { method: 'POST', body: JSON.stringify(body), timeout: opts.timeout }),
 
-  put: <T>(path: string, body: unknown) =>
-    httpClient<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
+  put: <T>(path: string, body: unknown, opts: CallOptions = {}) =>
+    httpClient<T>(path, { method: 'PUT', body: JSON.stringify(body), timeout: opts.timeout }),
 
-  patch: <T>(path: string, body: unknown) =>
-    httpClient<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+  patch: <T>(path: string, body: unknown, opts: CallOptions = {}) =>
+    httpClient<T>(path, { method: 'PATCH', body: JSON.stringify(body), timeout: opts.timeout }),
 
-  delete: <T>(path: string) =>
-    httpClient<T>(path, { method: 'DELETE' }),
+  delete: <T>(path: string, opts: CallOptions = {}) =>
+    httpClient<T>(path, { method: 'DELETE', timeout: opts.timeout }),
 
-  upload: async <T>(path: string, formData: FormData): Promise<T> => {
+  upload: async <T>(path: string, formData: FormData, opts: CallOptions = {}): Promise<T> => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.TIMEOUT);
+    const timeoutId = setTimeout(() => controller.abort(), opts.timeout ?? API_CONFIG.TIMEOUT);
     try {
       const response = await fetch(`${API_CONFIG.BASE_URL}${path}`, {
         method: 'POST',
