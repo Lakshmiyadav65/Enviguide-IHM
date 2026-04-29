@@ -26,6 +26,7 @@ import {
     Mail,
     Send,
     Loader2,
+    Download,
 } from 'lucide-react';
 import { api } from '../../lib/apiClient';
 import { ENDPOINTS } from '../../config/api.config';
@@ -105,6 +106,16 @@ export default function DocumentAudit() {
     const [mailSubject, setMailSubject] = useState('');
     const [mailBody, setMailBody] = useState('');
     const [sendingMail, setSendingMail] = useState(false);
+
+    // Document preview modal state — clicking View on an MD or SDoC link
+    // opens the file inside an iframe with Download + Approve actions
+    // instead of triggering a browser download via Content-Disposition.
+    const [viewingDoc, setViewingDoc] = useState<{
+        item: FlatItem;
+        kind: 'md' | 'sdoc';
+        url: string;
+        fileName: string;
+    } | null>(null);
 
     const loadClarifications = useCallback(() => {
         if (!imo) return;
@@ -390,32 +401,42 @@ IHM Audit Team`,
                                                 <td className="supplier-name">{item.vendorName || item.supplierEmails || '—'}</td>
                                                 <td>
                                                     {item.mdFilePath ? (
-                                                        <a
-                                                            href={item.mdFilePath}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
+                                                        <button
+                                                            type="button"
                                                             className="file-link-v3"
                                                             title={`View MD — ${item.mdFileName || 'document'}`}
+                                                            onClick={() => setViewingDoc({
+                                                                item,
+                                                                kind: 'md',
+                                                                url: item.mdFilePath!,
+                                                                fileName: item.mdFileName ?? 'MD document',
+                                                            })}
+                                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit' }}
                                                         >
                                                             <FileText size={16} className="pdf-icon-v3" />
                                                             View
-                                                        </a>
+                                                        </button>
                                                     ) : (
                                                         <span className="not-available">—</span>
                                                     )}
                                                 </td>
                                                 <td>
                                                     {item.sdocFilePath ? (
-                                                        <a
-                                                            href={item.sdocFilePath}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
+                                                        <button
+                                                            type="button"
                                                             className="file-link-v3"
                                                             title={`View SDoC — ${item.sdocFileName || 'document'}`}
+                                                            onClick={() => setViewingDoc({
+                                                                item,
+                                                                kind: 'sdoc',
+                                                                url: item.sdocFilePath!,
+                                                                fileName: item.sdocFileName ?? 'SDoC document',
+                                                            })}
+                                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit' }}
                                                         >
                                                             <FileText size={16} className="pdf-icon-v3" />
                                                             View
-                                                        </a>
+                                                        </button>
                                                     ) : (
                                                         <span className="not-available">—</span>
                                                     )}
@@ -469,6 +490,84 @@ IHM Audit Team`,
                         </div>
                     </div>
                 </div>
+
+                {/* Document preview modal — embeds the MD/SDoC inline so the
+                    auditor can review without triggering a download. Footer
+                    has Download (always) and Approve (only when both docs
+                    have arrived for this item, mirroring the row-level
+                    Accept rule). */}
+                {viewingDoc && (
+                    <div className="doc-modal-overlay" onClick={() => setViewingDoc(null)}>
+                        <div className="doc-modal-container" onClick={(e) => e.stopPropagation()}>
+                            <div className="doc-modal-header">
+                                <div className="header-doc-info">
+                                    <div className="pdf-icon-box">
+                                        <FileText size={20} color="#EF4444" />
+                                    </div>
+                                    <div className="doc-meta">
+                                        <h3>{viewingDoc.fileName}</h3>
+                                        <p>
+                                            {viewingDoc.kind === 'md' ? 'Material Declaration (MD)' : 'Supplier Declaration of Conformity (SDoC)'}
+                                            {' · PO '}{viewingDoc.item.poNumber}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button className="close-modal-btn" onClick={() => setViewingDoc(null)}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="doc-modal-body" style={{ padding: 0, height: '70vh', overflow: 'hidden' }}>
+                                <iframe
+                                    src={viewingDoc.url}
+                                    title={viewingDoc.fileName}
+                                    style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+                                />
+                            </div>
+
+                            <div className="doc-modal-footer">
+                                <div className="footer-left">
+                                    <button
+                                        type="button"
+                                        className="btn-accept"
+                                        disabled={viewingDoc.item.status !== 'received' || acceptingKey === viewingDoc.item.key}
+                                        title={
+                                            viewingDoc.item.status === 'reviewed' ? 'Already reviewed.'
+                                                : viewingDoc.item.status !== 'received'
+                                                    ? 'Both MD and SDoC must be uploaded before this item can be approved.'
+                                                    : 'Approve — mark this item reviewed'
+                                        }
+                                        onClick={async () => {
+                                            const item = viewingDoc.item;
+                                            await handleAccept(item);
+                                            setViewingDoc(null);
+                                        }}
+                                        style={{
+                                            opacity: viewingDoc.item.status !== 'received' || acceptingKey === viewingDoc.item.key ? 0.6 : 1,
+                                            cursor: viewingDoc.item.status !== 'received' ? 'not-allowed' : 'pointer',
+                                        }}
+                                    >
+                                        {acceptingKey === viewingDoc.item.key ? (
+                                            <><Loader2 size={18} className="spin" /> Approving…</>
+                                        ) : (
+                                            <><CheckCircle2 size={18} /> Approve</>
+                                        )}
+                                    </button>
+                                </div>
+                                <a
+                                    href={viewingDoc.url}
+                                    download={viewingDoc.fileName}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="btn-download"
+                                >
+                                    <Download size={18} />
+                                    Download
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Clarification mail modal */}
                 {mailItem && (
