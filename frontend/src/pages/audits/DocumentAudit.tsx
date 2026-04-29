@@ -29,7 +29,7 @@ import {
     Download,
 } from 'lucide-react';
 import { api } from '../../lib/apiClient';
-import { ENDPOINTS } from '../../config/api.config';
+import { ENDPOINTS, API_CONFIG } from '../../config/api.config';
 
 interface ClarificationItemRow {
     clarification_id: string;
@@ -113,14 +113,21 @@ export default function DocumentAudit() {
     const [viewingDoc, setViewingDoc] = useState<{
         item: FlatItem;
         kind: 'md' | 'sdoc';
+        /** URL that previews inline in the iframe (proxy with C-D: inline). */
         url: string;
+        /** Raw bucket URL — used for the Download button so the browser
+         *  honours the original attachment disposition and saves the file. */
+        rawUrl: string;
         fileName: string;
     } | null>(null);
     const [openingPreview, setOpeningPreview] = useState<string | null>(null);
 
-    /** Fetch a short-lived signed URL with Content-Disposition: inline so
-     *  the iframe previews the file instead of triggering a download.
-     *  Falls back to the raw URL if the backend isn't on cloud storage. */
+    /** Open the inline preview modal. Hits the backend's preview-url
+     *  endpoint to get a short-lived URL pointing at our own /preview-stream
+     *  proxy — the proxy re-emits the file with Content-Disposition: inline
+     *  so the iframe renders it instead of triggering a download. The
+     *  endpoint returns a path relative to the API base, so we prefix
+     *  API_CONFIG.BASE_URL before assigning it to the iframe src. */
     const openDocPreview = async (item: FlatItem, kind: 'md' | 'sdoc') => {
         const rawUrl = kind === 'md' ? item.mdFilePath : item.sdocFilePath;
         const rawName = kind === 'md' ? item.mdFileName : item.sdocFileName;
@@ -131,9 +138,14 @@ export default function DocumentAudit() {
             const res = await api.get<{ success: boolean; data: { url: string; fileName: string } }>(
                 ENDPOINTS.AUDITS.CLARIFICATION_ITEM_DOC_PREVIEW(item.clarificationId, item.itemIndex, kind),
             );
+            const previewPath = res.data?.url;
+            const absoluteUrl = previewPath
+                ? (previewPath.startsWith('http') ? previewPath : `${API_CONFIG.BASE_URL}${previewPath}`)
+                : rawUrl;
             setViewingDoc({
                 item, kind,
-                url: res.data?.url ?? rawUrl,
+                url: absoluteUrl,
+                rawUrl,
                 fileName: res.data?.fileName ?? rawName ?? 'document',
             });
         } catch (err) {
@@ -141,6 +153,7 @@ export default function DocumentAudit() {
             setViewingDoc({
                 item, kind,
                 url: rawUrl,
+                rawUrl,
                 fileName: rawName ?? 'document',
             });
         } finally {
@@ -584,7 +597,7 @@ IHM Audit Team`,
                                     </button>
                                 </div>
                                 <a
-                                    href={viewingDoc.url}
+                                    href={viewingDoc.rawUrl}
                                     download={viewingDoc.fileName}
                                     target="_blank"
                                     rel="noopener noreferrer"

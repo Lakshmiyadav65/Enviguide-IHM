@@ -27,6 +27,7 @@ import {
   sendClarificationItemReminder,
   markClarificationItemReviewed,
   getDocumentPreviewUrl,
+  streamDocumentPreview,
   getMdsPendingOverview, getVesselPoItems,
   deleteAudit,
 } from '../../controller/audit.controller.js';
@@ -43,6 +44,17 @@ const mdsUpload = multer({
 });
 
 const router = Router();
+
+// preview-stream is invoked from an iframe and can't carry an
+// Authorization header — it carries its own short-lived JWT in the
+// query string and validates it inside the controller. Register it
+// BEFORE the auth middleware so the global Bearer-token gate doesn't
+// reject the iframe's anonymous fetch.
+router.get(
+  '/clarifications/:clarId/items/:idx/document/:kind/preview-stream',
+  streamDocumentPreview,
+);
+
 router.use(authenticate);
 
 router.get('/pending',                       getPendingAudits);

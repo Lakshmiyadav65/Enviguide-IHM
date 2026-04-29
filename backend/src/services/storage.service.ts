@@ -133,6 +133,42 @@ export async function getInlinePreviewUrl(
   return getSignedUrl(getClient(), cmd, { expiresIn: expiresInSeconds });
 }
 
+/**
+ * Open a stored file as a readable stream + content metadata. Used by the
+ * /preview-stream proxy endpoint to re-serve Supabase objects with our
+ * own Content-Disposition: inline header — Supabase's public URL ignores
+ * the override, so we have to terminate the response ourselves.
+ *
+ * Returns null when storage isn't S3-backed (caller should fall back to
+ * the local /uploads/* static handler).
+ */
+export async function getStoredFileStream(filePathOrUrl: string): Promise<{
+  body: NodeJS.ReadableStream;
+  contentType: string;
+  contentLength?: number;
+} | null> {
+  if (!s3Configured) return null;
+
+  let key = filePathOrUrl;
+  const base = (env.S3_PUBLIC_BASE_URL
+    ?? `${env.S3_ENDPOINT!.replace(/\/$/, '')}/${env.S3_BUCKET}`
+  ).replace(/\/$/, '');
+  if (key.startsWith(`${base}/`)) {
+    key = key.substring(base.length + 1);
+  }
+  if (/^https?:\/\//i.test(key)) return null;
+
+  const result = await getClient().send(
+    new GetObjectCommand({ Bucket: env.S3_BUCKET!, Key: key }),
+  );
+  if (!result.Body) return null;
+  return {
+    body: result.Body as NodeJS.ReadableStream,
+    contentType: result.ContentType ?? 'application/octet-stream',
+    contentLength: result.ContentLength ?? undefined,
+  };
+}
+
 /** Delete a stored file by its S3 key. No-op for local files. */
 export async function deleteStoredFile(key: string | null | undefined): Promise<void> {
   if (!key || !s3Configured) return;

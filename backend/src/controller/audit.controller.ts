@@ -4,7 +4,8 @@ import crypto from 'crypto';
 import { AuditService } from '../services/audit.service.js';
 import { DocumentService } from '../services/document.service.js';
 import { sendMail } from '../services/email.service.js';
-import { persistUploadedFile, getInlinePreviewUrl } from '../services/storage.service.js';
+import jwt from 'jsonwebtoken';
+import { persistUploadedFile, getStoredFileStream } from '../services/storage.service.js';
 import { query } from '../config/database.js';
 import { env } from '../config/env.js';
 import { createError } from '../middleware/errorHandler.js';
@@ -741,12 +742,31 @@ export async function sendClarificationItemReminder(
   } catch (err) { next(err); }
 }
 
+/** Validate kind path-param. Accepts 'md' / 'mds' / 'sdoc' / 'sdocs'. */
+function parseDocKind(raw: unknown): 'md' | 'sdoc' | null {
+  const v = String(raw ?? '').trim().toLowerCase();
+  if (v === 'md' || v === 'mds') return 'md';
+  if (v === 'sdoc' || v === 'sdocs') return 'sdoc';
+  return null;
+}
+
+interface PreviewTokenPayload {
+  type: 'doc-preview';
+  clarId: string;
+  idx: number;
+  kind: 'md' | 'sdoc';
+}
+
 /**
  * GET /api/v1/audits/clarifications/:clarId/items/:idx/document/:kind/preview-url
- * Returns a short-lived signed URL the admin can drop into an iframe.
- * The signed URL forces Content-Disposition: inline so the file previews
- * in the browser (PDF / image) instead of being auto-downloaded by the
- * bucket's default headers.
+ *
+ * Returns a relative proxy URL the admin can drop into an iframe. The URL
+ * carries a 5-minute JWT-signed token; when the iframe fetches it, the
+ * /preview-stream handler validates the token, fetches the file from S3,
+ * and re-emits it with Content-Type: application/pdf (etc.) and
+ * Content-Disposition: inline. Going through our backend gives us full
+ * control over response headers — Supabase's public URL ignores the
+ * disposition override on its own.
  */
 export async function getDocumentPreviewUrl(
   req: Request,
@@ -759,17 +779,12 @@ export async function getDocumentPreviewUrl(
     if (!Number.isFinite(itemIndex) || itemIndex < 0) {
       return next(createError('Invalid item index', 400));
     }
-    const rawKind = String(req.params.kind ?? '').trim().toLowerCase();
-    const kind: 'md' | 'sdoc' | null =
-      rawKind === 'md' || rawKind === 'mds' ? 'md'
-      : rawKind === 'sdoc' || rawKind === 'sdocs' ? 'sdoc'
-      : null;
+    const kind = parseDocKind(req.params.kind);
     if (!kind) return next(createError("Invalid document kind. Expected 'md' or 'sdoc'.", 400));
 
     const item = await AuditService.getClarificationItem(clarificationId, itemIndex);
     if (!item) return next(createError('Clarification item not found', 404));
 
-    // Verify caller owns the parent vessel.
     const parent = await AuditService.getAuditByImo(String(item.imo_number), req.user!.userId);
     if (!parent) return next(createError('Audit not found for this user', 404));
 
@@ -777,16 +792,90 @@ export async function getDocumentPreviewUrl(
     const fileName = kind === 'sdoc' ? item.sdoc_file_name : item.mds_file_name;
     if (!filePath) return next(createError('Document not uploaded yet', 404));
 
-    const previewUrl = await getInlinePreviewUrl(String(filePath));
+    const payload: PreviewTokenPayload = {
+      type: 'doc-preview',
+      clarId: clarificationId,
+      idx: itemIndex,
+      kind,
+    };
+    const token = jwt.sign(payload, env.JWT_SECRET, { expiresIn: '5m' });
+
+    // Relative URL — frontend prefixes API_CONFIG.BASE_URL when assigning
+    // it to the iframe. Token in the query string is acceptable here: it
+    // only authorises a single read of one specific file, expires in 5 min,
+    // and never leaks back to the client logger.
+    const url = `/audits/clarifications/${clarificationId}/items/${itemIndex}/document/${kind}/preview-stream?t=${encodeURIComponent(token)}`;
+
     res.json({
       success: true,
-      data: {
-        // When we're not on cloud storage, fall back to the stored URL
-        // (typically a local /uploads/* path served by the express static
-        // handler — already inline by default).
-        url: previewUrl ?? String(filePath),
-        fileName: fileName ? String(fileName) : 'document',
-      },
+      data: { url, fileName: fileName ? String(fileName) : 'document' },
+    });
+  } catch (err) { next(err); }
+}
+
+/**
+ * GET /api/v1/audits/clarifications/:clarId/items/:idx/document/:kind/preview-stream?t=<token>
+ *
+ * Re-streams the requested file with Content-Disposition: inline so iframe
+ * previews work even when the underlying bucket forces 'attachment'. Reads
+ * the file from S3 (Supabase) and pipes the body directly to the response;
+ * no buffering of the whole document. Token must be a 'doc-preview' JWT
+ * issued by getDocumentPreviewUrl above.
+ */
+export async function streamDocumentPreview(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const token = String(req.query.t ?? '');
+    if (!token) return next(createError('Preview token required', 401));
+
+    let payload: PreviewTokenPayload;
+    try {
+      const decoded = jwt.verify(token, env.JWT_SECRET);
+      payload = decoded as PreviewTokenPayload;
+    } catch {
+      return next(createError('Preview token expired or invalid', 401));
+    }
+    if (payload.type !== 'doc-preview') {
+      return next(createError('Wrong token type', 401));
+    }
+
+    // Path-params must agree with the token's payload — prevents reusing a
+    // token issued for a different file.
+    const urlClarId = req.params.clarId as string;
+    const urlIdx = Number(req.params.idx);
+    const urlKind = parseDocKind(req.params.kind);
+    if (urlClarId !== payload.clarId || urlIdx !== payload.idx || urlKind !== payload.kind) {
+      return next(createError('Token does not match request', 401));
+    }
+
+    const item = await AuditService.getClarificationItem(payload.clarId, payload.idx);
+    if (!item) return next(createError('Clarification item not found', 404));
+
+    const filePath = payload.kind === 'sdoc' ? item.sdoc_file_path : item.mds_file_path;
+    const fileName = payload.kind === 'sdoc' ? item.sdoc_file_name : item.mds_file_name;
+    if (!filePath) return next(createError('Document not uploaded yet', 404));
+
+    const stream = await getStoredFileStream(String(filePath));
+    if (!stream) {
+      // Local-disk dev fallback: the file lives under /uploads/* and is
+      // served inline by express's static handler. Just redirect.
+      return res.redirect(String(filePath));
+    }
+
+    res.setHeader('Content-Type', stream.contentType);
+    const safeName = String(fileName ?? 'document').replace(/"/g, '');
+    res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+    if (stream.contentLength) res.setHeader('Content-Length', String(stream.contentLength));
+    res.setHeader('Cache-Control', 'private, max-age=60');
+
+    stream.body.pipe(res);
+    stream.body.on('error', (err) => {
+      console.error('[preview-stream] upstream error:', err);
+      // Headers already sent — just destroy the response.
+      res.destroy();
     });
   } catch (err) { next(err); }
 }
