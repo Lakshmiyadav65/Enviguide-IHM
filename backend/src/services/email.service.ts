@@ -1,27 +1,81 @@
 // -- Email Service ----------------------------------------
-// Two delivery transports, picked at runtime:
+// Three delivery transports, picked at runtime in this priority order:
 //
-//   1. Resend (HTTPS, port 443) — used when RESEND_API_KEY is set.
-//      Works on hosts that block outbound SMTP (e.g. Render Free).
-//      This is the recommended path for production.
+//   1. Brevo (HTTPS, port 443) — used when BREVO_API_KEY is set.
+//      Supports single-sender verification (no DNS), so this is the
+//      easiest way to ship real-recipient delivery on Render Free.
 //
-//   2. Nodemailer SMTP — fallback when SMTP_HOST/USER/PASS are set
-//      and Resend is not. Useful for local development against a
-//      Mailtrap instance, etc.
+//   2. Resend (HTTPS, port 443) — used when RESEND_API_KEY is set
+//      and Brevo isn't. Requires domain verification for arbitrary
+//      recipients.
 //
-// Both paths share the same SendMailInput contract and the same
-// "self-send Bcc reroute" rule (any To/Cc address that matches the
-// authenticated sender is moved to Bcc, so Gmail / Workspace don't
-// silently file the mail under Sent only).
+//   3. Nodemailer SMTP — fallback when only SMTP_HOST/USER/PASS are
+//      set. Useful for local development against Mailtrap. Will fail
+//      on hosts that block outbound SMTP (e.g. Render Free).
 //
-// Switching transports just means flipping env vars. No callsite
-// changes needed anywhere else in the app.
+// All three share the same SendMailInput contract, the "self-send
+// Bcc reroute" rule (any To/Cc address that matches the authenticated
+// sender is moved to Bcc), and the EMAIL_TEST_REDIRECT_TO escape
+// hatch. Switching transports just means flipping env vars — no
+// callsite changes needed anywhere else.
 
 import nodemailer, { type Transporter } from 'nodemailer';
 import { Resend } from 'resend';
 import { env } from '../config/env.js';
 
 // ─── Transport selection ────────────────────────────────────────────────
+
+/** Parse a "Display Name <email@x.com>" string into its parts.
+ *  Bare email also accepted ("email@x.com"). Brevo's API wants them
+ *  separated; nodemailer/Resend take the combined form directly. */
+function parseAddress(addr: string): { name?: string; email: string } {
+  const trimmed = addr.trim();
+  const m = trimmed.match(/^([^<]*)<\s*([^>\s]+)\s*>\s*$/);
+  if (m) {
+    const name = m[1]!.trim().replace(/^"|"$/g, '');
+    return { name: name || undefined, email: m[2]! };
+  }
+  return { email: trimmed };
+}
+
+interface BrevoSendBody {
+  sender: { name?: string; email: string };
+  to: { email: string; name?: string }[];
+  cc?: { email: string }[];
+  bcc?: { email: string }[];
+  replyTo?: { email: string };
+  subject: string;
+  htmlContent: string;
+  textContent?: string;
+}
+
+async function sendViaBrevo(body: BrevoSendBody): Promise<{ messageId: string }> {
+  const apiKey = env.BREVO_API_KEY;
+  if (!apiKey) {
+    throw new Error('Email not configured. Set BREVO_API_KEY in environment.');
+  }
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      'api-key': apiKey,
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      code?: string;
+    };
+    const detail = errorBody.message
+      ? `${errorBody.code ? `[${errorBody.code}] ` : ''}${errorBody.message}`
+      : `HTTP ${response.status}`;
+    throw new Error(`Brevo: ${detail}`);
+  }
+  const data = (await response.json()) as { messageId?: string };
+  return { messageId: data.messageId ?? '' };
+}
 
 let resendClient: Resend | null = null;
 function getResendClient(): Resend {
@@ -36,7 +90,7 @@ let smtpTransporter: Transporter | null = null;
 function getSmtpTransporter(): Transporter {
   if (!env.SMTP_HOST || !env.SMTP_PORT || !env.SMTP_USER || !env.SMTP_PASS) {
     throw new Error(
-      'Email not configured. Set RESEND_API_KEY (preferred) or SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS in environment.',
+      'Email not configured. Set BREVO_API_KEY (preferred), RESEND_API_KEY, or SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS in environment.',
     );
   }
   if (!smtpTransporter) {
@@ -64,8 +118,8 @@ export interface SendMailInput {
 
 export interface SendMailResult {
   messageId: string;
-  /** 'resend' | 'smtp' — useful for logs / debugging which path ran. */
-  transport: 'resend' | 'smtp';
+  /** Which transport actually delivered — useful for logs / debugging. */
+  transport: 'brevo' | 'resend' | 'smtp';
 }
 
 /** Normalise a to/cc/bcc field into a trimmed, de-duped array. */
@@ -169,8 +223,23 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   const replyTo = input.replyTo || env.EMAIL_FROM || env.SMTP_USER;
   const redirected = applyTestRedirect(to, cc, bcc, input.subject, input.text, input.html);
 
-  // Prefer Resend when configured. Render Free blocks outbound SMTP, so
-  // SMTP is only useful for local dev against Mailtrap-style services.
+  // Prefer Brevo when configured (HTTPS, single-sender verified — no DNS).
+  if (env.BREVO_API_KEY) {
+    const sender = parseAddress(fromAddr);
+    const { messageId } = await sendViaBrevo({
+      sender,
+      to: redirected.to.length > 0 ? redirected.to.map((email) => ({ email })) : [{ email: sender.email }],
+      cc: redirected.cc.length > 0 ? redirected.cc.map((email) => ({ email })) : undefined,
+      bcc: redirected.bcc.length > 0 ? redirected.bcc.map((email) => ({ email })) : undefined,
+      replyTo: replyTo ? { email: parseAddress(replyTo).email } : undefined,
+      subject: redirected.subject,
+      htmlContent: redirected.html ?? redirected.text ?? '',
+      textContent: redirected.text,
+    });
+    return { messageId, transport: 'brevo' };
+  }
+
+  // Fall back to Resend if Brevo isn't configured.
   if (env.RESEND_API_KEY) {
     const r = getResendClient();
     const { data, error } = await r.emails.send({

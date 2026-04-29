@@ -36,9 +36,12 @@ export const env = {
   SMTP_USER:    process.env.SMTP_USER,
   SMTP_PASS:    process.env.SMTP_PASS,
   EMAIL_FROM:   process.env.EMAIL_FROM,
-  // Resend transactional email API (HTTPS — works on hosts where SMTP
-  // is blocked). When set, sendMail uses Resend; otherwise it falls
-  // back to nodemailer/SMTP.
+  // Brevo transactional email API (HTTPS — works on hosts where SMTP
+  // is blocked, and supports single-sender verification without DNS).
+  // Preferred transport in production when set.
+  BREVO_API_KEY: process.env.BREVO_API_KEY,
+  // Resend transactional email API (HTTPS). Used when BREVO_API_KEY
+  // isn't set. Falls back to nodemailer/SMTP if neither is set.
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   // Dev/staging escape hatch: when set, every outgoing mail is
   // rerouted to this single address instead of its real recipient.
