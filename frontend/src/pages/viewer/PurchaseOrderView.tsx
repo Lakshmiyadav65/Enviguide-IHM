@@ -2,7 +2,7 @@
 import {
     ChevronDown, Search, Edit2, Trash2,
     FileText, Filter, Mail, X, Send, Paperclip,
-    Link as LinkIcon, Smile, Image, CheckCircle2
+    Link as LinkIcon, Smile, Image, CheckCircle2, Check
 } from 'lucide-react';
 import './PurchaseOrderView.css';
 import { api } from '../../lib/apiClient';
@@ -545,7 +545,7 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                         <tr key={item.id} className={item.selected ? 'row-is-selected' : ''}>
                                                             <td className="ch-col">
                                                                 <div className={`po-v4-row-action-checkbox-styled ${item.selected ? 'checked' : ''}`} onClick={(e) => toggleItemSelection(item.id, e)}>
-                                                                    {item.selected && <span className="check-icon-v4">âœ"</span>}
+                                                                    {item.selected && <Check size={14} strokeWidth={3} className="check-icon-v4" />}
                                                                 </div>
                                                             </td>
                                                             <td className="ac-col">

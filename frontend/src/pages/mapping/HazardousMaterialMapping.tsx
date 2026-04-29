@@ -17,7 +17,8 @@ import {
     Eye,
     Ship,
     Calendar,
-    ChevronLeft
+    ChevronLeft,
+    Check
 } from 'lucide-react';
 import './HazardousMaterialMapping.css';
 
@@ -560,7 +561,7 @@ export default function HazardousMaterialMapping() {
                                                     <div className="v5-card-inner">
                                                         <div className="v5-selection-rail">
                                                             <div className={`v5-check-circle ${viewingMaterial?.id === item.id ? 'checked' : ''}`}>
-                                                                {viewingMaterial?.id === item.id && <div className="check-mark">âœ"</div>}
+                                                                {viewingMaterial?.id === item.id && <Check size={14} strokeWidth={3} className="check-mark" />}
                                                             </div>
                                                         </div>
                                                         <div className="v5-card-data">
