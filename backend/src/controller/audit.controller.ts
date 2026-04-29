@@ -276,9 +276,25 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
       ));
     }
 
-    // --- Send + persist each batch. ----------------------------------------
-    const results: Array<Record<string, unknown>> = [];
-    let firstFailure: { to: string[]; message: string } | null = null;
+    // --- Persist DB rows synchronously, then dispatch SMTP in the background.
+    //
+    // Why: per-vendor split + Gmail SMTP can take minutes for a large
+    // recipient list, and Render-class hosting kills HTTP requests after
+    // ~30s. So we do all the database work up-front (fast), respond 200,
+    // then fire the SMTP sends without awaiting. Each clarification_requests
+    // row's status is patched to 'sent' / 'failed' as the dispatch completes.
+
+    type Persisted = {
+      clarificationId: string;
+      publicToken: string;
+      bodyWithLink: string;
+      html: string;
+      to: string[];
+      bcc?: string[];
+      itemCount: number;
+    };
+
+    const persisted: Persisted[] = [];
 
     for (const batch of batches) {
       const publicToken = crypto.randomBytes(32).toString('base64url');
@@ -299,26 +315,6 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
         })
         .join('');
 
-      let status = 'sent';
-      let errorMessage: string | null = null;
-      try {
-        await sendMail({
-          to: batch.to,
-          cc,
-          bcc: batch.bcc,
-          subject,
-          text: bodyWithLink,
-          html,
-        });
-      } catch (mailErr) {
-        status = 'failed';
-        errorMessage = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
-        if (!firstFailure) firstFailure = { to: batch.to, message: errorMessage };
-      }
-
-      // Store Cc + Bcc together in cc_emails so anyone who received the mail
-      // (vendor, admin reviewer on Bcc, etc.) authenticates on the public
-      // upload page. The schema has no dedicated bcc column.
       const ccAndBcc: string[] = [];
       if (cc && cc.length) ccAndBcc.push(...cc);
       if (batch.bcc && batch.bcc.length) ccAndBcc.push(...batch.bcc);
@@ -331,23 +327,16 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13)
          RETURNING id, status, created_at`,
         [
-          vesselId,
-          imo,
-          vesselName || null,
+          vesselId, imo, vesselName || null,
           batch.to.join(', '),
           ccAndBcc.length > 0 ? ccAndBcc.join(', ') : null,
-          subject,
-          bodyWithLink,
-          JSON.stringify(batch.rows),
-          status,
-          errorMessage,
-          req.user!.userId,
-          publicToken,
-          expiresAt,
+          subject, bodyWithLink, JSON.stringify(batch.rows),
+          'queued', null, req.user!.userId,
+          publicToken, expiresAt,
         ],
       );
-
       const clarificationId = String((inserted.rows[0] as Record<string, unknown>).id);
+
       const itemCount = batch.rows.length;
       if (itemCount > 0) {
         const placeholders: string[] = [];
@@ -365,27 +354,19 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
         );
       }
 
-      results.push({
+      persisted.push({
         clarificationId,
+        publicToken,
+        bodyWithLink,
+        html,
         to: batch.to,
+        bcc: batch.bcc,
         itemCount,
-        status,
-        errorMessage,
       });
     }
 
-    if (firstFailure) {
-      return next(createError(
-        `Email not sent to ${firstFailure.to.join(', ')}: ${firstFailure.message}`,
-        502,
-      ));
-    }
-
-    // All batches sent successfully. Move the audit into a dedicated
-    // 'Awaiting Clarification' state so it leaves Pending Reviews and
-    // shows up in MD SDoC Audit Pending — without colliding with fresh
-    // uploads that also have status = 'In Progress'. The PO upload
-    // controller resets this back to 'In Progress' on a re-upload.
+    // Move the audit into 'Awaiting Clarification' immediately — clarifications
+    // are queued, they'll be dispatched in the background.
     if (audit) {
       const auditRow = audit as Record<string, unknown>;
       const currentStatus = String(auditRow.status ?? '');
@@ -401,7 +382,49 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
       }
     }
 
-    res.json({ success: true, data: { batches: results } });
+    // Respond IMMEDIATELY so the platform's HTTP timeout never fires.
+    res.json({
+      success: true,
+      data: {
+        batches: persisted.map((p) => ({
+          clarificationId: p.clarificationId,
+          to: p.to,
+          itemCount: p.itemCount,
+          status: 'queued',
+        })),
+      },
+    });
+
+    // Fire-and-forget the SMTP sends. Each completion patches its
+    // clarification_requests row to 'sent' or 'failed'. We don't await
+    // — the response has already gone out.
+    void (async () => {
+      for (const p of persisted) {
+        try {
+          await sendMail({
+            to: p.to,
+            cc,
+            bcc: p.bcc,
+            subject,
+            text: p.bodyWithLink,
+            html: p.html,
+          });
+          await query(
+            `UPDATE clarification_requests SET status = 'sent', error_message = NULL WHERE id = $1`,
+            [p.clarificationId],
+          );
+        } catch (mailErr) {
+          const errorMessage = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
+          console.error(`[clarification-email] send failed for ${p.to.join(', ')}: ${errorMessage}`);
+          await query(
+            `UPDATE clarification_requests SET status = 'failed', error_message = $2 WHERE id = $1`,
+            [p.clarificationId, errorMessage],
+          ).catch((dbErr) => {
+            console.error('[clarification-email] failed to record failure:', dbErr);
+          });
+        }
+      }
+    })();
   } catch (err) { next(err); }
 }
 
