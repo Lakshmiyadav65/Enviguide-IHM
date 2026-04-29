@@ -758,6 +758,121 @@ interface PreviewTokenPayload {
 }
 
 /**
+ * POST /api/v1/audits/clarifications/:clarId/remind-bulk
+ *
+ * Sends ONE reminder email for the clarification (= one vendor) and bumps
+ * reminder_count on every item_index in the request body. Used by the PO
+ * viewer's bulk-select toolbar — the admin selects N rows, the frontend
+ * groups them by clarification_id, and fires this endpoint per group so
+ * each vendor gets a single email regardless of how many of their items
+ * are pending.
+ *
+ * Body: { itemIndices: number[], to?: string|string[], cc?: string|string[],
+ *         subject?: string, body?: string }
+ */
+export async function sendClarificationBulkReminder(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const clarificationId = req.params.clarId as string;
+    const body = (req.body || {}) as {
+      itemIndices?: number[];
+      to?: string | string[];
+      cc?: string | string[];
+      subject?: string;
+      body?: string;
+    };
+
+    const itemIndices: number[] = Array.isArray(body.itemIndices)
+      ? body.itemIndices.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n >= 0)
+      : [];
+    if (itemIndices.length === 0) {
+      return next(createError('itemIndices must be a non-empty array of integers', 400));
+    }
+
+    const clar = await AuditService.getClarificationById(clarificationId);
+    if (!clar) return next(createError('Clarification not found', 404));
+
+    const owned = await AuditService.getAuditByImo(String(clar.imo_number), req.user!.userId);
+    if (!owned) return next(createError('Audit not found for this user', 404));
+
+    const parseList = (v: string | string[] | undefined): string[] => {
+      if (Array.isArray(v)) return v.map((s) => String(s).trim()).filter(Boolean);
+      if (typeof v === 'string') return v.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+      return [];
+    };
+
+    const toOverride = parseList(body.to);
+    const ccOverride = parseList(body.cc);
+    const toField = toOverride.length > 0
+      ? toOverride
+      : parseList(String(clar.recipient_emails || ''));
+    const ccField = ccOverride.length > 0
+      ? ccOverride
+      : parseList(clar.cc_emails ? String(clar.cc_emails) : '');
+
+    if (toField.length === 0) {
+      return next(createError('No recipient email available for reminder', 400));
+    }
+
+    const supplierLink = `${env.APP_BASE_URL.replace(/\/$/, '')}/upload/${clar.public_token}`;
+    const newExpiresAt = new Date(Date.now() + 72 * 60 * 60 * 1000);
+    const expiresText = newExpiresAt.toISOString().replace('T', ' ').replace(/\..+/, ' UTC');
+
+    const subjectLine = body.subject?.trim()
+      || `Reminder: ${clar.subject || 'Documentation required'}`;
+    const bodyBase = body.body?.trim()
+      || `This is a reminder regarding our earlier request. We still need the MDS / SDoC documents for vessel ${clar.vessel_name || clar.imo_number}. ${itemIndices.length} item(s) are still outstanding.`;
+    const bodyWithLink = `${bodyBase}\n\n---\nUpload documents directly via this secure link (no login required):\n${supplierLink}\n\nThis link expires on ${expiresText} (72 hours from now).`;
+    const html = bodyWithLink
+      .split('\n')
+      .map((line) => {
+        const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        if (line.trim() === supplierLink) {
+          return `<div><a href="${supplierLink}" style="color:#00B0FA;font-weight:600">${supplierLink}</a></div>`;
+        }
+        return `<div>${escaped || '&nbsp;'}</div>`;
+      })
+      .join('');
+
+    try {
+      await sendMail({
+        to: toField,
+        cc: ccField.length > 0 ? ccField : undefined,
+        subject: subjectLine,
+        text: bodyWithLink,
+        html,
+      });
+    } catch (mailErr) {
+      return next(createError(
+        `Email not sent: ${mailErr instanceof Error ? mailErr.message : 'Unknown mail error'}`,
+        502,
+      ));
+    }
+
+    const updatedRows = await AuditService.incrementRemindersAndExtendToken(
+      clarificationId,
+      itemIndices,
+      newExpiresAt,
+    );
+
+    res.json({
+      success: true,
+      data: {
+        clarificationId,
+        itemCount: itemIndices.length,
+        sentTo: toField,
+        publicLink: supplierLink,
+        expiresAt: newExpiresAt,
+        updated: updatedRows,
+      },
+    });
+  } catch (err) { next(err); }
+}
+
+/**
  * GET /api/v1/audits/clarifications/:clarId/items/:idx/document/:kind/preview-url
  *
  * Returns a relative proxy URL the admin can drop into an iframe. The URL

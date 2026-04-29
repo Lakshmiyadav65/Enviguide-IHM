@@ -342,41 +342,103 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
     };
 
     const handleSendMail = async () => {
-        if (!reminderItem || !selectedMail) {
+        if (!selectedMail) {
             setShowMailView(false);
             return;
         }
-        if (!reminderItem.clarificationId || reminderItem.itemIndex === undefined) {
+
+        // ── Single-row reminder (per-row mail icon) ────────────────
+        if (reminderItem) {
+            if (!reminderItem.clarificationId || reminderItem.itemIndex === undefined) {
+                setShowMailView(false);
+                return;
+            }
+            setSendingReminder(true);
+            try {
+                await api.post(
+                    ENDPOINTS.AUDITS.CLARIFICATION_ITEM_REMIND(
+                        reminderItem.clarificationId,
+                        reminderItem.itemIndex,
+                    ),
+                    {
+                        to: selectedMail.to,
+                        subject: selectedMail.subject,
+                        body: selectedMail.body,
+                    },
+                );
+                setToastMessage({
+                    title: 'Reminder Sent',
+                    body: `Reminder email delivered to ${selectedMail.to || 'the supplier'}.`,
+                });
+                setShowMailView(false);
+                setReminderItem(null);
+                loadClarifications();
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 3000);
+            } catch (err) {
+                console.error('Reminder send failed:', err);
+                setToastMessage({
+                    title: 'Reminder Failed',
+                    body: err instanceof Error ? err.message : 'Could not send reminder. Please try again.',
+                });
+                setShowToast(true);
+                setTimeout(() => setShowToast(false), 4000);
+            } finally {
+                setSendingReminder(false);
+            }
+            return;
+        }
+
+        // ── Bulk reminder (toolbar mail icon, multiple rows) ───────
+        // Group selected items by clarificationId so each vendor gets
+        // exactly ONE email regardless of how many of their rows are
+        // pending. reminder_count bumps on every selected item, so the
+        // Reminder 1 / 2 / Non-Responsive ladder progresses correctly.
+        const selected = allItems.filter(
+            (i) => i.selected && i.clarificationId && i.itemIndex !== undefined,
+        );
+        if (selected.length === 0) {
             setShowMailView(false);
             return;
         }
+        const byClar = new Map<string, number[]>();
+        for (const item of selected) {
+            if (!byClar.has(item.clarificationId!)) byClar.set(item.clarificationId!, []);
+            byClar.get(item.clarificationId!)!.push(item.itemIndex!);
+        }
+
         setSendingReminder(true);
         try {
-            await api.post(
-                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_REMIND(
-                    reminderItem.clarificationId,
-                    reminderItem.itemIndex,
+            const results = await Promise.allSettled(
+                Array.from(byClar.entries()).map(([clarId, indices]) =>
+                    api.post(
+                        ENDPOINTS.AUDITS.CLARIFICATION_REMIND_BULK(clarId),
+                        {
+                            itemIndices: indices,
+                            to: selectedMail.to,
+                            subject: selectedMail.subject,
+                            body: selectedMail.body,
+                        },
+                    ),
                 ),
-                {
-                    to: selectedMail.to,
-                    subject: selectedMail.subject,
-                    body: selectedMail.body,
-                },
             );
+            const ok = results.filter((r) => r.status === 'fulfilled').length;
+            const failed = results.length - ok;
             setToastMessage({
-                title: 'Reminder Sent',
-                body: `Reminder email delivered to ${selectedMail.to || 'the supplier'}.`,
+                title: failed === 0 ? 'Reminders Sent' : `${ok} sent, ${failed} failed`,
+                body: `${selected.length} item${selected.length > 1 ? 's' : ''} across ${byClar.size} vendor${byClar.size > 1 ? 's' : ''} updated.`,
             });
             setShowMailView(false);
-            setReminderItem(null);
+            // Deselect everything so the toolbar collapses.
+            setAllItems((prev) => prev.map((i) => ({ ...i, selected: false })));
             loadClarifications();
             setShowToast(true);
-            setTimeout(() => setShowToast(false), 3000);
+            setTimeout(() => setShowToast(false), 3500);
         } catch (err) {
-            console.error('Reminder send failed:', err);
+            console.error('Bulk reminder send failed:', err);
             setToastMessage({
-                title: 'Reminder Failed',
-                body: err instanceof Error ? err.message : 'Could not send reminder. Please try again.',
+                title: 'Bulk Send Failed',
+                body: err instanceof Error ? err.message : 'Could not send reminders. Please try again.',
             });
             setShowToast(true);
             setTimeout(() => setShowToast(false), 4000);

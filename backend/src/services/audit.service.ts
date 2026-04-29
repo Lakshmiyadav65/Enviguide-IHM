@@ -633,6 +633,20 @@ export const AuditService = {
     return r.rows[0] as Record<string, unknown> | undefined;
   },
 
+  /** Bulk variant — looks up the clarification by id alone, no item join. */
+  async getClarificationById(clarificationId: string) {
+    const r = await query(
+      `SELECT id, imo_number, vessel_id, vessel_name,
+              recipient_emails, cc_emails, subject,
+              public_token, public_token_expires_at
+         FROM clarification_requests
+        WHERE id = $1
+        LIMIT 1`,
+      [clarificationId],
+    );
+    return r.rows[0] as Record<string, unknown> | undefined;
+  },
+
   /**
    * After a reminder email has been sent, bump the item's reminder_count and
    * extend the clarification's public link expiry so the supplier can still
@@ -657,6 +671,34 @@ export const AuditService = {
       [clarificationId, newExpiresAt],
     );
     return r.rows[0] as Record<string, unknown> | undefined;
+  },
+
+  /**
+   * Bulk variant: bump reminder_count on a SET of items in one clarification
+   * (one email goes to the vendor, but every selected item progresses through
+   * the Reminder 1 → 2 → Non-Responsive ladder). Token expiry is extended
+   * once per call.
+   */
+  async incrementRemindersAndExtendToken(
+    clarificationId: string,
+    itemIndices: number[],
+    newExpiresAt: Date,
+  ) {
+    if (itemIndices.length === 0) return [];
+    const r = await query(
+      `UPDATE clarification_items
+          SET reminder_count = reminder_count + 1, updated_at = NOW()
+        WHERE clarification_id = $1 AND item_index = ANY($2::int[])
+      RETURNING item_index, reminder_count`,
+      [clarificationId, itemIndices],
+    );
+    await query(
+      `UPDATE clarification_requests
+          SET public_token_expires_at = $2
+        WHERE id = $1`,
+      [clarificationId, newExpiresAt],
+    );
+    return r.rows as Array<Record<string, unknown>>;
   },
 
   /**

@@ -78,6 +78,8 @@ export const ENDPOINTS = {
       `/audits/clarifications/${clarId}/items/${idx}/document/${kind}/preview-url`,
     CLARIFICATION_ITEM_REMIND: (clarId: string, idx: number | string) =>
       `/audits/clarifications/${clarId}/items/${idx}/remind`,
+    CLARIFICATION_REMIND_BULK: (clarId: string) =>
+      `/audits/clarifications/${clarId}/remind-bulk`,
     CLARIFICATION_ITEM_REVIEW: (clarId: string, idx: number | string) =>
       `/audits/clarifications/${clarId}/items/${idx}/review`,
     DELETE: (id: string) => `/audits/${id}`,

@@ -25,6 +25,7 @@ import {
   getAuditLineItemsById, replaceAuditLineItemsById,
   uploadClarificationItemDocument,
   sendClarificationItemReminder,
+  sendClarificationBulkReminder,
   markClarificationItemReviewed,
   getDocumentPreviewUrl,
   streamDocumentPreview,
@@ -87,6 +88,11 @@ router.post(
 router.post(
   '/clarifications/:clarId/items/:idx/remind',
   sendClarificationItemReminder,
+);
+
+router.post(
+  '/clarifications/:clarId/remind-bulk',
+  sendClarificationBulkReminder,
 );
 
 router.post(
