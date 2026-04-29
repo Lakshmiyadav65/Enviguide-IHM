@@ -713,8 +713,8 @@ export default function HazardousMaterialMapping() {
                                     </div>
 
                                     <div className="detail-actions-footer">
-                                        <button className="action-btn cancel" onClick={() => { setViewingMaterial(null); setViewMode('list'); }}>CANCEL</button>
-                                        <button className="action-btn save" onClick={() => {
+                                        <button className="hm-mapping-btn cancel" onClick={() => { setViewingMaterial(null); setViewMode('list'); }}>CANCEL</button>
+                                        <button className="hm-mapping-btn save" onClick={() => {
                                             if (targetDeckForTransfer) {
                                                 const deck = availableDecks.find(d => (d.title || d.sectionName) === targetDeckForTransfer);
                                                 if (deck) {

@@ -286,7 +286,13 @@
     gap: 12px;
 }
 
-.action-btn {
+/* Scoped to the HM-mapping page only. Originally named .action-btn,
+   but that name collides with the small 26x26 icon buttons used by
+   Fleet / Pending Audits / Pending Reviews / etc. — once any visit
+   loaded this CSS, those pages' icon buttons stretched to flex:1 +
+   38px height with no icon visible. Renamed to .hm-mapping-btn so
+   it no longer leaks. */
+.hm-mapping-btn {
     flex: 1;
     height: 38px;
     border-radius: 6px;
@@ -296,13 +302,13 @@
     border: none;
 }
 
-.action-btn.cancel {
+.hm-mapping-btn.cancel {
     background: white;
     border: 1px solid #E2E8F0;
     color: #64748B;
 }
 
-.action-btn.save {
+.hm-mapping-btn.save {
     background: #2563EB;
     color: white;
 }
