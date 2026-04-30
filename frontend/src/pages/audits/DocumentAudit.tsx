@@ -161,6 +161,35 @@ export default function DocumentAudit() {
         }
     };
 
+    /** Force-download a remote file using its real (original) filename.
+     *  We can't just use <a href={url} download={name}> because the
+     *  HTML5 `download` attribute is silently ignored on cross-origin
+     *  URLs (browser falls back to the URL's last path segment, which
+     *  for our storage layout is the random hash key). Fetching first
+     *  and creating a blob URL sidesteps that — the blob is same-origin
+     *  so `download` is respected. */
+    const downloadAs = async (url: string, fileName: string) => {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Download failed (${res.status})`);
+            const blob = await res.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            // Free the blob after the click has been processed.
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        } catch (err) {
+            console.error('Download failed:', err);
+            // Last-resort fallback: open the raw URL so the user at
+            // least gets the file (with the wrong filename).
+            window.open(url, '_blank', 'noopener');
+        }
+    };
+
     const loadClarifications = useCallback(() => {
         if (!imo) return;
         setLoading(true);
@@ -600,16 +629,14 @@ IHM Audit Team`,
                                         )}
                                     </button>
                                 </div>
-                                <a
-                                    href={viewingDoc.rawUrl}
-                                    download={viewingDoc.fileName}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                <button
+                                    type="button"
+                                    onClick={() => downloadAs(viewingDoc.rawUrl, viewingDoc.fileName)}
                                     className="btn-download"
                                 >
                                     <Download size={18} />
                                     Download
-                                </a>
+                                </button>
                             </div>
                         </div>
                     </div>

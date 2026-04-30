@@ -146,21 +146,6 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
     // Admin is view-only on supplier documents — uploads happen exclusively
     // through the public supplier link (handled by the public controller).
 
-    // Mark a clarification item as reviewed by the admin. Moves the row from
-    // 'Received Mds' to 'Reviewed Mds' on next refresh.
-    const markItemReviewed = async (item: PurchaseOrderItem) => {
-        if (!item.clarificationId || item.itemIndex === undefined) return;
-        try {
-            await api.post(
-                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_REVIEW(item.clarificationId, item.itemIndex),
-                {},
-            );
-            loadClarifications();
-        } catch (err) {
-            console.error('Mark reviewed failed:', err);
-        }
-    };
-
     const [searchTerm, setSearchTerm] = useState('');
     const [isFilterBarOpen, setIsFilterBarOpen] = useState(false);
 
@@ -607,17 +592,9 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                                     >
                                                                         <Mail size={14} />
                                                                     </button>
-                                                                    {item.isSuspected && item.clarificationId && item.mdsStatus === 'received' && !item.reviewedAt && (
-                                                                        <button
-                                                                            type="button"
-                                                                            className="po-v4-action-icon-btn-v4"
-                                                                            onClick={() => markItemReviewed(item)}
-                                                                            title="Approve — mark this item reviewed"
-                                                                            style={{ color: '#10B981', cursor: 'pointer' }}
-                                                                        >
-                                                                            <CheckCircle2 size={14} />
-                                                                        </button>
-                                                                    )}
+                                                                    {/* Approve action lives on the MD SDoC Audit Pending page
+                                                                     *  (DocumentAudit). The PO Viewer only displays status —
+                                                                     *  the Reviewed badge below confirms the outcome. */}
                                                                     {item.reviewedAt && (
                                                                         <span
                                                                             title={item.reviewedBy ? `Reviewed by ${item.reviewedBy}` : 'Reviewed'}
