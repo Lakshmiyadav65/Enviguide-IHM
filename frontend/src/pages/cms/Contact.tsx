@@ -1,6 +1,6 @@
-﻿import Sidebar from '../../components/Sidebar';
+import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
-import { Mail, Phone, MapPin, Send, Ship, Anchor } from 'lucide-react';
+import { Mail, Phone, MapPin, Send, Ship, MessageCircle } from 'lucide-react';
 import './Contact.css';
 
 export default function Contact() {
@@ -16,36 +16,45 @@ export default function Contact() {
                 <div className="contact-frame">
                     <section className="contact-intro">
                         <div className="maritime-badge">
-                            <Anchor size={14} />
-                            <span>Vessel Support Deck</span>
+                            <MessageCircle size={14} />
+                            <span>We&rsquo;re Here to Help</span>
                         </div>
-                        <h1>Contact Our Fleet</h1>
-                        <p>High-precision support for global maritime safety management. Reach out to our leads for immediate assistance.</p>
+                        <h1>Contact Us</h1>
+                        <p>
+                            Have questions about how Enviguide can help your organization
+                            achieve its sustainability goals? Our team is ready to assist
+                            you; whether you&rsquo;re looking for a demo, need technical
+                            support, or want to explore partnership opportunities.
+                        </p>
                     </section>
 
                     <div className="contact-layout-grid">
                         <div className="form-column">
+                            <div className="form-heading">
+                                <h2>Get in Touch</h2>
+                                <p>Fill out the form and we&rsquo;ll get back to you within 1 to 2 business days.</p>
+                            </div>
                             <form onSubmit={handleSubmit} className="minimal-blueprint-form">
                                 <div className="input-row">
                                     <div className="minimal-group">
                                         <label>Full Name</label>
-                                        <input type="text" placeholder="John Administrator" required />
+                                        <input type="text" placeholder="Your full name" required />
                                     </div>
                                     <div className="minimal-group">
                                         <label>Company</label>
-                                        <input type="text" placeholder="Fleet Operations" />
+                                        <input type="text" placeholder="Your organization" />
                                     </div>
                                 </div>
                                 <div className="minimal-group">
                                     <label>Email Address</label>
-                                    <input type="email" placeholder="admin@vessel-fleet.com" required />
+                                    <input type="email" placeholder="you@company.com" required />
                                 </div>
                                 <div className="minimal-group">
-                                    <label>Brief Message</label>
-                                    <textarea rows={4} placeholder="What is your current coordinate/issue?" required></textarea>
+                                    <label>Message</label>
+                                    <textarea rows={4} placeholder="How can we help you?" required></textarea>
                                 </div>
                                 <button type="submit" className="ship-command-btn">
-                                    <span>Transmit Message</span>
+                                    <span>Send Message</span>
                                     <Send size={16} />
                                 </button>
                             </form>
@@ -55,27 +64,27 @@ export default function Contact() {
                             <div className="detail-item">
                                 <div className="detail-icon"><Mail size={20} /></div>
                                 <div className="detail-content">
-                                    <h3>Signal Channel</h3>
-                                    <p>ops@ihmplatform.com</p>
+                                    <h3>Send Us Mail</h3>
+                                    <p>info@enviguide.com</p>
                                 </div>
                             </div>
                             <div className="detail-item">
                                 <div className="detail-icon"><Phone size={20} /></div>
                                 <div className="detail-content">
-                                    <h3>Direct Line</h3>
-                                    <p>+1 (800) MARITIME</p>
+                                    <h3>Call Us Anytime</h3>
+                                    <p>+91 9986331158</p>
                                 </div>
                             </div>
                             <div className="detail-item">
                                 <div className="detail-icon"><MapPin size={20} /></div>
                                 <div className="detail-content">
-                                    <h3>Port Base</h3>
-                                    <p>Suite 400, Maritime Plaza, London</p>
+                                    <h3>Visit Our Office</h3>
+                                    <p>Hyderabad, Telangana, India - 500049.</p>
                                 </div>
                             </div>
                             <div className="nautical-seal">
-                                <Ship size={40} className="seal-icon" />
-                                <span>Est. 2026</span>
+                                <Ship size={18} className="seal-icon" />
+                                <span>EnviGuide IHM</span>
                             </div>
                         </div>
                     </div>
@@ -83,12 +92,12 @@ export default function Contact() {
                     <footer className="contact-footer">
                         <div className="copyright">
                             <Ship size={16} />
-                            <span>&copy; 2026 IHM Platform. Maritime Safety Standard.</span>
+                            <span>&copy; 2026 EnviGuide IHM. All rights reserved.</span>
                         </div>
                         <nav className="footer-nav">
                             <a href="#">Privacy Policy</a>
                             <a href="#">Terms of Service</a>
-                            <a href="#">Fleet Status</a>
+                            <a href="https://enviguide.com" target="_blank" rel="noopener noreferrer">enviguide.com</a>
                         </nav>
                     </footer>
                 </div>

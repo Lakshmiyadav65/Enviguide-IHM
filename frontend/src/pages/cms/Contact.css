@@ -1,92 +1,125 @@
+/* ============================================================
+   Contact page — refined card-based layout.
+   Original copy + values are unchanged; this file only restyles.
+   ============================================================ */
+
 .contact-premium-container {
     display: flex;
-    background-color: #ffffff;
-    height: 100vh; /* Fixed height */
+    background-color: #F8FAFC;
+    min-height: 100vh;
     color: #0F172A;
-    overflow: hidden; /* Prevent body scroll */
 }
 
 .contact-viewport {
     flex: 1;
     margin-left: var(--sidebar-width, 240px);
     width: calc(100% - var(--sidebar-width, 240px));
-    height: 100%;
     display: flex;
     flex-direction: column;
 }
 
 .contact-frame {
     flex: 1;
-    padding: 0 80px;
+    padding: 96px 56px 40px;
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
     display: flex;
     flex-direction: column;
-    justify-content: center; /* Center form vertically */
-    margin-top: 40px; /* Offset for fixed header */
 }
 
-/* Intro Section - More compact */
+/* ── Intro ─────────────────────────────────────────────────── */
 .contact-intro {
-    margin-bottom: 40px;
+    margin-bottom: 32px;
 }
 
 .maritime-badge {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    padding: 5px 12px;
-    background: #F1F5F9;
+    gap: 8px;
+    padding: 6px 14px;
+    background: rgba(0, 177, 255, 0.08);
+    border: 1px solid rgba(0, 177, 255, 0.18);
     border-radius: 100px;
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: #64748B;
-    margin-bottom: 20px;
+    letter-spacing: 0.14em;
+    color: #0099e0;
+    margin-bottom: 16px;
 }
 
 .contact-intro h1 {
-    font-size: 42px;
+    font-size: 38px;
     font-weight: 900;
-    letter-spacing: -0.04em;
-    margin-bottom: 12px;
+    letter-spacing: -0.035em;
+    margin: 0 0 10px;
     line-height: 1.1;
+    color: #0F172A;
 }
 
 .contact-intro p {
-    font-size: 16px;
-    color: #475569;
-    max-width: 500px;
-    line-height: 1.5;
+    font-size: 15px;
+    color: #64748B;
+    max-width: 560px;
+    line-height: 1.6;
+    margin: 0;
 }
 
-/* Layout Grid */
+/* ── Two-column layout ─────────────────────────────────────── */
 .contact-layout-grid {
     display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: 80px;
-    align-items: start;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 28px;
+    align-items: stretch;
 }
 
-/* Minimalist Refined Form */
+/* ── Form card ─────────────────────────────────────────────── */
+.form-column {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 18px;
+    padding: 36px;
+    box-shadow: 0 4px 24px rgba(15, 23, 42, 0.04);
+}
+
+.form-heading {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #F1F5F9;
+}
+
+.form-heading h2 {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 6px;
+    color: #0F172A;
+}
+
+.form-heading p {
+    font-size: 13px;
+    color: #64748B;
+    line-height: 1.5;
+    margin: 0;
+}
+
 .minimal-blueprint-form {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 22px;
 }
 
 .input-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 24px;
+    gap: 18px;
 }
 
 .minimal-group {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
 }
 
 .minimal-group label {
@@ -94,27 +127,38 @@
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.12em;
-    color: #94A3B8;
+    color: #64748B;
 }
 
 .minimal-group input,
 .minimal-group textarea {
-    border: 1.5px solid #F1F5F9;
+    border: 1.5px solid #E2E8F0;
     border-radius: 10px;
-    padding: 14px 18px;
+    padding: 13px 16px;
     font-size: 14px;
     font-weight: 500;
     color: #0F172A;
     background: #F8FAFC;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
     outline: none;
+    font-family: inherit;
+}
+
+.minimal-group textarea {
+    resize: vertical;
+    min-height: 110px;
+}
+
+.minimal-group input:hover,
+.minimal-group textarea:hover {
+    border-color: #CBD5E1;
 }
 
 .minimal-group input:focus,
 .minimal-group textarea:focus {
     border-color: #00B1FF;
     background: #FFFFFF;
-    box-shadow: 0 0 0 4px rgba(0, 177, 255, 0.08);
+    box-shadow: 0 0 0 4px rgba(0, 177, 255, 0.1);
 }
 
 .minimal-group input::placeholder,
@@ -125,9 +169,9 @@
 
 .ship-command-btn {
     align-self: flex-start;
-    margin-top: 10px;
-    padding: 14px 40px;
-    background: #00B1FF; /* Vibrant Blue CTA */
+    margin-top: 4px;
+    padding: 14px 36px;
+    background: #00B1FF;
     color: white;
     border: none;
     border-radius: 100px;
@@ -135,88 +179,126 @@
     font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 8px 20px rgba(0, 177, 255, 0.25);
+    transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 8px 20px rgba(0, 177, 255, 0.22);
 }
 
 .ship-command-btn:hover {
     background: #0099e0;
-    transform: translateY(-2px);
-    box-shadow: 0 12px 25px rgba(0, 177, 255, 0.35);
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px rgba(0, 177, 255, 0.32);
 }
 
 .ship-command-btn:active {
     transform: translateY(0);
+    box-shadow: 0 4px 12px rgba(0, 177, 255, 0.25);
 }
 
-/* Details Column */
+/* ── Contact details card ──────────────────────────────────── */
 .contact-details-column {
+    background: #0F172A;
+    border-radius: 18px;
+    padding: 32px;
+    color: #F8FAFC;
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(15, 23, 42, 0.18);
+}
+
+.contact-details-column::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 100% 0%, rgba(0, 177, 255, 0.18), transparent 45%),
+        radial-gradient(circle at 0% 100%, rgba(0, 177, 255, 0.08), transparent 50%);
+    pointer-events: none;
+}
+
+.contact-details-column > * {
+    position: relative;
 }
 
 .detail-item {
     display: flex;
-    gap: 20px;
+    gap: 16px;
     align-items: flex-start;
+    padding: 16px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.detail-item:first-child {
+    padding-top: 4px;
+}
+
+.detail-item:last-of-type {
+    border-bottom: none;
 }
 
 .detail-icon {
-    width: 42px;
-    height: 42px;
-    background: white;
-    border: 1.5px solid #F1F5F9;
-    border-radius: 12px;
+    width: 40px;
+    height: 40px;
+    background: rgba(0, 177, 255, 0.14);
+    border: 1px solid rgba(0, 177, 255, 0.25);
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #00B1FF;
     flex-shrink: 0;
-    transition: all 0.3s;
+    transition: background-color 0.2s, border-color 0.2s;
 }
 
 .detail-item:hover .detail-icon {
-    border-color: #00B1FF;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 177, 255, 0.1);
+    background: rgba(0, 177, 255, 0.22);
+    border-color: rgba(0, 177, 255, 0.45);
 }
 
 .detail-content h3 {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin-bottom: 4px;
+    letter-spacing: 0.12em;
+    margin: 0 0 4px;
     color: #94A3B8;
 }
 
 .detail-content p {
     font-size: 14px;
-    color: #1E293B;
+    color: #F8FAFC;
     font-weight: 600;
+    margin: 0;
+    line-height: 1.4;
 }
 
 .nautical-seal {
-    margin-top: 20px;
+    margin-top: auto;
+    padding-top: 24px;
     display: flex;
-    flex-direction: column;
-    gap: 8px;
-    color: #E2E8F0;
+    align-items: center;
+    gap: 12px;
+    color: rgba(248, 250, 252, 0.55);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
 }
 
 .seal-icon {
-    opacity: 0.4;
+    opacity: 0.55;
+    color: #00B1FF;
 }
 
-/* Footer Design - Compact */
+/* ── Footer ────────────────────────────────────────────────── */
 .contact-footer {
-    border-top: 1px solid #F1F5F9;
-    padding: 24px 0;
+    border-top: 1px solid #E2E8F0;
+    padding: 20px 0 0;
     margin-top: 40px;
     display: flex;
     justify-content: space-between;
@@ -247,4 +329,33 @@
     gap: 6px;
 }
 
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 960px) {
+    .contact-frame {
+        padding: 88px 24px 32px;
+    }
 
+    .contact-layout-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .input-row {
+        grid-template-columns: 1fr;
+    }
+
+    .form-column,
+    .contact-details-column {
+        padding: 24px;
+    }
+
+    .contact-intro h1 {
+        font-size: 30px;
+    }
+
+    .contact-footer {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+    }
+}
