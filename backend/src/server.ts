@@ -42,8 +42,22 @@ app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
 
 // -- Health Check ------------------------------------------
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Touches the DB on purpose: this endpoint is also what the
+// GitHub Actions keepalive cron pings every ~10 min, so one hit
+// keeps both the Render dyno and the Supabase pooler warm.
+app.get('/health', async (_req, res) => {
+  try {
+    const { query } = await import('./config/database.js');
+    await query('SELECT 1');
+    res.json({ status: 'ok', db: 'reachable', timestamp: new Date().toISOString() });
+  } catch (err) {
+    res.status(503).json({
+      status: 'degraded',
+      db: 'unreachable',
+      error: (err as Error).message,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // -- API Routes --------------------------------------------

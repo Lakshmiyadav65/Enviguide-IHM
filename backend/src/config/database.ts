@@ -30,13 +30,21 @@ pool.on('error', (err) => {
 
 /** Returns true for the handful of error shapes that mean "the pooled
  *  connection was already dead when we picked it up" — i.e. retrying
- *  with a fresh client is safe and likely to succeed. */
+ *  with a fresh client is safe and likely to succeed.
+ *
+ *  Deliberately does NOT match `connection timeout` / `ETIMEDOUT`: those
+ *  mean we couldn't reach the DB at all (e.g. Render Free dyno cold
+ *  start, network blip), and retrying immediately just doubles the load
+ *  on the pooler without helping. */
 function isStaleConnectionError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as { message?: string; code?: string };
   const msg = (e.message || '').toLowerCase();
+  // Specifically catch "Connection terminated unexpectedly" and
+  // "terminating connection due to administrator command" — both mean
+  // the existing socket died, not that we can't dial out.
+  if (msg.includes('connection timeout') || msg.includes('etimedout')) return false;
   return (
-    msg.includes('connection terminated') ||
     msg.includes('connection terminated unexpectedly') ||
     msg.includes('terminating connection') ||
     e.code === 'ECONNRESET' ||
