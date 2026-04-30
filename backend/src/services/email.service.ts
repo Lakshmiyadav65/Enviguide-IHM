@@ -118,8 +118,10 @@ export interface SendMailInput {
 
 export interface SendMailResult {
   messageId: string;
-  /** Which transport actually delivered — useful for logs / debugging. */
-  transport: 'brevo' | 'resend' | 'smtp';
+  /** Which transport actually delivered — useful for logs / debugging.
+   *  `log` means no transport was configured: the message was written
+   *  to stdout instead of being sent. Local-dev only. */
+  transport: 'brevo' | 'resend' | 'smtp' | 'log';
 }
 
 /** Normalise a to/cc/bcc field into a trimmed, de-duped array. */
@@ -264,17 +266,33 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
     return { messageId: data?.id ?? '', transport: 'resend' };
   }
 
-  // SMTP fallback (local dev / non-Render environments).
-  const t = getSmtpTransporter();
-  const result = await t.sendMail({
-    from: fromAddr,
-    replyTo,
-    to: redirected.to.length > 0 ? redirected.to : undefined,
-    cc: redirected.cc.length > 0 ? redirected.cc : undefined,
-    bcc: redirected.bcc.length > 0 ? redirected.bcc : undefined,
-    subject: redirected.subject,
-    text: redirected.text,
-    html: redirected.html,
-  });
-  return { messageId: (result as { messageId?: string }).messageId ?? '', transport: 'smtp' };
+  // SMTP — used when SMTP_HOST/PORT/USER/PASS are configured (e.g. a
+  // local Mailtrap, or your own SMTP server on Linode).
+  const smtpReady = env.SMTP_HOST && env.SMTP_PORT && env.SMTP_USER && env.SMTP_PASS;
+  if (smtpReady) {
+    const t = getSmtpTransporter();
+    const result = await t.sendMail({
+      from: fromAddr,
+      replyTo,
+      to: redirected.to.length > 0 ? redirected.to : undefined,
+      cc: redirected.cc.length > 0 ? redirected.cc : undefined,
+      bcc: redirected.bcc.length > 0 ? redirected.bcc : undefined,
+      subject: redirected.subject,
+      text: redirected.text,
+      html: redirected.html,
+    });
+    return { messageId: (result as { messageId?: string }).messageId ?? '', transport: 'smtp' };
+  }
+
+  // Last resort: nothing configured. Log to stdout and return a fake
+  // messageId so the rest of the flow (audit status flips, reminder
+  // counters, etc.) still works in local-only setups. Production should
+  // never hit this branch — set a real transport.
+  console.warn('[email] No transport configured — logging email to stdout instead of sending.');
+  console.warn('[email] To:', redirected.to.join(', ') || '(none)');
+  if (redirected.cc.length) console.warn('[email] Cc:', redirected.cc.join(', '));
+  if (redirected.bcc.length) console.warn('[email] Bcc:', redirected.bcc.join(', '));
+  console.warn('[email] Subject:', redirected.subject);
+  if (redirected.text) console.warn('[email] Text:', redirected.text.slice(0, 500));
+  return { messageId: `log-${Date.now()}`, transport: 'log' };
 }
