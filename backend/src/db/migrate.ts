@@ -490,14 +490,35 @@ UPDATE audit_summaries a
    );
 `;
 
-async function migrate() {
-  console.log('Running database migration...');
-  await query(migration);
-  console.log('Migration complete! All tables created.');
-  await closePool();
+/** Retry the migration a few times with exponential backoff. Render's
+ *  pre-start step runs this against the Supabase free DB, which can be
+ *  paused/cold at the moment we connect — first attempts often fail
+ *  with `Connection terminated unexpectedly` while the DB wakes up.
+ *  Crashing the deploy is the wrong response; just wait it out. */
+async function migrateWithRetry(maxAttempts = 5): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`Running database migration (attempt ${attempt}/${maxAttempts})...`);
+      await query(migration);
+      console.log('Migration complete! All tables created.');
+      return;
+    } catch (err) {
+      lastError = err;
+      const msg = (err as Error).message || String(err);
+      if (attempt < maxAttempts) {
+        const waitMs = Math.min(30_000, 2_000 * 2 ** (attempt - 1)); // 2s, 4s, 8s, 16s, 30s cap
+        console.warn(`Migration attempt ${attempt} failed (${msg}). Retrying in ${waitMs}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+      }
+    }
+  }
+  throw lastError;
 }
 
-migrate().catch((e) => {
-  console.error('Migration failed:', e);
-  process.exit(1);
-});
+migrateWithRetry()
+  .then(() => closePool())
+  .catch((e) => {
+    console.error('Migration failed after all retries:', e);
+    process.exit(1);
+  });
