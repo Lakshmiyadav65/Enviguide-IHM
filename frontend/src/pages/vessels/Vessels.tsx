@@ -315,12 +315,10 @@ export default function Vessels() {
     }, [activeVesselData, isEditing, isAdding]);
 
     const handleVesselSelect = (vessel: Vessel) => {
-        if (isEditing || isAdding) {
-            if (!formData.name || !formData.shipOwner || !formData.imoNumber) {
-                alert('Please fill the required vessel details (Name, Ship Owner, IMO No) before switching vessels.');
-                return;
-            }
-        }
+        // Switching vessels abandons any in-progress add/edit draft. The
+        // explicit Save button still validates required fields, so the
+        // only thing dropped here is unsaved typing — that's expected
+        // for a side-nav click.
         setActiveVesselName(vessel.name);
         setActiveVesselImo(vessel.imoNumber);
         setFormData(vessel);
@@ -329,12 +327,6 @@ export default function Vessels() {
     };
 
     const handleTabClick = (tabId: string) => {
-        if (isEditing || isAdding) {
-            if (!formData.name || !formData.shipOwner || !formData.imoNumber) {
-                alert('Please fill the required vessel details (Name, Ship Owner, IMO No) before switching tabs.');
-                return;
-            }
-        }
         setActiveTab(tabId);
     };
 
