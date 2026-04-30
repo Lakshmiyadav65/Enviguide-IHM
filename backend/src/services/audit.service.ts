@@ -82,6 +82,25 @@ export const AuditService = {
     return r.rows.map((row: Record<string, unknown>) => toApi(row));
   },
 
+  /** Every audit that's still alive — pending, in review, or awaiting
+   *  vendor clarifications. Used by the dashboard so KPI cards (Active
+   *  POs, Total Items Audit, Pending Audits) reflect reality across the
+   *  full audit lifecycle, not just one stage. */
+  async getActiveAudits(userId: string) {
+    const r = await query(
+      `SELECT a.* FROM audit_summaries a
+         JOIN vessels v ON a.vessel_id = v.id
+        WHERE v.created_by_id = $1
+          AND a.status IN (
+            'In Progress', 'Pending', 'Pending Review',
+            'Awaiting Clarification', 'submitted'
+          )
+        ORDER BY a.last_activity DESC`,
+      [userId],
+    );
+    return r.rows.map((row: Record<string, unknown>) => toApi(row));
+  },
+
   /** Get audits with status 'Pending Review' (Pending Reviews Registry) */
   async getPendingReviews(userId: string) {
     // Status alone drives this list. The audit's status flips back to

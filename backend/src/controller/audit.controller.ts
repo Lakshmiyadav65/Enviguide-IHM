@@ -41,6 +41,15 @@ export async function getPendingAudits(req: Request, res: Response, next: NextFu
   } catch (err) { next(err); }
 }
 
+/** GET /api/v1/audits/active — Every audit not yet completed/reviewed.
+ *  Drives the dashboard KPI counts. */
+export async function getActiveAudits(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const audits = await AuditService.getActiveAudits(req.user!.userId);
+    res.json({ success: true, data: audits, total: audits.length });
+  } catch (err) { next(err); }
+}
+
 /** GET /api/v1/audits/reviews — Audits with status Pending Review */
 export async function getPendingReviews(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {

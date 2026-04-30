@@ -67,6 +67,7 @@ export const ENDPOINTS = {
   // Administration / Audits
   AUDITS: {
     PENDING: '/audits/pending',
+    ACTIVE: '/audits/active',
     DETAIL: (imo: string) => `/audits/${imo}`,
     REVIEWS: '/audits/reviews',
     REVIEW_DETAIL: (imo: string) => `/audits/reviews/${imo}`,

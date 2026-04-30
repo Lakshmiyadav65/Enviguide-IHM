@@ -16,7 +16,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import {
-  getPendingAudits, getAuditDetail,
+  getPendingAudits, getActiveAudits, getAuditDetail,
   getPendingReviews, getReviewDetail,
   getMdsDocAudit, getAuditDocuments, uploadAuditDocument,
   sendAuditForReview, completeReview, rejectReview,
@@ -59,6 +59,7 @@ router.get(
 router.use(authenticate);
 
 router.get('/pending',                       getPendingAudits);
+router.get('/active',                        getActiveAudits);
 router.get('/reviews',                       getPendingReviews);
 router.get('/reviews/:imo',                  getReviewDetail);
 router.get('/mds-doc',                       getMdsDocAudit);
