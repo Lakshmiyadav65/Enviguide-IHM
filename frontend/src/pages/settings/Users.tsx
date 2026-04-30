@@ -1,9 +1,9 @@
 ﻿import { useState } from 'react';
-import { 
-    Search, Plus, Edit2, 
-    Trash2, Filter, Download, Mail, 
+import {
+    Search, Plus, Edit2,
+    Trash2, Filter, Download, Mail,
     Phone, Globe, Tag, FileText, AlertTriangle,
-    History
+    History, Users as UsersIcon, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
@@ -168,19 +168,27 @@ export default function Users() {
                 <Header notificationCount={5} />
                 
                 <div className="users-content-wrapper">
-                    <div className="users-page-header">
-                        <div className="header-info">
-                            <div className="breadcrumb">SECURITY / USERS</div>
-                            <h1>User Management</h1>
-                            <p>Manage platform access, registration details, and payment statuses for contact persons.</p>
+                    {/* Hero header card — icon + title + subtitle on the left,
+                        primary actions on the right, all inside one rounded
+                        container so the page feels like one cohesive panel
+                        instead of three stacked sections. */}
+                    <div className="users-hero-card">
+                        <div className="hero-left">
+                            <div className="hero-icon">
+                                <UsersIcon size={26} />
+                            </div>
+                            <div className="hero-text">
+                                <h1>User Management</h1>
+                                <p>Manage roles, registration details, and payment statuses for contact persons.</p>
+                            </div>
                         </div>
-                        <div className="header-actions">
+                        <div className="hero-actions">
                             <button className="btn-bulk">
                                 <FileText size={18} />
                                 <span>Bulk Import</span>
                             </button>
                             <button className="btn-add">
-                                <Plus size={20} />
+                                <Plus size={18} />
                                 <span>Add New User</span>
                             </button>
                         </div>
@@ -312,11 +320,15 @@ export default function Users() {
                             </table>
                         </div>
                         <div className="table-footer">
-                            <span className="count-text">Showing <b>{filteredUsers.length}</b> contact persons</span>
+                            <span className="count-text">Showing <b>{filteredUsers.length}</b> of {users.length} contact persons</span>
                             <div className="pagination">
-                                <button className="prev" disabled>Previous</button>
+                                <button className="prev" disabled aria-label="Previous page">
+                                    <ChevronLeft size={14} />
+                                </button>
                                 <button className="page-num active">1</button>
-                                <button className="next" disabled>Next</button>
+                                <button className="next" disabled aria-label="Next page">
+                                    <ChevronRight size={14} />
+                                </button>
                             </div>
                         </div>
                     </div>
