@@ -30,10 +30,6 @@ export default function Contact() {
 
                     <div className="contact-layout-grid">
                         <div className="form-column">
-                            <div className="form-heading">
-                                <h2>Get in Touch</h2>
-                                <p>Fill out the form and we&rsquo;ll get back to you within 1 to 2 business days.</p>
-                            </div>
                             <form onSubmit={handleSubmit} className="minimal-blueprint-form">
                                 <div className="input-row">
                                     <div className="minimal-group">
