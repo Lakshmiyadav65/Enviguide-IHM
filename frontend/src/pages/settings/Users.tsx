@@ -188,11 +188,11 @@ export default function Users() {
 
                     <div className="users-main-card">
                         <div className="users-toolbar">
-                            <div className="search-box">
+                            <div className="users-search-box">
                                 <Search size={18} className="search-icon" />
-                                <input 
-                                    type="text" 
-                                    placeholder="Search by name, email or category..." 
+                                <input
+                                    type="text"
+                                    placeholder="Search by name, email or category..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />

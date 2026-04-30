@@ -231,8 +231,8 @@ export default function UserRoleRights() {
                             <p>Configure and manage global permissions for specific system roles.</p>
                         </div>
                         <div className="header-actions">
-                            <button className="action-btn cancel"><X size={18} /> Cancel</button>
-                            <button className="action-btn save"><Save size={18} /> Save Changes</button>
+                            <button className="urr-action-btn cancel"><X size={18} /> Cancel</button>
+                            <button className="urr-action-btn save"><Save size={18} /> Save Changes</button>
                         </div>
                     </div>
 

@@ -52,8 +52,10 @@
     gap: 12px;
 }
 
-/* Buttons - Consistent with Profile/Contact */
-.action-btn {
+/* Buttons - Consistent with Profile/Contact.
+ * Scoped to .urr-action-btn so it doesn't collide with the table-row
+ * .action-btn used on Fleet / PendingAudits pages. */
+.urr-action-btn {
     padding: 12px 28px;
     border-radius: 100px;
     font-weight: 700;
@@ -68,25 +70,25 @@
     border: none;
 }
 
-.action-btn.cancel {
+.urr-action-btn.cancel {
     background: transparent;
     color: #64748B;
     border: 1.5px solid #E2E8F0;
 }
 
-.action-btn.cancel:hover {
+.urr-action-btn.cancel:hover {
     background: #F8FAFC;
     color: #0F172A;
     border-color: #CBD5E1;
 }
 
-.action-btn.save {
+.urr-action-btn.save {
     background: #00B1FF;
     color: white;
     box-shadow: 0 8px 20px rgba(0, 177, 255, 0.2);
 }
 
-.action-btn.save:hover {
+.urr-action-btn.save:hover {
     background: #0099e0;
     transform: translateY(-2px);
     box-shadow: 0 12px 25px rgba(0, 177, 255, 0.3);

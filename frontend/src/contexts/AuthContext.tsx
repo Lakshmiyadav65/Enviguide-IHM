@@ -70,7 +70,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const res = await api.post<LoginResponse>(ENDPOINTS.AUTH.LOGIN, { email, password });
+      // Generous timeout — the first login after the backend has been
+      // idle (Render Free) can take 30-50s while the service cold-starts.
+      // Default 15s is too short for that path.
+      const res = await api.post<LoginResponse>(
+        ENDPOINTS.AUTH.LOGIN,
+        { email, password },
+        { timeout: 60_000 },
+      );
       const { token, user: u } = res.data;
 
       const authUser: AuthUser = {

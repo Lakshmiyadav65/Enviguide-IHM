@@ -95,12 +95,12 @@
 }
 
 
-.search-box {
+.users-search-box {
     position: relative;
     width: 440px;
 }
 
-.search-box input {
+.users-search-box input {
     width: 100%;
     padding: 12px 14px 12px 44px;
     border-radius: 10px;
@@ -111,7 +111,7 @@
 }
 
 
-.search-box input:focus {
+.users-search-box input:focus {
     outline: none;
     border-color: #00B2FF;
     background: white;
