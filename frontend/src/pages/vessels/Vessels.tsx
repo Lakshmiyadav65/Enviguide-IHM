@@ -872,7 +872,7 @@ export default function Vessels() {
         }
 
         if (activeTab === 'materials') {
-            return <MaterialsRecord key={activeVesselName} vesselName={activeVesselName} />;
+            return <MaterialsRecord key={activeVesselName} vesselName={activeVesselName} vesselId={activeVesselData?.id} />;
         }
 
         if (activeTab === 'reports') {

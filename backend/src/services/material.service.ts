@@ -99,17 +99,22 @@ function extractFields(data: Record<string, unknown>): { columns: string[]; valu
 }
 
 export const MaterialService = {
-  /** List all materials for a vessel, optionally filtered by deck */
-  async getMaterialsForVessel(vesselId: string, deckId?: string) {
-    let sql = `SELECT m.*, d.name AS deck_name
+  /** List all materials for a vessel, optionally filtered by deck or deck area */
+  async getMaterialsForVessel(vesselId: string, deckId?: string, deckAreaId?: string) {
+    let sql = `SELECT m.*, d.name AS deck_name, da.name AS deck_area_name
                FROM materials m
                LEFT JOIN decks d ON m.deck_id = d.id
+               LEFT JOIN deck_areas da ON m.deck_area_id = da.id
                WHERE m.vessel_id = $1`;
     const params: unknown[] = [vesselId];
 
     if (deckId) {
-      sql += ' AND m.deck_id = $2';
       params.push(deckId);
+      sql += ` AND m.deck_id = $${params.length}`;
+    }
+    if (deckAreaId) {
+      params.push(deckAreaId);
+      sql += ` AND m.deck_area_id = $${params.length}`;
     }
 
     sql += ' ORDER BY m.created_at DESC';
@@ -118,6 +123,7 @@ export const MaterialService = {
     return result.rows.map((row: Record<string, unknown>) => ({
       ...toApi(row),
       deckName: row.deck_name || null,
+      deckAreaName: row.deck_area_name || null,
     }));
   },
 
@@ -154,16 +160,19 @@ export const MaterialService = {
   /** Get a single material by ID */
   async getMaterialById(id: string, vesselId: string) {
     const result = await query(
-      `SELECT m.*, d.name AS deck_name
+      `SELECT m.*, d.name AS deck_name, da.name AS deck_area_name
        FROM materials m
        LEFT JOIN decks d ON m.deck_id = d.id
+       LEFT JOIN deck_areas da ON m.deck_area_id = da.id
        WHERE m.id = $1 AND m.vessel_id = $2`,
       [id, vesselId],
     );
     if (!result.rows[0]) return null;
+    const row = result.rows[0] as Record<string, unknown>;
     return {
-      ...toApi(result.rows[0] as Record<string, unknown>),
-      deckName: (result.rows[0] as Record<string, unknown>).deck_name || null,
+      ...toApi(row),
+      deckName: row.deck_name || null,
+      deckAreaName: row.deck_area_name || null,
     };
   },
 

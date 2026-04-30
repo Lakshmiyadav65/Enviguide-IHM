@@ -1,22 +1,68 @@
-﻿import { useState, useMemo, useEffect, useRef } from 'react';
+﻿import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
     Search, Plus, Filter, ChevronRight, ChevronLeft, ChevronDown, AlertCircle,
-    Database, Package, Download, X, FileText, CheckCircle, ExternalLink, MoreVertical
+    Database, Package, Download, X, CheckCircle, MoreVertical
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import './MaterialsRecord.css';
 
 import { mockMaterials } from '../../lib/mockData';
 import type { Material } from '../../types/index';
-
-// Local interface removed in favor of imported Material type
-// Mock data removed in favor of imported mockMaterials
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
 
 interface MaterialsRecordProps {
     vesselName: string;
+    /** Backend UUID. When present, the page fetches from
+     *  `GET /vessels/:vesselId/materials` and ignores the demo mock list. */
+    vesselId?: string;
 }
 
-export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
+// Map vessel name to a mock ID — used only for demo vessels (no vesselId).
+const DEMO_VESSEL_ID_MAP: Record<string, string> = {
+    'MV Ocean Pioneer': '1',
+    'ACOSTA': '2',
+    'AFIF': '3',
+    'PACIFIC HORIZON': '4',
+};
+
+/** Normalise the backend `ihm_part` value (`'Part I'`, `'Part II'`, ...)
+ *  into the uppercase form the table expects (`'PART I'`, ...). */
+function normalizeIhmPart(raw: unknown): string {
+    const s = (typeof raw === 'string' ? raw : '').toUpperCase();
+    if (s.includes('III')) return 'PART III';
+    if (s.includes('II')) return 'PART II';
+    return 'PART I';
+}
+
+/** Convert a backend material row into the front-end `Material` shape used
+ *  by the records table and side panel. */
+function backendToMaterial(m: Record<string, unknown>): Material {
+    const category = (m.category as Material['category']) || 'warning';
+    return {
+        id: String(m.id),
+        vesselId: m.vesselId as string | undefined,
+        name: (m.name as string) || '',
+        ihmPart: normalizeIhmPart(m.ihmPart),
+        category,
+        status: 'Mapped',
+        completion: 100,
+        poNo: (m.shipPO as string) || '',
+        zone: (m.deckAreaName as string) || (m.deckName as string) || '',
+        materialName: (m.materialName as string) || '',
+        equipment: (m.equipment as string) || '',
+        compartment: (m.compartment as string) || '',
+        hazardType: (m.hazardType as string) || '',
+        component: (m.component as string) || '',
+        // Extra fields used by the detail panel — kept on the object even
+        // though they're not in the Material interface (it's permissive).
+        ...(m.manufacturer ? { manufacturer: m.manufacturer } : {}),
+        ...(m.ihmPartNumber ? { ihmPartNumber: m.ihmPartNumber } : {}),
+        ...(m.position ? { position: m.position } : {}),
+    } as Material;
+}
+
+export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecordProps) {
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTag, setActiveTag] = useState('All');
@@ -33,13 +79,44 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
     const topScrollRef = useRef<HTMLDivElement>(null);
     const tableContainerRef = useRef<HTMLDivElement>(null);
 
-    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    // Backend-backed materials for the current vessel. Empty for demo
+    // vessels (no vesselId) — the static mock list is used instead.
+    const [backendMaterials, setBackendMaterials] = useState<Material[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
+    const loadFromBackend = useCallback(async () => {
+        if (!vesselId) return;
+        setIsLoading(true);
+        try {
+            const res = await api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(
+                ENDPOINTS.MATERIALS.LIST(vesselId),
+            );
+            setBackendMaterials((res.data || []).map(backendToMaterial));
+        } catch (err) {
+            console.error('Failed to load materials from backend:', err);
+            setBackendMaterials([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [vesselId]);
+
+    // Initial fetch + re-fetch when the user returns to the tab (e.g. after
+    // adding a material in the mapping page popup window).
     useEffect(() => {
-        const handleStorageChange = () => setRefreshTrigger(prev => prev + 1);
-        window.addEventListener('storage', handleStorageChange);
-        return () => window.removeEventListener('storage', handleStorageChange);
-    }, []);
+        if (!vesselId) {
+            setBackendMaterials([]);
+            return;
+        }
+        loadFromBackend();
+        const onFocus = () => loadFromBackend();
+        const onVis = () => { if (document.visibilityState === 'visible') loadFromBackend(); };
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVis);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVis);
+        };
+    }, [vesselId, loadFromBackend]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -104,26 +181,23 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
         };
     }, []);
 
-    // Determine if the current vessel has ANY materials (mock, vessel inventory, or deck inventories)
+    // For real (backend-backed) vessels we're empty until the API call has
+    // returned data. For demo vessels we always have the static mock list.
     const hasAnyMaterials = useMemo(() => {
-        // Check vessel-wide inventory
-        const raw = localStorage.getItem(`vessel_inventory_${vesselName}`);
-        if (raw) {
-            try { if ((JSON.parse(raw) || []).length > 0) return true; } catch { /* ignore */ }
-        }
-        // Check any deck-specific inventory
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key?.startsWith(`inventory_${vesselName}_`)) {
-                try {
-                    if ((JSON.parse(localStorage.getItem(key) || '[]') || []).length > 0) return true;
-                } catch { /* ignore */ }
-            }
-        }
-        // Demo mock vessels always have materials
-        const demoVessels = ['MV Ocean Pioneer', 'ACOSTA', 'AFIF', 'PACIFIC HORIZON'];
-        return demoVessels.includes(vesselName);
-    }, [vesselName, refreshTrigger]);
+        if (vesselId) return backendMaterials.length > 0;
+        return Object.prototype.hasOwnProperty.call(DEMO_VESSEL_ID_MAP, vesselName);
+    }, [vesselId, backendMaterials, vesselName]);
+
+    // While the initial fetch is in flight on a backed vessel, hold off on
+    // the empty state so we don't flash "No Material Records Found" before
+    // the rows arrive.
+    if (vesselId && isLoading && backendMaterials.length === 0) {
+        return (
+            <div className="materials-container" style={{ padding: 32, textAlign: 'center', color: '#64748b' }}>
+                Loading materials...
+            </div>
+        );
+    }
 
     if (!hasAnyMaterials) {
         return (
@@ -215,78 +289,19 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
         );
     }
 
-    // Unified data source: mockData + localStorage (for real-time sync with mapping page)
-    const allAvailableMaterials = useMemo(() => {
-        // Read from mock data
-        const baseMaterials = mockMaterials.map(m => ({
-            ...m,
-            vesselId: m.vesselId || (m.zone?.includes('Deck') ? '1' : '2') // Assign mock vessel IDs
-        }));
-
-        // Read from localStorage (saved from HazardousMaterialMapping)
-        const savedInventoryRaw = localStorage.getItem(`vessel_inventory_${vesselName}`);
-        const savedInventory: Material[] = savedInventoryRaw ? JSON.parse(savedInventoryRaw) : [];
-
-        // NEW: Read from deck-specific localStorages to sync with mapping page
-        const deckInventories: Material[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key?.startsWith(`inventory_${vesselName}_`)) {
-                try {
-                    const data = JSON.parse(localStorage.getItem(key) || '[]');
-                    const sectionName = key.replace(`inventory_${vesselName}_`, '');
-                    deckInventories.push(...data.map((m: any) => {
-                        // Normalize IHM part value to PART I / PART II / PART III
-                        const partRaw = (m.ihmPart || '').toUpperCase();
-                        const ihmPart = partRaw.includes('PART III') ? 'PART III'
-                            : partRaw.includes('PART II') ? 'PART II'
-                            : partRaw.includes('PART I') ? 'PART I'
-                            : 'PART I';
-                        return {
-                            id: m.id,
-                            name: m.name,
-                            vesselId: vesselIdMap[vesselName] || vesselName, // fallback to vessel name for non-demo vessels
-                            fromCurrentVessel: true, // marker so the filter includes these
-                            ihmPart,
-                            category: (m.hmStatus && m.hmStatus.toLowerCase() === 'chm') ? 'hazard' : 'warning',
-                            completion: 100,
-                            status: 'Mapped',
-                            poNo: m.shipPO || '',
-                            zone: sectionName,
-                            materialName: m.material,
-                            equipment: m.equipment,
-                            compartment: m.compartment
-                        };
-                    }));
-                } catch (e) {
-                    console.error("Failed to parse deck inventory:", e);
-                }
-            }
-        }
-
-        // Combine both sources
-        return [...baseMaterials, ...savedInventory, ...deckInventories];
-    }, [vesselName, refreshTrigger]);
-
-    // Map vessel name to a mock ID if necessary
-    const vesselIdMap: Record<string, string> = {
-        'MV Ocean Pioneer': '1',
-        'ACOSTA': '2',
-        'AFIF': '3',
-        'PACIFIC HORIZON': '4'
-    };
-
-    // Calculate Dynamic Counts based on current vessel
-    const vesselSpecificMaterials = useMemo(() => {
-        return allAvailableMaterials.filter((m: any) => {
-            // Include materials tagged from current vessel (from localStorage / mapping page)
-            if (m.fromCurrentVessel) return true;
-            // Include mapped items explicitly
-            if (m.id && typeof m.id === 'string' && m.id.startsWith('MAPPED-')) return true;
-            // Include demo mock data for the 4 demo vessels
-            return vesselIdMap[vesselName] === m.vesselId;
-        });
-    }, [allAvailableMaterials, vesselName]);
+    // Backend-backed vessels show only what the API returned. Demo vessels
+    // (no vesselId) fall back to the static mock list.
+    const vesselSpecificMaterials = useMemo<Material[]>(() => {
+        if (vesselId) return backendMaterials;
+        const demoId = DEMO_VESSEL_ID_MAP[vesselName];
+        if (!demoId) return [];
+        return mockMaterials
+            .map((m) => ({
+                ...m,
+                vesselId: m.vesselId || (m.zone?.includes('Deck') ? '1' : '2'),
+            }))
+            .filter((m) => m.vesselId === demoId);
+    }, [vesselId, vesselName, backendMaterials]);
 
     const counts = useMemo(() => {
         return {
@@ -351,10 +366,14 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
     const displayedMaterials = filteredMaterials.slice(0, visibleCount);
 
     const handleEditClick = (material: Material) => {
-        // Redirect to mapping page with the selected material ID and vessel
-        // Defaulting to material.zone as section name if available
         const deckName = material.zone || 'A-DECK 01';
-        navigate(`/mapping?matId=${material.id}&vessel=${vesselName}&name=${deckName}`);
+        const params = new URLSearchParams({
+            matId: material.id,
+            vessel: vesselName,
+            name: deckName,
+        });
+        if (vesselId) params.set('vesselId', vesselId);
+        navigate(`/mapping?${params.toString()}`);
     };
 
     const handleSaveUpdate = () => {
@@ -646,16 +665,23 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                         </div>
                     </div>
 
-                    {selectedMaterialId && (
+                    {selectedMaterialId && (() => {
+                        const selected = vesselSpecificMaterials.find(m => m.id === selectedMaterialId);
+                        if (!selected) return null;
+                        const riskLabel = selected.category === 'hazard' ? 'High Risk'
+                            : selected.category === 'warning' ? 'Medium Risk'
+                            : 'Low Risk';
+                        const hasThreshold = typeof selected.thresholdValue === 'number';
+                        return (
                         <div className="materials-details-pane">
                             <div className="details-panel-header">
                                 <h2 style={{ fontSize: isEditing ? '16px' : '20px', textTransform: isEditing ? 'uppercase' : 'none', letterSpacing: isEditing ? '0.05em' : 'normal' }}>
-                                    {isEditing ? 'Edit Material Details' : mockMaterials.find(m => m.id === selectedMaterialId)?.name}
+                                    {isEditing ? 'Edit Material Details' : selected.name}
                                 </h2>
                                 {!isEditing && (
                                     <div className="po-badge">
                                         <Package size={14} />
-                                        <span>PO: {vesselSpecificMaterials.find(m => m.id === selectedMaterialId)?.poNo || 'N/A'}</span>
+                                        <span>PO: {selected.poNo || 'N/A'}</span>
                                     </div>
                                 )}
                                 <button className="close-panel-btn" onClick={() => { setSelectedMaterialId(null); setIsEditing(false); }}>
@@ -753,103 +779,80 @@ export default function MaterialsRecord({ vesselName }: MaterialsRecordProps) {
                                         <div className="substance-info-grid">
                                             <div className="substance-info-card">
                                                 <label>MATERIAL NAME</label>
-                                                <span>{mockMaterials.find(m => m.id === selectedMaterialId)?.name}</span>
+                                                <span>{selected.name || '-'}</span>
                                             </div>
                                             <div className="substance-info-card">
                                                 <label>PO NUMBER</label>
-                                                <span>{vesselSpecificMaterials.find(m => m.id === selectedMaterialId)?.poNo || 'N/A'}</span>
+                                                <span>{selected.poNo || 'N/A'}</span>
                                             </div>
                                             <div className="substance-info-card risk-card">
                                                 <label>RISK LEVEL</label>
-                                                <span><div className="risk-dot"></div> High Risk</span>
+                                                <span><div className="risk-dot"></div> {riskLabel}</span>
                                             </div>
                                             <div className="substance-info-card">
-                                                <label>LAST UPDATE</label>
-                                                <span>12 Oct 2023</span>
+                                                <label>IHM PART</label>
+                                                <span>{selected.ihmPart || '-'}</span>
+                                            </div>
+                                            <div className="substance-info-card">
+                                                <label>DECK / ZONE</label>
+                                                <span>{selected.zone || '-'}</span>
+                                            </div>
+                                            <div className="substance-info-card">
+                                                <label>EQUIPMENT</label>
+                                                <span>{selected.equipment || '-'}</span>
+                                            </div>
+                                            <div className="substance-info-card">
+                                                <label>COMPARTMENT</label>
+                                                <span>{selected.compartment || '-'}</span>
+                                            </div>
+                                            <div className="substance-info-card">
+                                                <label>STATUS</label>
+                                                <span>{selected.status || '-'}</span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="details-section">
-                                        <div className="monitoring-header">
-                                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
-                                                <div style={{ width: '4px', height: '12px', background: '#3b82f6', borderRadius: '2px' }}></div>
-                                                THRESHOLD MONITORING
-                                            </h3>
-                                            <span className="critical-badge">CRITICAL LIMIT</span>
-                                        </div>
+                                    {hasThreshold && (
+                                        <div className="details-section">
+                                            <div className="monitoring-header">
+                                                <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+                                                    <div style={{ width: '4px', height: '12px', background: '#3b82f6', borderRadius: '2px' }}></div>
+                                                    THRESHOLD MONITORING
+                                                </h3>
+                                                {selected.thresholdType === 'limit-exceeded' && (
+                                                    <span className="critical-badge">CRITICAL LIMIT</span>
+                                                )}
+                                            </div>
 
-                                        <div className="monitoring-visual-row">
-                                            <div className="circular-dial-container">
-                                                <div className="circular-ring">
-                                                    <div className="circular-inner">110%</div>
+                                            <div className="monitoring-visual-row">
+                                                <div className="circular-dial-container">
+                                                    <div className="circular-ring">
+                                                        <div className="circular-inner">{Math.round((selected.thresholdValue || 0) * 100)}%</div>
+                                                    </div>
                                                 </div>
+                                                {selected.thresholdMessage && (
+                                                    <div className="monitoring-stats">
+                                                        <div className="stat-label">STATUS</div>
+                                                        <div className="stat-value" style={{ fontSize: '14px' }}>{selected.thresholdMessage}</div>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className="monitoring-stats">
-                                                <div className="stat-label">CURRENT VALUE</div>
-                                                <div className="stat-value">1.1 <span className="stat-unit">mg/kg</span></div>
-                                            </div>
-                                            <div className="monitoring-stats">
-                                                <div className="stat-label">REGULATORY LIMIT</div>
-                                                <div className="stat-value">1.0 <span className="stat-unit">mg/kg</span></div>
-                                            </div>
-                                        </div>
 
-                                        <div className="monitoring-progress-bar">
-                                            <div className="monitoring-fill" style={{ width: '100%' }}></div>
-                                        </div>
-
-                                        <div className="monitoring-metadata">
-                                            <div className="reg-ref">
-                                                <AlertCircle size={14} /> Regulation Ref: <strong>HKC / EU SRR Appendix 1</strong>
-                                            </div>
-                                            <div className="compliance-status-marker">
-                                                <AlertCircle size={14} /> NON-COMPLIANT
+                                            <div className="monitoring-progress-bar">
+                                                <div className="monitoring-fill" style={{ width: `${Math.min(100, (selected.thresholdValue || 0) * 100)}%` }}></div>
                                             </div>
                                         </div>
-
-                                        <div className="secondary-substances-grid">
-                                            <div className="sec-sub-card">
-                                                <div className="sec-sub-header">
-                                                    <span className="sec-sub-name">SUBSTANCE A</span>
-                                                    <span className="sec-status-pill safe-pill">Safe</span>
-                                                </div>
-                                                <div className="sec-sub-val">0.2 / 2.0 <span style={{ fontSize: '10px', color: '#64748b' }}>mg/kg</span></div>
-                                                <div className="sec-sub-bar"><div className="sec-sub-fill" style={{ width: '40%', background: '#10b981' }}></div></div>
-                                            </div>
-                                            <div className="sec-sub-card">
-                                                <div className="sec-sub-header">
-                                                    <span className="sec-sub-name">SUBSTANCE B</span>
-                                                    <span className="sec-status-pill warning-pill">Warning</span>
-                                                </div>
-                                                <div className="sec-sub-val">0.85 / 1.0 <span style={{ fontSize: '10px', color: '#64748b' }}>mg/kg</span></div>
-                                                <div className="sec-sub-bar"><div className="sec-sub-fill" style={{ width: '85%', background: '#f59e0b' }}></div></div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="details-section">
-                                        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <div style={{ width: '4px', height: '12px', background: '#3b82f6', borderRadius: '2px' }}></div>
-                                            LAB DOCUMENTATION
-                                        </h3>
-                                        <div className="doc-list-item">
-                                            <div className="doc-info">
-                                                <FileText size={18} color="#ef4444" />
-                                                <span className="doc-name">Lab-Report-092.pdf</span>
-                                            </div>
-                                            <a href="https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf" target="_blank" rel="noopener noreferrer" className="doc-external-link"><ExternalLink size={16} /></a>
-                                        </div>
-                                    </div>
+                                    )}
 
                                     <div className="panel-footer">
-                                        <button className="edit-details-btn-full" onClick={() => handleEditClick(mockMaterials.find(m => m.id === selectedMaterialId)!)}>EDIT MATERIAL DETAILS</button>
+                                        <button className="edit-details-btn-full" onClick={() => handleEditClick(selected)}>EDIT MATERIAL DETAILS</button>
                                         <button className="more-options-btn"><MoreVertical size={18} /></button>
                                     </div>
                                 </div>
                             )}
                         </div>
-                    )}
+                        );
+                    })()}
                     {/* Filter Side Panel */}
                     {isFilterPanelOpen && (
                         <div className="filter-side-panel">

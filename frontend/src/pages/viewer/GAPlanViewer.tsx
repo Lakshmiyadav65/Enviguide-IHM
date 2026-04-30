@@ -446,8 +446,10 @@ export default function GAPlanViewer({
             w: section.rect.width.toString(),
             h: section.rect.height.toString(),
             mode: 'add',
-            vessel: vesselName
+            vessel: vesselName,
         });
+        if (vesselId) urlParams.set('vesselId', vesselId);
+        if (section.id) urlParams.set('deckAreaId', section.id);
         window.open(`/mapping?${urlParams.toString()}`, '_blank');
     };
 

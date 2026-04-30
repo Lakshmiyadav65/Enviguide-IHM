@@ -55,6 +55,81 @@ interface MaterialEntry {
 import type { Material } from '../../types/index';
 
 import { PLAN_GENERIC } from '../../assets/ship_plans';
+import { api } from '../../lib/apiClient';
+import { ENDPOINTS } from '../../config/api.config';
+
+/** Backend → MaterialEntry shape used by this page. Backend stores
+ *  hazard_type as a single string; the form keeps an array, so we wrap. */
+function backendToEntry(m: Record<string, unknown>): MaterialEntry {
+    const px = m.pin && typeof m.pin === 'object' ? (m.pin as { x?: number; y?: number }).x : undefined;
+    const py = m.pin && typeof m.pin === 'object' ? (m.pin as { x?: number; y?: number }).y : undefined;
+    return {
+        id: String(m.id),
+        avoidUpdation: Boolean(m.avoidUpdation),
+        movementType: (m.movementType as string) || '',
+        ihmPart: (m.ihmPart as string) || '',
+        hazMaterials: m.hazardType ? [m.hazardType as string] : [],
+        deckPlan: (m.deckAreaName as string) || (m.deckName as string) || '',
+        shipPO: (m.shipPO as string) || '',
+        name: (m.name as string) || '',
+        compartment: (m.compartment as string) || '',
+        equipment: (m.equipment as string) || '',
+        position: (m.position as string) || '',
+        component: (m.component as string) || '',
+        material: (m.materialName as string) || '',
+        quantity: (m.quantity as string) || '',
+        unit: (m.unit as string) || 'kg',
+        hmStatus: ((m.hmStatus as string) || 'CHM').toUpperCase() === 'PCHM' ? 'PCHM' : 'CHM',
+        files: [],
+        pin: typeof px === 'number' && typeof py === 'number' ? { x: px, y: py } : null,
+        description: (m.description as string) || '',
+        manufacturer: (m.manufacturer as string) || '',
+        ihmPartNumber: (m.ihmPartNumber as string) || '',
+        equipmentClass: (m.equipmentClass as string) || '',
+        noOfPieces: (m.noOfPieces as string) || '',
+        totalQuantity: (m.totalQuantity as string) || '',
+        remarks: (m.remarks as string) || '',
+    };
+}
+
+/** Pull just `Part I` / `Part II` / `Part III` out of the dropdown's
+ *  human-readable label for the backend's strict validator. */
+function shortIhmPart(raw: string): string {
+    const s = (raw || '').toLowerCase();
+    if (s.includes('part iii')) return 'Part III';
+    if (s.includes('part ii')) return 'Part II';
+    return 'Part I';
+}
+
+/** Form payload → backend body. Drops fields the backend doesn't store
+ *  (deckPlan label, hazMaterials array). */
+function entryToBackendBody(entry: Omit<MaterialEntry, 'id' | 'pin'>, pin: { x: number; y: number } | null) {
+    return {
+        name: entry.name,
+        ihmPart: shortIhmPart(entry.ihmPart),
+        category: entry.hmStatus === 'CHM' ? 'hazard' : 'warning',
+        hazardType: entry.hazMaterials[0] || null,
+        hmStatus: entry.hmStatus,
+        equipmentClass: entry.equipmentClass || null,
+        quantity: entry.quantity || null,
+        unit: entry.unit || null,
+        noOfPieces: entry.noOfPieces || null,
+        totalQuantity: entry.totalQuantity || null,
+        compartment: entry.compartment || null,
+        equipment: entry.equipment || null,
+        position: entry.position || null,
+        component: entry.component || null,
+        materialName: entry.material || null,
+        shipPO: entry.shipPO || null,
+        movementType: entry.movementType || null,
+        manufacturer: entry.manufacturer || null,
+        ihmPartNumber: entry.ihmPartNumber || null,
+        description: entry.description || null,
+        remarks: entry.remarks || null,
+        avoidUpdation: Boolean(entry.avoidUpdation),
+        pin,
+    };
+}
 
 export default function HazardousMaterialMapping() {
     const location = useLocation();
@@ -72,6 +147,8 @@ export default function HazardousMaterialMapping() {
         w: parseFloat(query.get('w') || '1000'),
         h: parseFloat(query.get('h') || '700')
     };
+    const vesselId = query.get('vesselId') || '';
+    const deckAreaId = query.get('deckAreaId') || '';
 
 
 
@@ -173,20 +250,46 @@ export default function HazardousMaterialMapping() {
 
     // Initial mode check and focus on crop
     useEffect(() => {
-        // 1. Sync inventory when deck or vessel changes
+        // 1. Sync inventory when deck or vessel changes. Backed vessels
+        //    pull from the API; demo / non-backed vessels still hit
+        //    localStorage so the wizard works without a backend record.
+        const matId = query.get('matId');
         const key = `inventory_${vesselName}_${sectionName}`;
-        const stored = localStorage.getItem(key);
-        const parsed = stored ? JSON.parse(stored) : [];
-        setInventory(parsed);
         lastLoadedKeyRef.current = key;
 
-        // 2. Handle matId focus
-        const matId = query.get('matId');
-        if (matId) {
-            const found = parsed.find((i: MaterialEntry) => i.id === matId);
-            if (found) {
-                setViewingMaterial(found);
-                setViewMode('detail');
+        let cancelled = false;
+        if (vesselId) {
+            (async () => {
+                try {
+                    const params = deckAreaId ? `?deckAreaId=${encodeURIComponent(deckAreaId)}` : '';
+                    const res = await api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(
+                        ENDPOINTS.MATERIALS.LIST(vesselId) + params,
+                    );
+                    if (cancelled) return;
+                    const entries = (res.data || []).map(backendToEntry);
+                    setInventory(entries);
+                    if (matId) {
+                        const found = entries.find((i) => i.id === matId);
+                        if (found) {
+                            setViewingMaterial(found);
+                            setViewMode('detail');
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to load materials from backend:', err);
+                    if (!cancelled) setInventory([]);
+                }
+            })();
+        } else {
+            const stored = localStorage.getItem(key);
+            const parsed = stored ? JSON.parse(stored) : [];
+            setInventory(parsed);
+            if (matId) {
+                const found = parsed.find((i: MaterialEntry) => i.id === matId);
+                if (found) {
+                    setViewingMaterial(found);
+                    setViewMode('detail');
+                }
             }
         }
 
@@ -216,22 +319,22 @@ export default function HazardousMaterialMapping() {
         window.addEventListener('resize', updatePosition);
 
         return () => {
+            cancelled = true;
             clearTimeout(timer);
             window.removeEventListener('resize', updatePosition);
         };
-    }, [rect.w, rect.h, query, vesselName, sectionName]);
+    }, [rect.w, rect.h, query, vesselName, sectionName, vesselId, deckAreaId]);
 
-    // Save to localStorage whenever inventory changes
+    // Save to localStorage whenever inventory changes — only for non-backed
+    // (demo) vessels. Backed vessels persist via the API on each create.
     useEffect(() => {
+        if (vesselId) return;
         const key = `inventory_${vesselName}_${sectionName}`;
-        // Only save if the current inventory belongs to the current deck/vessel key
-        // This prevents overwriting data during navigation transitions
         if (lastLoadedKeyRef.current === key && inventory.length > 0) {
             localStorage.setItem(key, JSON.stringify(inventory));
-            // Dispatch storage event for other tabs
             window.dispatchEvent(new Event('storage'));
         }
-    }, [inventory, sectionName, vesselName]);
+    }, [inventory, sectionName, vesselName, vesselId]);
 
     const handleCanvasClick = (e: React.MouseEvent) => {
         if (activeTool === 'pin') {
@@ -293,46 +396,7 @@ export default function HazardousMaterialMapping() {
 
 
 
-    const handleAddMaterial = () => {
-        if (!tempPin) {
-            alert("Please drop a pin on the deck plan first.");
-            return;
-        }
-
-        if (!formData.name || !formData.ihmPart || formData.hazMaterials.length === 0) {
-            alert("Please fill in all required fields (Name, IHM Part, and Hazardous Materials).");
-            return;
-        }
-
-        const newEntry: MaterialEntry = {
-            id: Date.now().toString(),
-            ...formData,
-            pin: tempPin
-        };
-
-        const updatedInventory = [...inventory, newEntry];
-        setInventory(updatedInventory);
-
-        // Sync with vessel-wide inventory for the Records page
-        const recordMaterial: Material = {
-            id: `MAPPED-${newEntry.id}`,
-            name: newEntry.name,
-            ihmPart: newEntry.ihmPart,
-            category: newEntry.hmStatus === 'CHM' ? 'hazard' : 'warning',
-            status: 'Verified',
-            completion: 100,
-            zone: sectionName,
-            poNo: newEntry.shipPO,
-            component: newEntry.component,
-            materialName: newEntry.material,
-            hazardType: newEntry.hazMaterials[0] || '',
-            equipment: newEntry.equipment
-        };
-
-        const vesselInventoryKey = `vessel_inventory_${vesselName}`;
-        const existingVesselInv: Material[] = JSON.parse(localStorage.getItem(vesselInventoryKey) || '[]');
-        localStorage.setItem(vesselInventoryKey, JSON.stringify([...existingVesselInv, recordMaterial]));
-
+    const resetFormAfterCreate = () => {
         setTempPin(null);
         setFormData({
             avoidUpdation: false,
@@ -360,6 +424,67 @@ export default function HazardousMaterialMapping() {
         });
         setViewMode('list');
         setActiveTool('none');
+    };
+
+    const handleAddMaterial = async () => {
+        if (!tempPin) {
+            alert("Please drop a pin on the deck plan first.");
+            return;
+        }
+
+        if (!formData.name || !formData.ihmPart || formData.hazMaterials.length === 0) {
+            alert("Please fill in all required fields (Name, IHM Part, and Hazardous Materials).");
+            return;
+        }
+
+        // Backed vessel — persist via the API and re-use the server id.
+        if (vesselId) {
+            try {
+                const body = {
+                    ...entryToBackendBody(formData, tempPin),
+                    ...(deckAreaId ? { deckAreaId } : {}),
+                };
+                const res = await api.post<{ success: boolean; data: Record<string, unknown> }>(
+                    ENDPOINTS.MATERIALS.LIST(vesselId),
+                    body,
+                );
+                const created = backendToEntry({ ...res.data, deckAreaName: sectionName });
+                setInventory((prev) => [...prev, created]);
+                resetFormAfterCreate();
+            } catch (err) {
+                console.error('Failed to create material:', err);
+                alert('Could not save the material. Please try again.');
+            }
+            return;
+        }
+
+        // Demo / non-backed vessel — keep the localStorage flow.
+        const newEntry: MaterialEntry = {
+            id: Date.now().toString(),
+            ...formData,
+            pin: tempPin,
+        };
+        setInventory((prev) => [...prev, newEntry]);
+
+        const recordMaterial: Material = {
+            id: `MAPPED-${newEntry.id}`,
+            name: newEntry.name,
+            ihmPart: newEntry.ihmPart,
+            category: newEntry.hmStatus === 'CHM' ? 'hazard' : 'warning',
+            status: 'Verified',
+            completion: 100,
+            zone: sectionName,
+            poNo: newEntry.shipPO,
+            component: newEntry.component,
+            materialName: newEntry.material,
+            hazardType: newEntry.hazMaterials[0] || '',
+            equipment: newEntry.equipment,
+        };
+        const vesselInventoryKey = `vessel_inventory_${vesselName}`;
+        const existingVesselInv: Material[] = JSON.parse(localStorage.getItem(vesselInventoryKey) || '[]');
+        localStorage.setItem(vesselInventoryKey, JSON.stringify([...existingVesselInv, recordMaterial]));
+
+        resetFormAfterCreate();
     };
 
     const filteredInventory = useMemo(() => {
@@ -405,7 +530,15 @@ export default function HazardousMaterialMapping() {
         <div className="hazmat-mapping-page">
             <header className="mapping-header-v5">
                 <div className="h-left-v5">
-                    <button className="back-btn-v5" onClick={() => navigate(-1)}>
+                    <button className="back-btn-v5" onClick={() => {
+                        if (window.opener && !window.opener.closed) {
+                            window.close();
+                        } else if (window.history.length > 1) {
+                            navigate(-1);
+                        } else {
+                            navigate('/decks');
+                        }
+                    }}>
                         <ChevronLeft size={20} />
                     </button>
                     <div className="logo-group-v5">
@@ -610,7 +743,9 @@ export default function HazardousMaterialMapping() {
                                             </div>
                                             <div className="dh-titles">
                                                 <h3>{viewingMaterial.name}</h3>
-                                                <span className="dh-ref">EG NO: {viewingMaterial.shipPO ? (viewingMaterial.shipPO.startsWith('EG') ? viewingMaterial.shipPO : `EG${viewingMaterial.shipPO}`) : 'EG3456'}</span>
+                                                {viewingMaterial.shipPO && (
+                                                    <span className="dh-ref">PO: {viewingMaterial.shipPO}</span>
+                                                )}
                                             </div>
                                         </div>
                                         <span className="status-badge-premium mapped" style={{ marginLeft: 'auto' }}>MAPPED</span>
@@ -619,7 +754,13 @@ export default function HazardousMaterialMapping() {
                                     <div className="detail-form-grid">
                                         <div className="df-group">
                                             <label>IHM PART NUMBER</label>
-                                            <input type="text" className="df-input" defaultValue="IHM-CAD-P4022" />
+                                            <input
+                                                key={`ihm-${viewingMaterial.id}`}
+                                                type="text"
+                                                className="df-input"
+                                                defaultValue={viewingMaterial.ihmPartNumber || ''}
+                                                placeholder="e.g. IHM-CAD-P4022"
+                                            />
                                         </div>
                                         <div className="df-group">
                                             <label>LOCATION ON SHIP</label>
@@ -650,7 +791,12 @@ export default function HazardousMaterialMapping() {
 
                                     <div className="df-group full">
                                         <label>MANUFACTURER DETAILS</label>
-                                        <textarea className="df-textarea" defaultValue="Maritime Component Solutions Ltd. (UK Office) - Heavy Duty Scupper Trap assemblies." />
+                                        <textarea
+                                            key={`mfr-${viewingMaterial.id}`}
+                                            className="df-textarea"
+                                            defaultValue={viewingMaterial.manufacturer || ''}
+                                            placeholder="e.g. Maritime Component Solutions Ltd."
+                                        />
                                     </div>
 
                                     <div className="df-group full">
@@ -695,14 +841,14 @@ export default function HazardousMaterialMapping() {
                                                 </div>
                                             ) : (
                                                 // Normal List for <= 2
-                                                (viewingMaterial.files || ['MD_RosePlate_V2.pdf']).map((file: string, idx: number) => (
+                                                (viewingMaterial.files || []).map((file: string, idx: number) => (
                                                     <div key={idx} className="attached-file-row">
                                                         <FileText size={14} color="#2563EB" />
                                                         <span style={{ flex: 1 }}>{file}</span>
                                                         <div style={{ display: 'flex', gap: '8px' }}>
                                                             <Eye size={16} style={{ cursor: 'pointer', color: '#94A3B8' }} />
                                                             <X size={16} className="remove-file" onClick={() => {
-                                                                const newFiles = (viewingMaterial.files || ['MD_RosePlate_V2.pdf']).filter((_, i) => i !== idx);
+                                                                const newFiles = (viewingMaterial.files || []).filter((_, i) => i !== idx);
                                                                 setViewingMaterial({ ...viewingMaterial, files: newFiles });
                                                             }} />
                                                         </div>
@@ -714,25 +860,29 @@ export default function HazardousMaterialMapping() {
 
                                     <div className="detail-actions-footer">
                                         <button className="hm-mapping-btn cancel" onClick={() => { setViewingMaterial(null); setViewMode('list'); }}>CANCEL</button>
-                                        <button className="hm-mapping-btn save" onClick={() => {
+                                        <button className="hm-mapping-btn save" onClick={async () => {
                                             if (targetDeckForTransfer) {
                                                 const deck = availableDecks.find(d => (d.title || d.sectionName) === targetDeckForTransfer);
                                                 if (deck) {
                                                     const r = deck.rect || { x: 0, y: 0, width: 2000, height: 1400 };
-                                                    // Data Integrity: Remove from current deck inventory before transfer
                                                     const newInv = inventory.filter(i => i.id !== viewingMaterial.id);
                                                     setInventory(newInv);
-                                                    localStorage.setItem(`inventory_${vesselName}_${sectionName}`, JSON.stringify(newInv));
+                                                    if (!vesselId) {
+                                                        // Demo / non-backed vessel — keep localStorage path.
+                                                        localStorage.setItem(`inventory_${vesselName}_${sectionName}`, JSON.stringify(newInv));
+                                                    }
 
                                                     const params = new URLSearchParams({
-                                                        url: fileUrl, // Preserve original plan URL
+                                                        url: fileUrl,
                                                         name: deck.title || deck.sectionName,
                                                         vessel: vesselName,
                                                         x: (r.x || 0).toString(),
                                                         y: (r.y || 0).toString(),
                                                         w: (r.width || r.w || 2000).toString(),
-                                                        h: (r.height || r.h || 1400).toString()
+                                                        h: (r.height || r.h || 1400).toString(),
                                                     });
+                                                    if (vesselId) params.set('vesselId', vesselId);
+                                                    if (deck.id) params.set('deckAreaId', deck.id);
 
                                                     navigate(`${location.pathname}?${params.toString()}`, {
                                                         state: { transferMaterial: { ...viewingMaterial, deckPlan: deck.title || deck.sectionName } }
@@ -740,8 +890,19 @@ export default function HazardousMaterialMapping() {
                                                     return;
                                                 }
                                             }
-                                            // Normal Save
-                                            alert("Changes saved.");
+                                            // Normal Save — backed vessels persist via PUT.
+                                            if (vesselId) {
+                                                try {
+                                                    await api.put(
+                                                        ENDPOINTS.MATERIALS.DETAIL(vesselId, viewingMaterial.id),
+                                                        entryToBackendBody(viewingMaterial, viewingMaterial.pin),
+                                                    );
+                                                } catch (err) {
+                                                    console.error('Failed to update material:', err);
+                                                    alert('Could not save changes. Please try again.');
+                                                    return;
+                                                }
+                                            }
                                             setViewingMaterial(null);
                                             setViewMode('list');
                                         }}>SAVE CHANGES</button>

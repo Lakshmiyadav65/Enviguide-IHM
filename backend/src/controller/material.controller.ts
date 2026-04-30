@@ -15,7 +15,8 @@ export async function listMaterials(req: Request, res: Response, next: NextFunct
     if (!vessel) return next(createError('Vessel not found', 404));
 
     const deckId = req.query.deckId as string | undefined;
-    const materials = await MaterialService.getMaterialsForVessel(vesselId, deckId);
+    const deckAreaId = req.query.deckAreaId as string | undefined;
+    const materials = await MaterialService.getMaterialsForVessel(vesselId, deckId, deckAreaId);
     const total = await MaterialService.getMaterialCount(vesselId);
 
     res.json({ success: true, data: materials, total });

@@ -51,11 +51,17 @@ export const ENDPOINTS = {
     UPLOAD_BULK: '/purchase-orders/upload-bulk',
   },
 
-  // Materials / IHM
+  // Materials / IHM (nested under a vessel)
   MATERIALS: {
-    LIST: '/materials',
-    DETAIL: (id: string) => `/materials/${id}`,
-    MAPPING: '/materials/mapping',
+    LIST: (vesselId: string) => `/vessels/${vesselId}/materials`,
+    DETAIL: (vesselId: string, materialId: string) =>
+      `/vessels/${vesselId}/materials/${materialId}`,
+    MAPPING: (vesselId: string) => `/vessels/${vesselId}/materials/mapping`,
+    SUMMARY: (vesselId: string) => `/vessels/${vesselId}/materials/summary`,
+    TRANSFER: (vesselId: string, materialId: string) =>
+      `/vessels/${vesselId}/materials/${materialId}/transfer`,
+    REMAP: (vesselId: string, materialId: string) =>
+      `/vessels/${vesselId}/materials/${materialId}/remap`,
   },
 
   // Administration / Audits

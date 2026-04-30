@@ -714,8 +714,12 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
             y: deck.rect.y.toString(),
             w: deck.rect.width.toString(),
             h: deck.rect.height.toString(),
-            vessel: vesselName
+            vessel: vesselName,
         };
+        // Backend identifiers — when present, the mapping page reads/writes
+        // materials via the API instead of localStorage.
+        if (vesselId) params.vesselId = vesselId;
+        if (deck.id) params.deckAreaId = deck.id;
         if (mode) params.mode = mode;
         if (materialId) params.matId = materialId;
         const urlParams = new URLSearchParams(params);
