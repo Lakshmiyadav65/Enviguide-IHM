@@ -93,6 +93,8 @@ export default function Vessels() {
     const [hiddenSections, setHiddenSections] = useState<string[]>([]);
     const [reorderedSections, setReorderedSections] = useState<any[]>([]);
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+    // New Reports landing — tabs for Standard / Quarterly / Custom
+    const [activeReportTab, setActiveReportTab] = useState<'standard' | 'quarterly' | 'custom'>('standard');
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const docInputRef = useRef<HTMLInputElement>(null);
@@ -870,36 +872,28 @@ export default function Vessels() {
         if (activeTab === 'reports') {
             const vesselDisplayName = activeVesselName.includes(' ') ? activeVesselName.split(' ')[1].toUpperCase() : activeVesselName.toUpperCase();
 
-            const reportCategories = [
+            // Standard report templates — these are the *types* of reports
+            // the user can generate, not historical data. The catalog is part
+            // of the product; only the generated history (dates, files,
+            // download URLs) is real data and that comes from the backend
+            // once the reports table exists. Until then, no fake "Last
+            // updated" timestamps and no fake quarterly archive entries.
+            const reportCategories: Array<{
+                id: string;
+                title: string;
+                items: Array<{ id: string; name: string; date: string | null }>;
+            }> = [
                 {
                     id: 'adhoc',
                     title: 'AD HOC REPORT',
                     items: [
-                        { id: 'summary', name: 'Compliance Summary Report', date: 'Last updated: Oct 24, 2023' },
-                        { id: 'inventory', name: 'Detailed Materials Inventory Report', date: 'Last updated: Oct 12, 2023' },
-                        { id: 'hazmat', name: 'Global Hazmat Overview Report', date: 'Last updated: Nov 05, 2023' },
+                        { id: 'summary', name: 'Compliance Summary Report', date: null },
+                        { id: 'inventory', name: 'Detailed Materials Inventory Report', date: null },
+                        { id: 'hazmat', name: 'Global Hazmat Overview Report', date: null },
                     ]
                 },
-                { id: 'q1_2026', title: 'Q1 (01/01/2026 - 31/03/2026)', items: [{ id: 'q1_26_1', name: 'Quarterly Compliance Report', date: 'Last updated: Feb 01, 2026' }] },
-                { id: 'q4_2025', title: 'Q4 (01/10/2025 - 31/12/2025)', items: [{ id: 'q4_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 05, 2026' }] },
-                { id: 'q3_2025', title: 'Q3 (01/07/2025 - 30/09/2025)', items: [{ id: 'q3_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 10, 2025' }] },
-                { id: 'q2_2025', title: 'Q2 (01/04/2025 - 30/06/2025)', items: [{ id: 'q2_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 15, 2025' }] },
-                { id: 'q1_2025', title: 'Q1 (01/01/2025 - 31/03/2025)', items: [{ id: 'q1_25_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 10, 2025' }] },
-                { id: 'q4_2024', title: 'Q4 (01/10/2024 - 31/12/2024)', items: [{ id: 'q4_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 12, 2025' }] },
-                { id: 'q3_2024', title: 'Q3 (01/07/2024 - 30/09/2024)', items: [{ id: 'q3_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 15, 2024' }] },
-                { id: 'q2_2024', title: 'Q2 (01/04/2024 - 30/06/2024)', items: [{ id: 'q2_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 20, 2024' }] },
-                { id: 'q1_2024', title: 'Q1 (01/01/2024 - 31/03/2024)', items: [{ id: 'q1_24_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 18, 2024' }] },
-                { id: 'q4_2023', title: 'Q4 (01/10/2023 - 31/12/2023)', items: [{ id: 'q4_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 22, 2024' }] },
-                { id: 'q3_2023', title: 'Q3 (01/07/2023 - 30/09/2023)', items: [{ id: 'q3_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 25, 2023' }] },
-                { id: 'q2_2023', title: 'Q2 (01/04/2023 - 30/06/2023)', items: [{ id: 'q2_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 28, 2023' }] },
-                { id: 'q1_2023', title: 'Q1 (01/01/2023 - 31/03/2023)', items: [{ id: 'q1_23_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 30, 2023' }] },
-                { id: 'q4_2022', title: 'Q4 (01/10/2022 - 31/12/2022)', items: [{ id: 'q4_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 15, 2023' }] },
-                { id: 'q3_2022', title: 'Q3 (01/07/2022 - 30/09/2022)', items: [{ id: 'q3_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 20, 2022' }] },
-                { id: 'q2_2022', title: 'Q2 (01/04/2022 - 30/06/2022)', items: [{ id: 'q2_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 25, 2022' }] },
-                { id: 'q1_2022', title: 'Q1 (01/01/2022 - 31/03/2022)', items: [{ id: 'q1_22_1', name: 'Quarterly Compliance Report', date: 'Last updated: Apr 28, 2022' }] },
-                { id: 'q4_2021', title: 'Q4 (01/10/2021 - 31/12/2021)', items: [{ id: 'q4_21_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jan 18, 2022' }] },
-                { id: 'q3_2021', title: 'Q3 (01/07/2021 - 30/09/2021)', items: [{ id: 'q3_21_1', name: 'Quarterly Compliance Report', date: 'Last updated: Oct 22, 2021' }] },
-                { id: 'q2_2021', title: 'Q2 (01/04/2021 - 30/06/2021)', items: [{ id: 'q2_21_1', name: 'Quarterly Compliance Report', date: 'Last updated: Jul 25, 2021' }] },
+                // Quarterly archive entries are populated from the backend
+                // once a generated report is persisted. Empty until then.
             ];
 
             const SECTIONS_LIST = [
@@ -928,10 +922,221 @@ export default function Vessels() {
                 }
             };
 
-            if (reportStep === 0 || reportStep === 1) {
+            // ── Step 0: NEW tabbed landing (Standard / Quarterly / Custom) ──
+            // Replaces the long stack of collapsed accordions. Step 1 still
+            // uses the legacy accordion+form rendering below — but filtered
+            // to only the selected category so the screen feels like a
+            // single config card instead of 21 stacked sections.
+            if (reportStep === 0) {
+                const adhocCat = reportCategories.find((c) => c.id === 'adhoc');
+                const standardItems = adhocCat?.items ?? [];
+
+                // Group quarterly categories by year, newest year first.
+                const quarterlyGrouped: Record<string, typeof reportCategories> = {};
+                reportCategories.forEach((cat) => {
+                    if (cat.id === 'adhoc') return;
+                    const yearMatch = cat.title.match(/(\d{4})/);
+                    if (!yearMatch) return;
+                    const year = yearMatch[1];
+                    if (!quarterlyGrouped[year]) quarterlyGrouped[year] = [];
+                    quarterlyGrouped[year].push(cat);
+                });
+                const quarterlyByYear = Object.keys(quarterlyGrouped)
+                    .sort((a, b) => Number(b) - Number(a))
+                    .map((year) => ({ year, quarters: quarterlyGrouped[year] }));
+
+                // Brief description for each Ad Hoc report.
+                const standardDescriptions: Record<string, string> = {
+                    summary: 'High-level snapshot of regulatory compliance, certification status, and outstanding action items.',
+                    inventory: 'Full breakdown of every mapped material across all decks, with IHM Part classification and quantities.',
+                    hazmat: 'Vessel-wide hazardous materials overview — totals by category, threshold flags, and risk hot-spots.',
+                };
+
+                const startGenerate = (catId: string, itemName: string) => {
+                    setSelectedReportType(itemName);
+                    setSelectedReportCategory(catId);
+                    setReportStep(1);
+                };
+
+                return (
+                    <div className="reports-landing-v2">
+                        {/* Hero header card */}
+                        <div className="reports-hero-card">
+                            <div className="reports-hero-icon">
+                                <BarChart2 size={26} />
+                            </div>
+                            <div className="reports-hero-text">
+                                <h1>Reports &amp; Analytics</h1>
+                                <p>
+                                    Generate compliance, inventory, and quarterly reports for{' '}
+                                    <strong>{vesselDisplayName}</strong>.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="reports-tabs">
+                            <button
+                                type="button"
+                                className={activeReportTab === 'standard' ? 'active' : ''}
+                                onClick={() => setActiveReportTab('standard')}
+                            >
+                                Standard Reports
+                                <span className="tab-count">{standardItems.length}</span>
+                            </button>
+                            <button
+                                type="button"
+                                className={activeReportTab === 'quarterly' ? 'active' : ''}
+                                onClick={() => setActiveReportTab('quarterly')}
+                            >
+                                Quarterly Archive
+                                {quarterlyByYear.length > 0 && (
+                                    <span className="tab-count">
+                                        {quarterlyByYear.reduce((acc, g) => acc + g.quarters.length, 0)}
+                                    </span>
+                                )}
+                            </button>
+                            <button
+                                type="button"
+                                className={activeReportTab === 'custom' ? 'active' : ''}
+                                onClick={() => setActiveReportTab('custom')}
+                            >
+                                Custom
+                            </button>
+                        </div>
+
+                        {/* Standard Reports — card grid */}
+                        {activeReportTab === 'standard' && (
+                            <div className="report-cards-grid">
+                                {standardItems.map((item) => (
+                                    <div className="report-card-v2" key={item.id}>
+                                        <div className="report-card-icon">
+                                            <FileText size={22} />
+                                        </div>
+                                        <div className="report-card-body">
+                                            <h3>{item.name}</h3>
+                                            <p>{standardDescriptions[item.id] ?? 'Standard compliance report.'}</p>
+                                            {item.date ? (
+                                                <span className="report-card-meta">{item.date}</span>
+                                            ) : (
+                                                <span className="report-card-meta muted">Not yet generated</span>
+                                            )}
+                                        </div>
+                                        <div className="report-card-actions">
+                                            <button
+                                                type="button"
+                                                className="report-btn-primary full"
+                                                onClick={() => startGenerate('adhoc', item.name)}
+                                            >
+                                                <RotateCw size={14} /> Generate Report
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Quarterly Archive — populated from real generated
+                            reports once that table exists; empty state until then. */}
+                        {activeReportTab === 'quarterly' && (
+                            quarterlyByYear.length > 0 ? (
+                                <div className="quarterly-archive">
+                                    {quarterlyByYear.map(({ year, quarters }) => (
+                                        <div className="year-group" key={year}>
+                                            <div className="year-group-header">
+                                                <Calendar size={14} />
+                                                <span className="year-label">{year}</span>
+                                                <span className="year-count">{quarters.length} reports</span>
+                                            </div>
+                                            <div className="year-quarters">
+                                                {quarters.map((q) => {
+                                                    const item = q.items[0];
+                                                    const range = q.title.match(/\(([^)]+)\)/)?.[1] ?? '';
+                                                    const label = q.title.split(' ')[0];
+                                                    return (
+                                                        <div className="quarter-row" key={q.id}>
+                                                            <div className="quarter-info">
+                                                                <strong>{label}</strong>
+                                                                <span>{range}</span>
+                                                            </div>
+                                                            <div className="quarter-meta">{item.date}</div>
+                                                            <div className="quarter-actions">
+                                                                <button
+                                                                    type="button"
+                                                                    className="report-btn-mini primary"
+                                                                    onClick={() => startGenerate(q.id, item.name)}
+                                                                >
+                                                                    <RotateCw size={12} /> Generate
+                                                                </button>
+                                                                <button type="button" className="report-btn-mini">
+                                                                    <Download size={12} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="reports-empty-state">
+                                    <div className="reports-empty-icon">
+                                        <Calendar size={28} />
+                                    </div>
+                                    <h3>No quarterly reports yet</h3>
+                                    <p>
+                                        Once you generate a report for a quarter, it will be archived here so the team
+                                        can re-download it later.
+                                    </p>
+                                </div>
+                            )
+                        )}
+
+                        {/* Custom — date range builder placeholder */}
+                        {activeReportTab === 'custom' && (
+                            <div className="custom-report-panel">
+                                <div className="custom-report-icon">
+                                    <FileText size={28} />
+                                </div>
+                                <h3>Build a custom report</h3>
+                                <p>
+                                    Pick a date range, choose the sections you want included, and generate a one-off report
+                                    outside the standard quarterly cadence.
+                                </p>
+                                <button
+                                    type="button"
+                                    className="report-btn-primary"
+                                    onClick={() => startGenerate('adhoc', 'Custom Report')}
+                                >
+                                    <RotateCw size={14} /> Configure custom report
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            // ── Step 1: legacy single-accordion config form (filtered) ──
+            // Show only the selected category as an expanded card with a
+            // back link, so the screen reads as one focused config panel
+            // instead of the full landing list.
+            if (reportStep === 1) {
+                const visibleCategories = reportCategories.filter((c) => c.id === selectedReportCategory);
                 return (
                     <div className="reports-accordion-wrapper" ref={scrollContainerRef}>
-                        {reportCategories.map((cat) => {
+                        <button
+                            type="button"
+                            className="reports-back-link"
+                            onClick={() => {
+                                setReportStep(0);
+                                setSelectedReportCategory(null);
+                            }}
+                        >
+                            <ChevronLeft size={16} /> Back to Reports
+                        </button>
+                        <div className="legacy-accordion-frame">
+                        {visibleCategories.map((cat) => {
                             const isCategoryConfiguring = reportStep === 1 && selectedReportCategory === cat.id;
                             // Only expand if it's the selected category. ADHOC is no longer forced open.
                             const isExpanded = selectedReportCategory === cat.id;
@@ -1106,6 +1311,7 @@ export default function Vessels() {
                                 </div>
                             );
                         })}
+                        </div>
                     </div>
                 );
             }
