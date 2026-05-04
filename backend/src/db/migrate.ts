@@ -313,6 +313,99 @@ CREATE TABLE IF NOT EXISTS "role_permissions" (
   PRIMARY KEY (role_name, node_id)
 );
 
+-- Seed the new flat module-action authorization catalog used by the
+-- /security/authorizations page. 10 module roots + 70 leaf nodes
+-- (one per Module x Action combination). Coexists with any legacy
+-- per-screen nodes (ship_view / ship_add / ...) that older grants
+-- may still reference; nothing here deletes or supersedes those.
+INSERT INTO "permission_nodes" (id, label, parent_id, sort_order) VALUES
+  ('mod_vessels',          'Vessels',           NULL, 10),
+  ('mod_materials',        'Materials Record',  NULL, 20),
+  ('mod_decks',            'Decks',             NULL, 30),
+  ('mod_documents',        'Documents',         NULL, 40),
+  ('mod_purchase_orders',  'Purchase Orders',   NULL, 50),
+  ('mod_audits',           'Audits',            NULL, 60),
+  ('mod_reports',          'Reports',           NULL, 70),
+  ('mod_certificate',      'IHM Certificate',   NULL, 80),
+  ('mod_settings',         'Settings',          NULL, 90),
+  ('mod_security',         'Security',          NULL, 100)
+ON CONFLICT (id) DO NOTHING;
+
+-- Action leaves. The 7 actions are: create, read, update, delete, print, export, send.
+-- Generating each row explicitly keeps the SQL boring & greppable.
+INSERT INTO "permission_nodes" (id, label, parent_id, sort_order) VALUES
+  ('vessels_create',          'Create', 'mod_vessels',         1),
+  ('vessels_read',            'Read',   'mod_vessels',         2),
+  ('vessels_update',          'Update', 'mod_vessels',         3),
+  ('vessels_delete',          'Delete', 'mod_vessels',         4),
+  ('vessels_print',           'Print',  'mod_vessels',         5),
+  ('vessels_export',          'Export', 'mod_vessels',         6),
+  ('vessels_send',            'Send',   'mod_vessels',         7),
+  ('materials_create',        'Create', 'mod_materials',       1),
+  ('materials_read',          'Read',   'mod_materials',       2),
+  ('materials_update',        'Update', 'mod_materials',       3),
+  ('materials_delete',        'Delete', 'mod_materials',       4),
+  ('materials_print',         'Print',  'mod_materials',       5),
+  ('materials_export',        'Export', 'mod_materials',       6),
+  ('materials_send',          'Send',   'mod_materials',       7),
+  ('decks_create',            'Create', 'mod_decks',           1),
+  ('decks_read',              'Read',   'mod_decks',           2),
+  ('decks_update',            'Update', 'mod_decks',           3),
+  ('decks_delete',            'Delete', 'mod_decks',           4),
+  ('decks_print',             'Print',  'mod_decks',           5),
+  ('decks_export',            'Export', 'mod_decks',           6),
+  ('decks_send',              'Send',   'mod_decks',           7),
+  ('documents_create',        'Create', 'mod_documents',       1),
+  ('documents_read',          'Read',   'mod_documents',       2),
+  ('documents_update',        'Update', 'mod_documents',       3),
+  ('documents_delete',        'Delete', 'mod_documents',       4),
+  ('documents_print',         'Print',  'mod_documents',       5),
+  ('documents_export',        'Export', 'mod_documents',       6),
+  ('documents_send',          'Send',   'mod_documents',       7),
+  ('purchase_orders_create',  'Create', 'mod_purchase_orders', 1),
+  ('purchase_orders_read',    'Read',   'mod_purchase_orders', 2),
+  ('purchase_orders_update',  'Update', 'mod_purchase_orders', 3),
+  ('purchase_orders_delete',  'Delete', 'mod_purchase_orders', 4),
+  ('purchase_orders_print',   'Print',  'mod_purchase_orders', 5),
+  ('purchase_orders_export',  'Export', 'mod_purchase_orders', 6),
+  ('purchase_orders_send',    'Send',   'mod_purchase_orders', 7),
+  ('audits_create',           'Create', 'mod_audits',          1),
+  ('audits_read',             'Read',   'mod_audits',          2),
+  ('audits_update',           'Update', 'mod_audits',          3),
+  ('audits_delete',           'Delete', 'mod_audits',          4),
+  ('audits_print',            'Print',  'mod_audits',          5),
+  ('audits_export',           'Export', 'mod_audits',          6),
+  ('audits_send',             'Send',   'mod_audits',          7),
+  ('reports_create',          'Create', 'mod_reports',         1),
+  ('reports_read',            'Read',   'mod_reports',         2),
+  ('reports_update',          'Update', 'mod_reports',         3),
+  ('reports_delete',          'Delete', 'mod_reports',         4),
+  ('reports_print',           'Print',  'mod_reports',         5),
+  ('reports_export',          'Export', 'mod_reports',         6),
+  ('reports_send',            'Send',   'mod_reports',         7),
+  ('certificate_create',      'Create', 'mod_certificate',     1),
+  ('certificate_read',        'Read',   'mod_certificate',     2),
+  ('certificate_update',      'Update', 'mod_certificate',     3),
+  ('certificate_delete',      'Delete', 'mod_certificate',     4),
+  ('certificate_print',       'Print',  'mod_certificate',     5),
+  ('certificate_export',      'Export', 'mod_certificate',     6),
+  ('certificate_send',        'Send',   'mod_certificate',     7),
+  ('settings_create',         'Create', 'mod_settings',        1),
+  ('settings_read',           'Read',   'mod_settings',        2),
+  ('settings_update',         'Update', 'mod_settings',        3),
+  ('settings_delete',         'Delete', 'mod_settings',        4),
+  ('settings_print',          'Print',  'mod_settings',        5),
+  ('settings_export',         'Export', 'mod_settings',        6),
+  ('settings_send',           'Send',   'mod_settings',        7),
+  ('security_create',         'Create', 'mod_security',        1),
+  ('security_read',           'Read',   'mod_security',        2),
+  ('security_update',         'Update', 'mod_security',        3),
+  ('security_delete',         'Delete', 'mod_security',        4),
+  ('security_print',          'Print',  'mod_security',        5),
+  ('security_export',         'Export', 'mod_security',        6),
+  ('security_send',           'Send',   'mod_security',        7)
+ON CONFLICT (id) DO NOTHING;
+
 -- Suppliers master table
 CREATE TABLE IF NOT EXISTS "suppliers" (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -437,6 +530,28 @@ ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS sdoc_received_at TIME
 ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 ALTER TABLE "clarification_items" ADD COLUMN IF NOT EXISTS reviewed_by VARCHAR(255);
 
+-- Generated reports — one row per PDF the user produces. The Quarterly
+-- Archive tab reads from this; the file_path points at the cached PDF
+-- so re-download is instant. file_path is null while a generation is
+-- in flight (status='generating') and gets filled when the renderer
+-- finishes.
+CREATE TABLE IF NOT EXISTS "reports" (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vessel_id       UUID NOT NULL REFERENCES "vessels"(id) ON DELETE CASCADE,
+  report_type     VARCHAR(50) NOT NULL, -- 'compliance', 'inventory', 'hazmat', 'quarterly'
+  period_label    VARCHAR(64),          -- e.g. 'Q4 2025' or 'Ad Hoc 2026-04-30'
+  period_start    DATE,
+  period_end      DATE,
+  status          VARCHAR(20) NOT NULL DEFAULT 'generating', -- generating|ready|failed
+  file_name       VARCHAR(255),
+  file_path       VARCHAR(500),
+  file_size       INTEGER,
+  generated_by    VARCHAR(255),
+  error_message   TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_vessels_created_by ON "vessels"(created_by_id);
 CREATE INDEX IF NOT EXISTS idx_ga_plans_vessel ON "ga_plans"(vessel_id);
@@ -467,6 +582,9 @@ CREATE INDEX IF NOT EXISTS idx_clarif_public_token ON "clarification_requests"(p
 CREATE INDEX IF NOT EXISTS idx_audit_lines_audit ON "audit_line_items"(audit_id);
 CREATE INDEX IF NOT EXISTS idx_audit_lines_vessel ON "audit_line_items"(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_audit_lines_po ON "audit_line_items"(po_number);
+CREATE INDEX IF NOT EXISTS idx_reports_vessel ON "reports"(vessel_id);
+CREATE INDEX IF NOT EXISTS idx_reports_type ON "reports"(report_type);
+CREATE INDEX IF NOT EXISTS idx_reports_period ON "reports"(period_start, period_end);
 
 -- Backfill (idempotent, safe for fresh uploads):
 -- Audits that were transitioned to 'In Progress' by the old send-mail code

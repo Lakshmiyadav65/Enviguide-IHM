@@ -26,6 +26,7 @@ import UserRights from '../pages/settings/UserRights';
 import Users from '../pages/settings/Users';
 import UserRoleRights from '../pages/settings/UserRoleRights';
 import UserCategory from '../pages/settings/UserCategory';
+import Authorizations from '../pages/security/Authorizations';
 import Contact from '../pages/cms/Contact';
 import SupplierUpload from '../pages/public/SupplierUpload';
 
@@ -64,6 +65,7 @@ export const AppRoutes = () => {
         <Route path="/security/user-rights" element={<UserRights />} />
         <Route path="/security/user-role-rights" element={<UserRoleRights />} />
         <Route path="/security/user-category" element={<UserCategory />} />
+        <Route path="/security/authorizations" element={<Authorizations />} />
         <Route path="/master-data" element={<Dashboard />} />
         <Route path="/inventory" element={<Dashboard />} />
         <Route path="/menu/registered" element={<Registered />} />

@@ -51,6 +51,15 @@ export const ENDPOINTS = {
     UPLOAD_BULK: '/purchase-orders/upload-bulk',
   },
 
+  // Reports (nested under a vessel)
+  REPORTS: {
+    LIST: (vesselId: string) => `/vessels/${vesselId}/reports`,
+    DOWNLOAD: (vesselId: string, type: string) =>
+      `/vessels/${vesselId}/reports/${type}/download`,
+    FILE: (vesselId: string, reportId: string) =>
+      `/vessels/${vesselId}/reports/file/${reportId}`,
+  },
+
   // Materials / IHM (nested under a vessel)
   MATERIALS: {
     LIST: (vesselId: string) => `/vessels/${vesselId}/materials`,
@@ -100,6 +109,22 @@ export const ENDPOINTS = {
     USER_ROLE_RIGHTS: '/security/user-role-rights',
     USER_CATEGORIES: '/security/user-categories',
     USER_MENU: '/security/user-menu',
+  },
+
+  // Users (admin) — what the Authorizations page reads to populate the
+  // user picker. The /security/* aliases above are stubs; this is the
+  // real list endpoint backed by the users table.
+  USERS: {
+    LIST: '/users',
+    DETAIL: (id: string) => `/users/${id}`,
+  },
+
+  // Permissions / Authorizations
+  PERMISSIONS: {
+    NODES: '/permissions/nodes',
+    ROLES: '/permissions/roles',
+    ROLE: (name: string) => `/permissions/roles/${encodeURIComponent(name)}`,
+    USER: (id: string) => `/permissions/users/${id}`,
   },
 
   // Master Data

@@ -89,11 +89,7 @@ const menuItems: MenuItem[] = [
         label: 'Security',
         children: [
             { path: '/security/users', label: 'Users' },
-            { path: '/security/user-profile', label: 'User Profile' },
-            { path: '/security/user-menu', label: 'User Menu' },
-            { path: '/security/user-rights', label: 'User Rights' },
-            { path: '/security/user-role-rights', label: 'User Role Rights' },
-            { path: '/security/user-category', label: 'User Category' },
+            { path: '/security/authorizations', label: 'Authorizations' },
         ]
     },
     { path: '/contact', icon: Mail, label: 'Contact Us' },
