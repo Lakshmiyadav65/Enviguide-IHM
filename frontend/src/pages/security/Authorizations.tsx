@@ -9,11 +9,12 @@
 // "vessels_create" / "audits_send" — seeded by the migration.
 
 import { useEffect, useMemo, useState } from 'react';
-import { Shield, RefreshCw, Save, Check, ShieldCheck } from 'lucide-react';
+import { Shield, RefreshCw, Save, Check, ShieldCheck, UserPlus, X } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { api } from '../../lib/apiClient';
 import { ENDPOINTS } from '../../config/api.config';
+import { useAuth } from '../../contexts/AuthContext';
 import './Authorizations.css';
 
 // ─── Catalog ────────────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ type Tab = 'user' | 'role';
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function Authorizations() {
+  const { user: me, refresh: refreshAuth } = useAuth();
   const [tab, setTab] = useState<Tab>('user');
 
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -83,6 +85,66 @@ export default function Authorizations() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+
+  // Add Ship Manager modal
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [smForm, setSmForm] = useState({
+    name: '', email: '', phone: '', country: '', password: '', confirmPassword: '',
+  });
+  const [smError, setSmError] = useState<string | null>(null);
+  const [smSaving, setSmSaving] = useState(false);
+
+  const resetSmForm = () => {
+    setSmForm({ name: '', email: '', phone: '', country: '', password: '', confirmPassword: '' });
+    setSmError(null);
+  };
+
+  const submitShipManager = async () => {
+    setSmError(null);
+    const { name, email, password, confirmPassword } = smForm;
+    if (!name.trim() || !email.trim() || !password) {
+      setSmError('Name, email and password are required.');
+      return;
+    }
+    if (password.length < 6) {
+      setSmError('Password must be at least 6 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setSmError('Passwords do not match.');
+      return;
+    }
+    setSmSaving(true);
+    try {
+      const res = await api.post<{ success: boolean; data: UserRow }>(ENDPOINTS.USERS.LIST, {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        phone: smForm.phone.trim() || undefined,
+        country: smForm.country.trim() || undefined,
+        category: 'Ship Manager',
+        roleName: 'ship_manager',
+        status: 'active',
+      });
+      const created = res.data;
+      // Re-pull users so the new row shows up in the picker, then jump
+      // straight to it on the User Permissions tab — admin can tick
+      // permissions immediately and Save without context-switching.
+      const list = await api.get<{ success: boolean; data: UserRow[] }>(ENDPOINTS.USERS.LIST).catch(() => ({ data: [] as UserRow[] }));
+      if (Array.isArray(list.data)) setUsers(list.data);
+      setTab('user');
+      setSelectedRole('ship_manager');
+      setSelectedUserId(created.id);
+      setShowAddModal(false);
+      resetSmForm();
+      setToast({ kind: 'ok', text: `Ship Manager "${created.name}" created. Tick permissions and Save.` });
+      setTimeout(() => setToast(null), 3500);
+    } catch (err) {
+      setSmError((err as Error).message || 'Failed to create Ship Manager');
+    } finally {
+      setSmSaving(false);
+    }
+  };
 
   // ── Load users + roles once ────────────────────────────────────────────────
   useEffect(() => {
@@ -219,6 +281,10 @@ export default function Authorizations() {
       const final = [...legacy, ...granted];
       await api.put(path, { nodeIds: final });
       setInitialGranted(new Set(granted));
+      // If the admin just edited their own grants (or their own role's grants),
+      // re-fetch /auth/me so the sidebar gating updates without a relog.
+      const editingSelf = tab === 'user' && me && selectedUserId === me.id;
+      if (editingSelf) await refreshAuth();
       setToast({ kind: 'ok', text: 'Saved' });
     } catch (err) {
       setToast({ kind: 'err', text: (err as Error).message || 'Save failed' });
@@ -246,6 +312,9 @@ export default function Authorizations() {
             <p>Manage roles and module-level access permissions</p>
           </div>
           <div className="auth-hero-actions">
+            <button type="button" className="auth-btn outline" onClick={() => { resetSmForm(); setShowAddModal(true); }}>
+              <UserPlus size={15} /> Add Ship Manager
+            </button>
             <button type="button" className="auth-btn ghost" onClick={refresh} disabled={!isDirty || saving}>
               <RefreshCw size={15} /> Refresh
             </button>
@@ -412,6 +481,106 @@ export default function Authorizations() {
 
         {toast && (
           <div className={`auth-toast ${toast.kind}`}>{toast.text}</div>
+        )}
+
+        {/* ── Add Ship Manager modal ─────────────────────────────────────── */}
+        {showAddModal && (
+          <div className="sm-modal-overlay" onClick={() => !smSaving && setShowAddModal(false)}>
+            <div className="sm-modal" onClick={(e) => e.stopPropagation()}>
+              <header className="sm-modal-header">
+                <div className="sm-modal-title">
+                  <UserPlus size={20} />
+                  <div>
+                    <h3>Add Ship Manager</h3>
+                    <p>Create the account, then grant module permissions on the matrix.</p>
+                  </div>
+                </div>
+                <button type="button" className="sm-modal-close" onClick={() => !smSaving && setShowAddModal(false)} aria-label="Close">
+                  <X size={18} />
+                </button>
+              </header>
+
+              <div className="sm-modal-body">
+                <div className="sm-row sm-row-2">
+                  <div className="sm-field">
+                    <label>Full Name <span className="sm-required">*</span></label>
+                    <input
+                      type="text"
+                      value={smForm.name}
+                      onChange={(e) => setSmForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="e.g. Frank Shaw"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="sm-field">
+                    <label>Email <span className="sm-required">*</span></label>
+                    <input
+                      type="email"
+                      value={smForm.email}
+                      onChange={(e) => setSmForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="manager@company.com"
+                    />
+                  </div>
+                </div>
+                <div className="sm-row sm-row-2">
+                  <div className="sm-field">
+                    <label>Phone</label>
+                    <input
+                      type="tel"
+                      value={smForm.phone}
+                      onChange={(e) => setSmForm((f) => ({ ...f, phone: e.target.value }))}
+                      placeholder="+91 9876543210"
+                    />
+                  </div>
+                  <div className="sm-field">
+                    <label>Country</label>
+                    <input
+                      type="text"
+                      value={smForm.country}
+                      onChange={(e) => setSmForm((f) => ({ ...f, country: e.target.value }))}
+                      placeholder="India"
+                    />
+                  </div>
+                </div>
+                <div className="sm-row sm-row-2">
+                  <div className="sm-field">
+                    <label>Temporary Password <span className="sm-required">*</span></label>
+                    <input
+                      type="password"
+                      value={smForm.password}
+                      onChange={(e) => setSmForm((f) => ({ ...f, password: e.target.value }))}
+                      placeholder="At least 6 characters"
+                    />
+                  </div>
+                  <div className="sm-field">
+                    <label>Confirm Password <span className="sm-required">*</span></label>
+                    <input
+                      type="password"
+                      value={smForm.confirmPassword}
+                      onChange={(e) => setSmForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                      placeholder="Re-enter password"
+                    />
+                  </div>
+                </div>
+
+                <p className="sm-hint">
+                  The Ship Manager will receive no email — share the email + temporary
+                  password with them directly. They can change it once logged in.
+                </p>
+
+                {smError && <div className="sm-error">{smError}</div>}
+              </div>
+
+              <footer className="sm-modal-footer">
+                <button type="button" className="auth-btn ghost" onClick={() => setShowAddModal(false)} disabled={smSaving}>
+                  Cancel
+                </button>
+                <button type="button" className="auth-btn primary" onClick={submitShipManager} disabled={smSaving}>
+                  <UserPlus size={15} /> {smSaving ? 'Creating…' : 'Create Ship Manager'}
+                </button>
+              </footer>
+            </div>
+          </div>
         )}
       </main>
     </div>

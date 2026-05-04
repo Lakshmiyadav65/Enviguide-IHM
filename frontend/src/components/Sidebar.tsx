@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -13,17 +13,26 @@ import {
     Menu as MenuIcon,
     Lock
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import './Sidebar.css';
+
+interface MenuChild {
+    path: string;
+    label: string;
+    icon?: any;
+    /** Permission node id required to see this child. Omit for public items. */
+    requires?: string;
+}
 
 interface MenuItem {
     path: string;
     icon: any;
     label: string;
-    children?: {
-        path: string;
-        label: string;
-        icon?: any;
-    }[];
+    /** Permission required to see a leaf menu item. Parents with children
+     *  inherit visibility from their children — they show up if any child
+     *  is visible to the user, regardless of this field. */
+    requires?: string;
+    children?: MenuChild[];
 }
 
 /**
@@ -46,6 +55,9 @@ function matchesChildRoute(childPath: string, currentPath: string): boolean {
     return alias ? alias(currentPath) : false;
 }
 
+// Permission map — every gated route below points at one of the node ids
+// seeded by the backend migration (vessels_read, audits_read, etc.).
+// Items without `requires` are visible to everyone (e.g. Dashboard, Contact).
 const menuItems: MenuItem[] = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Admin Dashboard' },
     {
@@ -53,9 +65,9 @@ const menuItems: MenuItem[] = [
         icon: Ship,
         label: 'Vessel',
         children: [
-            { path: '/vessels/ship', icon: Ship, label: 'Ship' },
-            { path: '/vessels/fleet', icon: Layers, label: 'Fleet' },
-            { path: '/vessels/sub-fleet', icon: Layers, label: 'Sub Fleet' },
+            { path: '/vessels/ship', icon: Ship, label: 'Ship', requires: 'vessels_read' },
+            { path: '/vessels/fleet', icon: Layers, label: 'Fleet', requires: 'vessels_read' },
+            { path: '/vessels/sub-fleet', icon: Layers, label: 'Sub Fleet', requires: 'vessels_read' },
         ]
     },
     {
@@ -63,13 +75,13 @@ const menuItems: MenuItem[] = [
         icon: MenuIcon,
         label: 'Menu',
         children: [
-            { path: '/menu/registered', label: 'Registered' },
-            { path: '/menu/ownership', label: 'Ownership' },
-            { path: '/menu/ownership-manager', label: 'Ownership Manager' },
-            { path: '/menu/supplier', label: 'Supplier' },
-            { path: '/menu/equipment', label: 'Equipment' },
-            { path: '/menu/suspended', label: 'Suspended' },
-            { path: '/menu/suspected-keyword', label: 'Suspected Keyword' },
+            { path: '/menu/registered', label: 'Registered', requires: 'vessels_read' },
+            { path: '/menu/ownership', label: 'Ownership', requires: 'vessels_read' },
+            { path: '/menu/ownership-manager', label: 'Ownership Manager', requires: 'vessels_read' },
+            { path: '/menu/supplier', label: 'Supplier', requires: 'settings_read' },
+            { path: '/menu/equipment', label: 'Equipment', requires: 'settings_read' },
+            { path: '/menu/suspended', label: 'Suspended', requires: 'audits_read' },
+            { path: '/menu/suspected-keyword', label: 'Suspected Keyword', requires: 'settings_read' },
         ]
     },
     {
@@ -77,10 +89,10 @@ const menuItems: MenuItem[] = [
         icon: Settings,
         label: 'Administration',
         children: [
-            { path: '/administration/upload-po', icon: Upload, label: 'Upload Purchase Order' },
-            { path: '/administration/pending-audits', icon: FileText, label: 'Pending Audits' },
-            { path: '/administration/pending-reviews', icon: FileText, label: 'Pending Reviews' },
-            { path: '/administration/md-sdoc-audit', icon: FileText, label: 'MD SDOC Audit Pending' },
+            { path: '/administration/upload-po', icon: Upload, label: 'Upload Purchase Order', requires: 'purchase_orders_create' },
+            { path: '/administration/pending-audits', icon: FileText, label: 'Pending Audits', requires: 'audits_read' },
+            { path: '/administration/pending-reviews', icon: FileText, label: 'Pending Reviews', requires: 'audits_read' },
+            { path: '/administration/md-sdoc-audit', icon: FileText, label: 'MD SDOC Audit Pending', requires: 'audits_read' },
         ]
     },
     {
@@ -88,8 +100,8 @@ const menuItems: MenuItem[] = [
         icon: Lock,
         label: 'Security',
         children: [
-            { path: '/security/users', label: 'Users' },
-            { path: '/security/authorizations', label: 'Authorizations' },
+            { path: '/security/users', label: 'Users', requires: 'security_read' },
+            { path: '/security/authorizations', label: 'Authorizations', requires: 'security_read' },
         ]
     },
     { path: '/contact', icon: Mail, label: 'Contact Us' },
@@ -97,20 +109,51 @@ const menuItems: MenuItem[] = [
 
 export default function Sidebar() {
     const location = useLocation();
+    const { hasPermission, user } = useAuth();
     const [expandedItem, setExpandedItem] = useState<string>('');
     const [activeFocus, setActiveFocus] = useState<string | null>(null);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
 
+    // Filter the menu against the current user's permissions.
+    //
+    // Three bypass cases — when ANY of them holds, show the full menu:
+    //   1. No user yet (initial render, or auth still loading).
+    //   2. user.isAdmin === true (admin / superadmin / manager).
+    //   3. user.permissions is empty — this is the "legacy" state for
+    //      every account that pre-dates the Authorizations feature, or
+    //      whose grants haven't been edited yet. Filtering them would
+    //      hide the entire app on first login, which is wrong.
+    //
+    // The matrix only takes effect once an admin has explicitly clicked
+    // Save with a non-empty permission set, which is the natural moment
+    // a user becomes "scoped". Until then, behaviour matches what
+    // existed before this feature shipped.
+    const visibleMenu = useMemo<MenuItem[]>(() => {
+        if (!user) return menuItems;
+        if (user.isAdmin) return menuItems;
+        if (!user.permissions || user.permissions.length === 0) return menuItems;
+        const out: MenuItem[] = [];
+        for (const item of menuItems) {
+            if (item.children && item.children.length > 0) {
+                const kids = item.children.filter((c) => !c.requires || hasPermission(c.requires));
+                if (kids.length > 0) out.push({ ...item, children: kids });
+            } else if (!item.requires || hasPermission(item.requires)) {
+                out.push(item);
+            }
+        }
+        return out;
+    }, [user, hasPermission]);
+
     useEffect(() => {
         const currentPath = location.pathname;
-        const parentItem = menuItems.find(item =>
+        const parentItem = visibleMenu.find(item =>
             item.children?.some(child => matchesChildRoute(child.path, currentPath)),
         );
         if (parentItem) {
             setExpandedItem(parentItem.label);
         }
-    }, [location.pathname]);
+    }, [location.pathname, visibleMenu]);
 
     const toggleSubmenu = (label: string) => {
         if (isCollapsed) {
@@ -156,7 +199,7 @@ export default function Sidebar() {
             </div>
 
             <nav className="sidebar-nav">
-                {menuItems.map((item) => {
+                {visibleMenu.map((item) => {
                     const isExpanded = expandedItem === item.label;
                     const hasChildren = !!(item.children && item.children.length > 0);
                     const isOnChildRoute = hasChildren && item.children?.some(child => matchesChildRoute(child.path, location.pathname));

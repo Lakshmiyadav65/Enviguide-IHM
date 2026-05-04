@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { AuthService } from '../services/auth.service.js';
+import { PermissionService } from '../services/permission.service.js';
 import { createError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
 import type { AuthPayload } from '../middleware/auth.middleware.js';
@@ -13,10 +14,10 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       return next(createError('Email and password are required', 400));
     }
 
-    // Only @enviguide.com emails are allowed
-    if (!email.endsWith('@enviguide.com')) {
-      return next(createError('Access restricted to @enviguide.com accounts only', 403));
-    }
+    // Authorization is enforced by the database (the user must exist and be
+    // active). The previous @enviguide.com email gate blocked admin-created
+    // Ship Manager accounts that legitimately use other domains, so it's
+    // gone — DB lookup + status === 'active' is the real gate.
 
     const user = await AuthService.findUserByEmail(email);
     if (!user) {
@@ -91,6 +92,30 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
       return next(createError('User not found', 404));
     }
 
+    // Effective permissions = direct user grants ∪ role grants. The Authorizations
+    // page edits both buckets; the frontend treats their union as the truth.
+    const userPerms = await PermissionService.getUserPermissions(user.id);
+    let rolePerms: string[] = [];
+    const roleName = (user as { role_name?: string | null }).role_name;
+    if (roleName) {
+      rolePerms = await PermissionService.getRolePermissions(roleName).catch(() => []);
+    }
+    const effective = Array.from(new Set([...userPerms, ...rolePerms]));
+
+    // 'isAdmin' bypasses the permission check on the frontend — admin /
+    // superadmin / manager users see everything regardless of grants.
+    // We check both `category` (the legacy field that holds 'admin' /
+    // 'manager' / 'viewer' or display strings like 'Admin User') and
+    // `role_name` (the new field set when an admin assigns a role).
+    // Anything containing 'admin' or 'manager' counts — generous on
+    // purpose so we don't accidentally hide the entire UI from an
+    // admin whose category was set by a different code path.
+    const cat  = (user.category || '').toLowerCase();
+    const role = (roleName || '').toLowerCase();
+    const isAdminTag = (s: string) =>
+      s.includes('admin') || s === 'superadmin' || s === 'manager';
+    const isAdmin = isAdminTag(cat) || isAdminTag(role);
+
     res.json({
       success: true,
       data: {
@@ -98,9 +123,12 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
         name: user.name,
         email: user.email,
         role: user.category,
+        roleName: roleName ?? null,
         phone: user.phone,
         country: user.country,
         status: user.status,
+        isAdmin,
+        permissions: effective,
       },
     });
   } catch (err) {
