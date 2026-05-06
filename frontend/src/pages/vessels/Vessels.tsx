@@ -145,29 +145,6 @@ export default function Vessels() {
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    // Pull the Quarterly Archive timeline whenever the user opens the
-    // Quarterly tab on a vessel. One entry per calendar quarter from
-    // the vessel's onboarding date through today's quarter, with the
-    // matching report row attached when one exists.
-    useEffect(() => {
-        if (activeTab !== 'reports' || activeReportTab !== 'quarterly') return;
-        const vId = activeVesselData?.id;
-        if (!vId) { setQuarterlyTimeline([]); return; }
-        let cancelled = false;
-        setQuarterlyLoading(true);
-        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
-        const token = localStorage.getItem('ihm_token') || '';
-        fetch(`${base}/vessels/${vId}/reports/quarterly/timeline`, {
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-        })
-            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`Failed (${r.status})`))))
-            .then((j) => { if (!cancelled && Array.isArray(j?.data)) setQuarterlyTimeline(j.data); })
-            .catch(() => { if (!cancelled) setQuarterlyTimeline([]); })
-            .finally(() => { if (!cancelled) setQuarterlyLoading(false); });
-        return () => { cancelled = true; };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeTab, activeReportTab, activeVesselData?.id, generatingQuarter]);
-
     // Scroll effect for report blurred cards (Accordion cards in Step 0)
     useEffect(() => {
         const handleScroll = () => {
@@ -356,6 +333,32 @@ export default function Vessels() {
             setFormData(activeVesselData);
         }
     }, [activeVesselData, isEditing, isAdding]);
+
+    // Pull the Quarterly Archive timeline whenever the user opens the
+    // Quarterly tab on a vessel. One entry per calendar quarter from
+    // the vessel's onboarding date through today's quarter, with the
+    // matching report row attached when one exists. Must be declared
+    // AFTER `activeVesselData` so it can reference it without tripping
+    // the temporal-dead-zone — earlier placement white-screened the
+    // whole page on first render.
+    useEffect(() => {
+        if (activeTab !== 'reports' || activeReportTab !== 'quarterly') return;
+        const vId = activeVesselData?.id;
+        if (!vId) { setQuarterlyTimeline([]); return; }
+        let cancelled = false;
+        setQuarterlyLoading(true);
+        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+        const token = localStorage.getItem('ihm_token') || '';
+        fetch(`${base}/vessels/${vId}/reports/quarterly/timeline`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`Failed (${r.status})`))))
+            .then((j) => { if (!cancelled && Array.isArray(j?.data)) setQuarterlyTimeline(j.data); })
+            .catch(() => { if (!cancelled) setQuarterlyTimeline([]); })
+            .finally(() => { if (!cancelled) setQuarterlyLoading(false); });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab, activeReportTab, activeVesselData?.id, generatingQuarter]);
 
     const handleVesselSelect = (vessel: Vessel) => {
         // Switching vessels abandons any in-progress add/edit draft. The
