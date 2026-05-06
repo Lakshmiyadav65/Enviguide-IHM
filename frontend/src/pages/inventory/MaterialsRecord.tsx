@@ -188,6 +188,41 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
         return Object.prototype.hasOwnProperty.call(DEMO_VESSEL_ID_MAP, vesselName);
     }, [vesselId, backendMaterials, vesselName]);
 
+    // ── HOOKS — keep ALL of them above the early returns below.
+    //
+    // React requires the same number of hooks on every render. We have two
+    // early returns further down (Loading and empty-state) and previously
+    // both useMemo's lived AFTER them. The moment a backed vessel finished
+    // loading, the render path stopped early-returning and started calling
+    // those hooks, tripping React's "Rendered more hooks than during the
+    // previous render" rule and white-screening the whole page. Both
+    // useMemo's now live up here so hook count stays constant.
+
+    // Backend-backed vessels show only what the API returned. Demo vessels
+    // (no vesselId) fall back to the static mock list.
+    const vesselSpecificMaterials = useMemo<Material[]>(() => {
+        if (vesselId) return backendMaterials;
+        const demoId = DEMO_VESSEL_ID_MAP[vesselName];
+        if (!demoId) return [];
+        return mockMaterials
+            .map((m) => ({
+                ...m,
+                vesselId: m.vesselId || (m.zone?.includes('Deck') ? '1' : '2'),
+            }))
+            .filter((m) => m.vesselId === demoId);
+    }, [vesselId, vesselName, backendMaterials]);
+
+    const counts = useMemo(() => {
+        return {
+            all: vesselSpecificMaterials.length,
+            part1: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART I').length,
+            part2: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART II').length,
+            part3: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART III').length,
+            nonHaz: vesselSpecificMaterials.filter(m => m.category === 'safe' || m.thresholdMessage === 'Non-Hazardous').length,
+            archived: 0
+        };
+    }, [vesselSpecificMaterials]);
+
     // While the initial fetch is in flight on a backed vessel, hold off on
     // the empty state so we don't flash "No Material Records Found" before
     // the rows arrive.
@@ -289,30 +324,8 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
         );
     }
 
-    // Backend-backed vessels show only what the API returned. Demo vessels
-    // (no vesselId) fall back to the static mock list.
-    const vesselSpecificMaterials = useMemo<Material[]>(() => {
-        if (vesselId) return backendMaterials;
-        const demoId = DEMO_VESSEL_ID_MAP[vesselName];
-        if (!demoId) return [];
-        return mockMaterials
-            .map((m) => ({
-                ...m,
-                vesselId: m.vesselId || (m.zone?.includes('Deck') ? '1' : '2'),
-            }))
-            .filter((m) => m.vesselId === demoId);
-    }, [vesselId, vesselName, backendMaterials]);
-
-    const counts = useMemo(() => {
-        return {
-            all: vesselSpecificMaterials.length,
-            part1: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART I').length,
-            part2: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART II').length,
-            part3: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART III').length,
-            nonHaz: vesselSpecificMaterials.filter(m => m.category === 'safe' || m.thresholdMessage === 'Non-Hazardous').length,
-            archived: 0
-        };
-    }, [vesselSpecificMaterials]);
+    // (vesselSpecificMaterials + counts hoisted above the early returns —
+    // see the long comment higher up for the React hook-ordering reason.)
 
     const filteredMaterials = vesselSpecificMaterials.filter(m => {
         const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
