@@ -46,6 +46,35 @@ export async function renderPdf(html: string, opts: RenderOptions = {}): Promise
   const page = await browser.newPage();
   try {
     await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    // Belt-and-braces: ensure every <img> on the page has actually
+    // decoded before we ask Puppeteer to render the PDF. networkidle0
+    // covers the network side, but a slow decode (or a script that
+    // sets layout based on naturalWidth) can race with the pdf() call
+    // and produce missing images / unsized deck-frame crops.
+    //
+    // After images decode, re-run the deck-crop hook (if the page
+    // registered one) so any frames that missed their `load` event —
+    // e.g. because the image was already cached when the listener
+    // attached — get sized correctly before render.
+    // Runs inside the headless Chromium page — `document`/`window`
+    // are the browser globals, not Node ones. Cast through `any` to
+    // bypass tsconfig's lib:["es2022"] (no DOM types).
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    await page.evaluate(async () => {
+      const d = (globalThis as any).document;
+      const w = (globalThis as any).window;
+      if (d && d.images) {
+        await Promise.all(
+          Array.from(d.images as ArrayLike<{ decode: () => Promise<void> }>).map(
+            (img) => img.decode().catch(() => undefined),
+          ),
+        );
+      }
+      if (w && typeof w.__cropDeckFrames === 'function') w.__cropDeckFrames();
+    });
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+
     const pdf = await page.pdf({
       format: 'A4',
       landscape: opts.landscape ?? false,

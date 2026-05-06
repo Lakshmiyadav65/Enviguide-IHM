@@ -22,6 +22,7 @@ import {
   renderCoverPage,
   renderSpecsPage,
   renderHmMarkedDecksPages,
+  DECK_CROP_SCRIPT,
 } from './quarterly-compliance.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -165,6 +166,7 @@ ${renderSpecsPage(data)}
 ${renderInventorySummaryPage(data)}
 ${renderPerDeckPages(data)}
 ${renderHmMarkedDecksPages(data.materialGroups)}
+${DECK_CROP_SCRIPT}
 </body>
 </html>`;
 }

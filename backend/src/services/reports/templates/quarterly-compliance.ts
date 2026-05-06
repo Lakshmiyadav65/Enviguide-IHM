@@ -196,77 +196,57 @@ function renderMaterialTable(group: MaterialGroup, startNo = 1): string {
 }
 
 // ─── HM Marked Decks pages ────────────────────────────────────────────────
-// One page per GA plan (= per deck). Each page shows the plan once with
-// numbered pin markers for every material on that deck, plus a legend
-// table below mapping number → material details. This collapses what
-// would otherwise be one page per material (100+ pages for a real vessel)
-// into one page per deck (~5).
+// One page per *deck area* — each page shows just that deck's region
+// of the GA plan (cropped from the full image), with numbered pin
+// markers and a legend table below. The full GA plan is never rendered
+// in the report; the deck_areas.x/y/width/height rect on each material
+// drives a CSS-based crop so the reader sees the relevant deck only.
 export function renderHmMarkedDecksPages(groups: MaterialGroup[]): string {
   const allMaterials: MaterialRow[] = groups.flatMap((g) => g.rows);
-  const withPlan = allMaterials.filter(
-    (m) => m.gaPlanUrl && (m.pinX !== null || m.rect),
-  );
-  if (withPlan.length === 0) return '';
+  // Only materials with both a GA plan and a deck-area rect can be
+  // cropped — without the rect we have nothing to crop to.
+  const withRect = allMaterials.filter((m) => m.gaPlanUrl && m.rect);
+  if (withRect.length === 0) return '';
 
-  // Group by GA plan URL. Order of insertion preserves Part I → III flow.
-  const byPlan = new Map<string, MaterialRow[]>();
-  for (const m of withPlan) {
-    const key = m.gaPlanUrl!;
-    if (!byPlan.has(key)) byPlan.set(key, []);
-    byPlan.get(key)!.push(m);
+  // Group by (gaPlanUrl, rect). Same rect = same deck area, even if
+  // multiple materials live there.
+  const byArea = new Map<string, MaterialRow[]>();
+  for (const m of withRect) {
+    const r = m.rect!;
+    const key = `${m.gaPlanUrl}|${r.x.toFixed(2)},${r.y.toFixed(2)},${r.w.toFixed(2)},${r.h.toFixed(2)}`;
+    if (!byArea.has(key)) byArea.set(key, []);
+    byArea.get(key)!.push(m);
   }
 
   const pages: string[] = [];
-  for (const [planUrl, materials] of byPlan.entries()) {
-    const deckName = materials[0]?.gaPlanName || materials[0]?.location || 'Deck';
+  for (const [, materials] of byArea.entries()) {
+    const m0 = materials[0]!;
+    const rect = m0.rect!;
+    const planUrl = m0.gaPlanUrl!;
+    const deckName = m0.location || m0.gaPlanName || 'Deck';
 
-    // Pin/rect coords are stored as raw pixels relative to the GA plan
-    // image (the mapping page captures click coordinates). Detect that
-    // and infer the image's coordinate space from the bounding box of
-    // every pin and rect on the plan, then normalise to a percentage
-    // for CSS positioning. If everything is already 0-1, the legacy
-    // path passes through unchanged.
+    // Pins in deck-area-local fractional coordinates [0..1].
+    // pinX/pinY are stored in image pixel space; subtract the rect
+    // origin and divide by rect size. If the data is already
+    // fractional (legacy 0-1 of the full image), we can't recover the
+    // rect-relative position without image dims — fall back to rect
+    // centre in that case.
     const looksLikePixels = materials.some(
-      (m) =>
-        (m.pinX !== null && m.pinX > 1) ||
-        (m.pinY !== null && m.pinY > 1) ||
-        (m.rect && (m.rect.x > 1 || m.rect.y > 1 || m.rect.w > 1 || m.rect.h > 1)),
+      (m) => (m.pinX !== null && m.pinX > 1) || (m.pinY !== null && m.pinY > 1),
     );
-    let scaleX = 1;
-    let scaleY = 1;
-    if (looksLikePixels) {
-      let maxX = 1;
-      let maxY = 1;
-      for (const m of materials) {
-        if (m.pinX !== null && m.pinX > maxX) maxX = m.pinX;
-        if (m.pinY !== null && m.pinY > maxY) maxY = m.pinY;
-        if (m.rect) {
-          const xEnd = m.rect.x + m.rect.w;
-          const yEnd = m.rect.y + m.rect.h;
-          if (xEnd > maxX) maxX = xEnd;
-          if (yEnd > maxY) maxY = yEnd;
-        }
-      }
-      // 8% padding so pins don't sit flush against the edge.
-      scaleX = maxX * 1.08;
-      scaleY = maxY * 1.08;
-    }
-
-    const toFraction = (v: number, scale: number) =>
-      looksLikePixels ? v / scale : v;
 
     const markers = materials
       .map((m, idx) => {
-        let pinTop = '50%';
-        let pinLeft = '50%';
-        if (m.pinX !== null && m.pinY !== null) {
-          pinLeft = `${(toFraction(m.pinX, scaleX) * 100).toFixed(1)}%`;
-          pinTop = `${(toFraction(m.pinY, scaleY) * 100).toFixed(1)}%`;
-        } else if (m.rect) {
-          pinLeft = `${(toFraction(m.rect.x + m.rect.w / 2, scaleX) * 100).toFixed(1)}%`;
-          pinTop = `${(toFraction(m.rect.y + m.rect.h / 2, scaleY) * 100).toFixed(1)}%`;
+        let leftFrac = 0.5;
+        let topFrac = 0.5;
+        if (m.pinX !== null && m.pinY !== null && looksLikePixels) {
+          leftFrac = (m.pinX - rect.x) / rect.w;
+          topFrac = (m.pinY - rect.y) / rect.h;
+          // Clamp so a stray pin can't escape the cropped frame.
+          leftFrac = Math.max(0, Math.min(1, leftFrac));
+          topFrac = Math.max(0, Math.min(1, topFrac));
         }
-        return `<div class="pin-number" style="top:${pinTop}; left:${pinLeft};">${idx + 1}</div>`;
+        return `<div class="pin-number" style="left:${(leftFrac * 100).toFixed(2)}%; top:${(topFrac * 100).toFixed(2)}%;">${idx + 1}</div>`;
       })
       .join('');
 
@@ -285,7 +265,11 @@ export function renderHmMarkedDecksPages(groups: MaterialGroup[]): string {
 <section class="page">
   ${BRAND_HEADER}
   <h3>HM Marked Decks &mdash; ${esc(deckName)}</h3>
-  <div class="deck-plan-area" style="background-image:url('${esc(planUrl)}'); background-size:contain; background-repeat:no-repeat; background-position:center; background-color:#FFFFFF;">
+  <div class="deck-frame"
+       data-rx="${rect.x}" data-ry="${rect.y}"
+       data-rw="${rect.w}" data-rh="${rect.h}"
+       style="aspect-ratio: ${rect.w.toFixed(2)} / ${rect.h.toFixed(2)};">
+    <img class="deck-bg" src="${esc(planUrl)}" alt="" />
     ${markers}
   </div>
   <table class="hm-legend">
@@ -304,6 +288,55 @@ export function renderHmMarkedDecksPages(groups: MaterialGroup[]): string {
   }
   return pages.join('');
 }
+
+// Inline script that runs at render time inside Puppeteer. Each
+// .deck-frame holds an <img> of the *full* GA plan plus the rect's
+// pixel coordinates in data-r{x,y,w,h}. Once the image has loaded
+// (so naturalWidth/Height are known) we set the img to its natural
+// size scaled so that rect.w fills the frame width, and shift it so
+// the rect aligns with the frame's top-left corner. The frame has
+// overflow:hidden so only the rect region is visible. Pins above the
+// img are positioned in % of the frame, which already maps 1:1 to
+// rect-local fractions because the frame IS the rect view.
+//
+// Exposes window.__cropDeckFrames so the PDF renderer can invoke it
+// after images decode, removing any race between image-load events
+// and Puppeteer's pdf() call.
+export const DECK_CROP_SCRIPT = `
+<script>
+(function () {
+  function fit(frame) {
+    var img = frame.querySelector('.deck-bg');
+    if (!img || !img.naturalWidth) return;
+    var rx = parseFloat(frame.dataset.rx);
+    var ry = parseFloat(frame.dataset.ry);
+    var rw = parseFloat(frame.dataset.rw);
+    var cw = frame.clientWidth;
+    if (!cw || !rw) return;
+    var scale = cw / rw;
+    img.style.width  = (img.naturalWidth  * scale) + 'px';
+    img.style.height = (img.naturalHeight * scale) + 'px';
+    img.style.left   = (-rx * scale) + 'px';
+    img.style.top    = (-ry * scale) + 'px';
+  }
+  window.__cropDeckFrames = function () {
+    document.querySelectorAll('.deck-frame').forEach(function (frame) { fit(frame); });
+  };
+  function init() {
+    document.querySelectorAll('.deck-frame').forEach(function (frame) {
+      var img = frame.querySelector('.deck-bg');
+      if (!img) return;
+      if (img.complete && img.naturalWidth > 0) fit(frame);
+      else img.addEventListener('load', function () { fit(frame); });
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>`;
 
 // ─── Vessel photograph block ──────────────────────────────────────────────
 // Uses the real image when available; otherwise falls back to the
@@ -838,16 +871,21 @@ table.hm-meta th { width: 22%; }
   color: #555555;
 }
 
-.deck-plan-area {
+.deck-frame {
   margin-top: 3mm;
   width: 100%;
-  height: 110mm;
+  max-height: 130mm;
   border: 1px solid #000;
-  background:
-    repeating-linear-gradient(0deg, #FFFFFF 0, #FFFFFF 9px, #F2F2F2 9px, #F2F2F2 10px),
-    repeating-linear-gradient(90deg, #FFFFFF 0, #FFFFFF 9px, #F2F2F2 9px, #F2F2F2 10px);
+  background-color: #FFFFFF;
   position: relative;
   overflow: hidden;
+}
+.deck-frame .deck-bg {
+  position: absolute;
+  display: block;
+  /* width / height / left / top set by inline script at render time
+     so the rect fills the frame and only that region is visible. */
+  max-width: none;
 }
 .pin-number {
   position: absolute;
@@ -929,6 +967,7 @@ ${renderDetailsPage(data)}
 ${renderPurchaseOrdersPage(data)}
 ${renderSuspectedHazmatPage(data)}
 ${renderHmMarkedDecksPages(data.materialGroups)}
+${DECK_CROP_SCRIPT}
 </body>
 </html>`;
 }
