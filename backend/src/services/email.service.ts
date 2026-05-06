@@ -22,6 +22,9 @@
 import nodemailer, { type Transporter } from 'nodemailer';
 import { Resend } from 'resend';
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
+
+const emailLog = logger.child('email');
 
 // ─── Transport selection ────────────────────────────────────────────────
 
@@ -224,6 +227,8 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   const fromAddr = env.EMAIL_FROM || env.SMTP_USER || 'onboarding@resend.dev';
   const replyTo = input.replyTo || env.EMAIL_FROM || env.SMTP_USER;
   const redirected = applyTestRedirect(to, cc, bcc, input.subject, input.text, input.html);
+  const t0 = Date.now();
+  emailLog.info(`send → to=${redirected.to.join(',') || '(none)'} subj="${redirected.subject.slice(0, 60)}"`);
 
   // Prefer Brevo when configured (HTTPS, single-sender verified — no DNS).
   if (env.BREVO_API_KEY) {
@@ -238,6 +243,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       htmlContent: redirected.html ?? redirected.text ?? '',
       textContent: redirected.text,
     });
+    emailLog.info(`✓ brevo ok id=${messageId} ${Date.now() - t0}ms`);
     return { messageId, transport: 'brevo' };
   }
 
@@ -261,8 +267,10 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       const msg = (error as { message?: string })?.message
         ?? (error as { name?: string })?.name
         ?? 'Resend send failed';
+      emailLog.error(`✗ resend fail ${Date.now() - t0}ms :: ${msg}`);
       throw new Error(msg);
     }
+    emailLog.info(`✓ resend ok id=${data?.id ?? ''} ${Date.now() - t0}ms`);
     return { messageId: data?.id ?? '', transport: 'resend' };
   }
 
@@ -281,6 +289,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       text: redirected.text,
       html: redirected.html,
     });
+    emailLog.info(`✓ smtp ok id=${(result as { messageId?: string }).messageId ?? ''} ${Date.now() - t0}ms`);
     return { messageId: (result as { messageId?: string }).messageId ?? '', transport: 'smtp' };
   }
 
@@ -288,11 +297,11 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
   // messageId so the rest of the flow (audit status flips, reminder
   // counters, etc.) still works in local-only setups. Production should
   // never hit this branch — set a real transport.
-  console.warn('[email] No transport configured — logging email to stdout instead of sending.');
-  console.warn('[email] To:', redirected.to.join(', ') || '(none)');
-  if (redirected.cc.length) console.warn('[email] Cc:', redirected.cc.join(', '));
-  if (redirected.bcc.length) console.warn('[email] Bcc:', redirected.bcc.join(', '));
-  console.warn('[email] Subject:', redirected.subject);
-  if (redirected.text) console.warn('[email] Text:', redirected.text.slice(0, 500));
+  emailLog.warn('No transport configured — logging email to stdout instead of sending.');
+  emailLog.warn(`To: ${redirected.to.join(', ') || '(none)'}`);
+  if (redirected.cc.length) emailLog.warn(`Cc: ${redirected.cc.join(', ')}`);
+  if (redirected.bcc.length) emailLog.warn(`Bcc: ${redirected.bcc.join(', ')}`);
+  emailLog.warn(`Subject: ${redirected.subject}`);
+  if (redirected.text) emailLog.warn(`Text: ${redirected.text.slice(0, 500)}`);
   return { messageId: `log-${Date.now()}`, transport: 'log' };
 }

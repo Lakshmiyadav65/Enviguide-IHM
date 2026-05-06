@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { query } from '../config/database.js';
+import { logger } from '../utils/logger.js';
 import { renderPdf } from './reports/renderer.js';
 import {
   buildQuarterlyComplianceData,
@@ -18,6 +19,8 @@ import {
   renderQuarterlyComplianceHtml,
   footerTemplate,
 } from './reports/templates/quarterly-compliance.js';
+
+const log = logger.child('report');
 
 export type ReportType = 'compliance' | 'inventory' | 'hazmat' | 'quarterly';
 
@@ -64,6 +67,8 @@ export const ReportService = {
    *  second filesystem read. */
   async generate(opts: GenerateOptions): Promise<GeneratedReport> {
     const period = opts.period ?? quarterContaining();
+    const t0 = Date.now();
+    log.info(`generate start type=${opts.type} vessel=${opts.vesselId} period=${period.label}`);
     // For now every report type renders the Quarterly Compliance
     // template. Slice 2 will swap templates per type.
     const data = await buildQuarterlyComplianceData(
@@ -71,6 +76,8 @@ export const ReportService = {
       period,
       opts.generatedBy,
     );
+    const tBuild = Date.now() - t0;
+    log.debug(`data built in ${tBuild}ms — vessel=${data.vessel.name} materials=${data.materialGroups.reduce((n, g) => n + g.rows.length, 0)} hazmat=${data.hazmatOverview.filter((t) => t.count > 0).length}/16`);
 
     // Insert a 'generating' row so concurrent calls don't race.
     const insert = await query(
@@ -82,12 +89,14 @@ export const ReportService = {
     const reportId = String((insert.rows[0] as { id: string }).id);
 
     try {
+      const tRender0 = Date.now();
       const html = renderQuarterlyComplianceHtml(data);
       const pdf = await renderPdf(html, {
         displayHeaderFooter: true,
         footerTemplate: footerTemplate(data),
         margin: { top: '14mm', bottom: '18mm', left: '12mm', right: '12mm' },
       });
+      const tRender = Date.now() - tRender0;
 
       ensureDir(REPORTS_DIR);
       const fileName = `${fileSafe(data.vessel.imoNumber)}_${fileSafe(period.label)}_${reportTitle(opts.type).replace(/\s+/g, '-')}.pdf`;
@@ -101,8 +110,10 @@ export const ReportService = {
         [fileName, fullPath, pdf.length, reportId],
       );
 
+      log.info(`✓ generate ok type=${opts.type} vessel=${data.vessel.name} pages~=${Math.round(pdf.length / 50000)} size=${(pdf.length / 1024).toFixed(0)}KB render=${tRender}ms total=${Date.now() - t0}ms file=${fileName}`);
       return { id: reportId, fileName, filePath: fullPath, fileSize: pdf.length, pdf };
     } catch (err) {
+      log.error(`✗ generate failed type=${opts.type} vessel=${opts.vesselId} after=${Date.now() - t0}ms :: ${(err as Error).message}`);
       await query(
         `UPDATE reports SET status = 'failed', error_message = $1, updated_at = NOW() WHERE id = $2`,
         [(err as Error).message, reportId],

@@ -2,6 +2,9 @@
 // CRUD + role assignment + profile update. Distinct from AuthService (login).
 import bcrypt from 'bcryptjs';
 import { query } from '../config/database.js';
+import { logger } from '../utils/logger.js';
+
+const log = logger.child('user');
 
 const FIELD_MAP: Record<string, string> = {
   name: 'name',
@@ -94,7 +97,9 @@ export const UserService = {
       `INSERT INTO users (${cols.join(', ')}) VALUES (${ph}) RETURNING *`,
       vals,
     );
-    return toApi(r.rows[0] as Record<string, unknown>);
+    const created = toApi(r.rows[0] as Record<string, unknown>) as { id: string; name: string; email: string; category?: string; roleName?: string };
+    log.info(`✓ created user=${created.name} email=${created.email} category=${created.category ?? '-'} role=${created.roleName ?? '-'}`);
+    return created;
   },
 
   async update(id: string, data: Record<string, unknown>) {

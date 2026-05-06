@@ -12,6 +12,8 @@ import { fileURLToPath } from 'url';
 import { env } from './config/env.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFound } from './middleware/notFound.js';
+import { requestLog } from './middleware/requestLog.js';
+import { logger } from './utils/logger.js';
 
 // Route modules
 import rootRouter from './routes/routes.js';
@@ -37,6 +39,11 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+// requestLog runs after morgan so its lines bracket the morgan output:
+//   ↓ APP    → POST /api/v1/auth/login        (request entered)
+//   ↓ MORGAN POST /api/v1/auth/login 200 142ms (request done — morgan)
+//   ↓ APP    ← POST /api/v1/auth/login 200    (request done — app log)
+app.use(requestLog);
 
 // -- Static Files (uploads) --------------------------------
 app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
@@ -70,7 +77,7 @@ app.use(errorHandler);
 
 // -- Start Server ------------------------------------------
 app.listen(env.PORT, () => {
-  console.log(`IHM API running -> http://localhost:${env.PORT}/api/v1`);
+  logger.info(`IHM API running → http://localhost:${env.PORT}/api/v1 (env=${env.NODE_ENV})`);
 });
 
 export default app;

@@ -4,7 +4,10 @@ import { AuthService } from '../services/auth.service.js';
 import { PermissionService } from '../services/permission.service.js';
 import { createError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
+import { logger } from '../utils/logger.js';
 import type { AuthPayload } from '../middleware/auth.middleware.js';
+
+const log = logger.child('auth');
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -21,19 +24,23 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
     const user = await AuthService.findUserByEmail(email);
     if (!user) {
+      log.warn(`login fail (no user) email=${email}`);
       return next(createError('Invalid credentials', 401));
     }
 
     if (user.status !== 'active') {
+      log.warn(`login fail (deactivated) email=${email}`);
       return next(createError('Account is deactivated', 403));
     }
 
     const valid = await AuthService.verifyPassword(password, user.password);
     if (!valid) {
+      log.warn(`login fail (bad password) email=${email}`);
       return next(createError('Invalid credentials', 401));
     }
 
     const token = AuthService.generateToken(user);
+    log.info(`login ok user=${user.name} (${user.email})`);
 
     // Fire-and-forget last activity update
     AuthService.updateLastActivity(user.id).catch(() => {});
