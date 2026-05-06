@@ -14,7 +14,7 @@ import { ReportService, type ReportType } from '../services/report.service.js';
 import { VesselService } from '../services/vessel.service.js';
 import { createError } from '../middleware/errorHandler.js';
 
-const VALID_TYPES: ReportType[] = ['compliance', 'inventory', 'hazmat', 'quarterly'];
+const VALID_TYPES: ReportType[] = ['compliance', 'inventory', 'hazmat', 'quarterly', 'overall'];
 
 function parseType(raw: unknown): ReportType {
   const t = String(raw ?? '').toLowerCase();

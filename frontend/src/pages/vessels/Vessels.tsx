@@ -931,6 +931,7 @@ export default function Vessels() {
                     id: 'adhoc',
                     title: 'AD HOC REPORT',
                     items: [
+                        { id: 'overall', name: 'Ship Overall Report', date: null },
                         { id: 'summary', name: 'Compliance Summary Report', date: null },
                         { id: 'inventory', name: 'Detailed Materials Inventory Report', date: null },
                         { id: 'hazmat', name: 'Global Hazmat Overview Report', date: null },
@@ -991,6 +992,7 @@ export default function Vessels() {
 
                 // Brief description for each Ad Hoc report.
                 const standardDescriptions: Record<string, string> = {
+                    overall: 'Comprehensive snapshot of the vessel — specs, IHM movement, hazmat overview, full materials inventory, and HM-marked decks in one document.',
                     summary: 'High-level snapshot of regulatory compliance, certification status, and outstanding action items.',
                     inventory: 'Full breakdown of every mapped material across all decks, with IHM Part classification and quantities.',
                     hazmat: 'Vessel-wide hazardous materials overview — totals by category, threshold flags, and risk hot-spots.',
@@ -1000,6 +1002,7 @@ export default function Vessels() {
                 // backend report type the generator understands.
                 const backendType = (catId: string, itemId: string): string => {
                     if (catId === 'adhoc') {
+                        if (itemId === 'overall') return 'overall';
                         if (itemId === 'inventory') return 'inventory';
                         if (itemId === 'hazmat') return 'hazmat';
                         return 'compliance'; // summary or default
@@ -1201,7 +1204,7 @@ export default function Vessels() {
                                             <button
                                                 type="button"
                                                 className="report-btn-primary full"
-                                                onClick={() => startGenerate('adhoc', item.name)}
+                                                onClick={() => startGenerate('adhoc', item.id)}
                                             >
                                                 <RotateCw size={14} /> Generate Report
                                             </button>

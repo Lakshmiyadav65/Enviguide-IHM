@@ -14,6 +14,7 @@ import {
   buildQuarterlyComplianceData,
   quarterContaining,
   quartersSince,
+  lifetimePeriod,
   type ReportPeriod,
 } from './reports/data.js';
 import {
@@ -23,7 +24,7 @@ import {
 
 const log = logger.child('report');
 
-export type ReportType = 'compliance' | 'inventory' | 'hazmat' | 'quarterly';
+export type ReportType = 'compliance' | 'inventory' | 'hazmat' | 'quarterly' | 'overall';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPORTS_DIR = path.resolve(__dirname, '..', '..', 'uploads', 'reports');
@@ -38,6 +39,7 @@ function reportTitle(type: ReportType): string {
     case 'inventory':  return 'Detailed Materials Inventory Report';
     case 'hazmat':     return 'Global Hazmat Overview Report';
     case 'quarterly':  return 'Quarterly Compliance Report';
+    case 'overall':    return 'Ship Overall Report';
   }
 }
 
@@ -67,7 +69,11 @@ export const ReportService = {
    *  DB row so the controller can stream it to the browser without a
    *  second filesystem read. */
   async generate(opts: GenerateOptions): Promise<GeneratedReport> {
-    const period = opts.period ?? quarterContaining();
+    // 'overall' covers vessel onboarding → today; everything else
+    // defaults to the current calendar quarter.
+    const period =
+      opts.period
+      ?? (opts.type === 'overall' ? await lifetimePeriod(opts.vesselId) : quarterContaining());
     const t0 = Date.now();
     log.info(`generate start type=${opts.type} vessel=${opts.vesselId} period=${period.label}`);
     // For now every report type renders the Quarterly Compliance

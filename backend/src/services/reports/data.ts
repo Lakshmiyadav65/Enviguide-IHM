@@ -175,6 +175,19 @@ export function quarterContaining(ref: Date = new Date()): ReportPeriod {
   return { start, end, label: `Q${q + 1} ${y}` };
 }
 
+/** Vessel-lifetime period — onboarding date through today. Used by the
+ *  'overall' report type which is a full snapshot rather than a quarter. */
+export async function lifetimePeriod(vesselId: string): Promise<ReportPeriod> {
+  const r = await query(
+    `SELECT created_at FROM vessels WHERE id = $1 LIMIT 1`,
+    [vesselId],
+  );
+  if (r.rows.length === 0) throw new Error('Vessel not found');
+  const start = new Date(String((r.rows[0] as { created_at: string }).created_at));
+  const end = new Date();
+  return { start, end, label: 'Overall' };
+}
+
 /** Walks every calendar quarter from the one containing `from` through
  *  the one containing `until` (inclusive), oldest first. Used to build
  *  the Quarterly Archive timeline — one card per elapsed quarter since
