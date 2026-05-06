@@ -1,0 +1,722 @@
+// ─── IHM Report — HTML template ───────────────────────────────────────────
+// Renders the finalized A4 IHM compliance report. Structure mirrors the
+// Hong Kong Convention / EU-SRR / MEPC Res. 379(80) / EMSA standard layout.
+//
+// Pages (in order):
+//   1. Cover                — brand header, title, vessel line, photo,
+//                             meta table, compliance references.
+//   2. Vessel Specifications — owner/ship details table.
+//   3. Table of Contents     — dotted-leader TOC.
+//   4. IHM Movement          — quarterly delta table + summary.
+//   5. Ship Hazmat Overview  — 16-tile colored grid + dynamic pie chart.
+//   6. IHM Details           — Part I (I-1, I-2, I-3), Part II, Part III
+//                              with legend box and 10-column table.
+//   7+ HM Marked Decks       — one page per material that has a GA plan
+//                              + pin coordinates (others are skipped).
+//
+// Puppeteer renders this as the document body; per-page IMO + page number
+// are injected via Puppeteer's footerTemplate option (see footerTemplate()
+// below). CSS @page named-content rules are intentionally not used —
+// Puppeteer ignores them.
+
+import type {
+  ReportData, MaterialRow, MaterialGroup, HazmatTile,
+} from '../data.js';
+
+// ─── HTML escape ──────────────────────────────────────────────────────────
+function esc(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+const dash = (s: string | null | undefined) => (s && String(s).trim() ? esc(s) : '&mdash;');
+
+// ─── Hazmat tile colours (from finalized template) ────────────────────────
+// Each entry maps the catalog `code` to {bg, ink}. Used for both the
+// dashboard tiles and the pie-chart slices so the legend matches.
+const TILE_COLOURS: Record<string, { bg: string; ink: string }> = {
+  Asb:   { bg: '#4DA6E0', ink: '#FFFFFF' },
+  PCB:   { bg: '#8B4F9F', ink: '#FFFFFF' },
+  ODS:   { bg: '#F4D03F', ink: '#FFFFFF' },
+  OC:    { bg: '#A8E6CF', ink: '#2A6B4F' },
+  Cd:    { bg: '#F08C3C', ink: '#FFFFFF' },
+  Cr:    { bg: '#8B2E2E', ink: '#FFFFFF' },
+  Pb:    { bg: '#E8C547', ink: '#5A4500' },
+  Hg:    { bg: '#B8B8B8', ink: '#333333' },
+  PBB:   { bg: '#E8C5E0', ink: '#6B3A60' },
+  PBDE:  { bg: '#7FD9E8', ink: '#1F5F6B' },
+  PCN:   { bg: '#E84C9A', ink: '#FFFFFF' },
+  RM:    { bg: '#C5E84C', ink: '#4F6320' },
+  CSCP:  { bg: '#3FA858', ink: '#FFFFFF' },
+  PFOS:  { bg: '#F5C5C5', ink: '#7A3030' },
+  HBCDD: { bg: '#3F7C7C', ink: '#FFFFFF' },
+  Cb:    { bg: '#5DCFC0', ink: '#1F5752' },
+};
+
+const tileBg  = (code: string) => TILE_COLOURS[code]?.bg  ?? '#94A3B8';
+const tileInk = (code: string) => TILE_COLOURS[code]?.ink ?? '#FFFFFF';
+
+// ─── Brand header (used on every page) ────────────────────────────────────
+const BRAND_HEADER = `
+<div class="brand-header">
+  <div class="brand-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="5" r="2"/>
+      <path d="M12 7v13"/>
+      <path d="M5 12a7 7 0 0 0 14 0"/>
+      <path d="M9 12H5"/>
+      <path d="M19 12h-4"/>
+    </svg>
+  </div>
+  <div class="brand-text">
+    <div class="brand-name">Enviguide<span> IHM</span></div>
+    <div class="brand-tagline">Inventory of Hazardous Materials | Maritime Compliance</div>
+  </div>
+</div>`;
+
+// ─── Pie chart (dynamic, by hazmat counts) ────────────────────────────────
+// Builds an SVG pie from the non-zero hazmat tiles. Each slice's colour
+// comes from TILE_COLOURS so the legend matches the dashboard above.
+function renderPieChart(overview: HazmatTile[]): string {
+  const slices = overview.filter((t) => t.count > 0);
+  const total = slices.reduce((sum, t) => sum + t.count, 0);
+
+  if (total === 0 || slices.length === 0) {
+    return `
+      <div class="pie-wrapper">
+        <div class="pie-empty">No hazmat compounds present</div>
+      </div>`;
+  }
+
+  // Single-slice case — degenerate path, draw a full circle instead.
+  if (slices.length === 1) {
+    const s = slices[0]!; // length === 1 guaranteed by the check above
+    return `
+      <div class="pie-wrapper">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="50" fill="${tileBg(s.code)}"/>
+        </svg>
+        <div class="pie-labels">
+          <div><span class="swatch" style="background:${tileBg(s.code)}"></span>${esc(s.code)} - ${s.count}</div>
+        </div>
+      </div>`;
+  }
+
+  let cumulative = 0;
+  const paths: string[] = [];
+  for (const s of slices) {
+    const fraction = s.count / total;
+    const startAngle = cumulative * 2 * Math.PI;
+    const endAngle = (cumulative + fraction) * 2 * Math.PI;
+    cumulative += fraction;
+
+    // Convert polar (radius=50, centre=50,50) to cartesian. SVG y-axis
+    // is flipped so subtract from 50 to draw clockwise from 12 o'clock.
+    const x1 = 50 + 50 * Math.sin(startAngle);
+    const y1 = 50 - 50 * Math.cos(startAngle);
+    const x2 = 50 + 50 * Math.sin(endAngle);
+    const y2 = 50 - 50 * Math.cos(endAngle);
+    const largeArc = fraction > 0.5 ? 1 : 0;
+
+    paths.push(
+      `<path d="M 50,50 L ${x1.toFixed(2)},${y1.toFixed(2)} A 50,50 0 ${largeArc},1 ${x2.toFixed(2)},${y2.toFixed(2)} Z" fill="${tileBg(s.code)}"/>`,
+    );
+  }
+
+  const labels = slices
+    .map((s) => `<div><span class="swatch" style="background:${tileBg(s.code)}"></span>${esc(s.code)} - ${s.count}</div>`)
+    .join('');
+
+  return `
+    <div class="pie-wrapper">
+      <svg viewBox="0 0 100 100">${paths.join('')}</svg>
+      <div class="pie-labels">${labels}</div>
+    </div>`;
+}
+
+// ─── Hazmat tile grid (16 tiles, all rendered, dimmed when count === 0) ──
+function renderHazmatTiles(overview: HazmatTile[]): string {
+  return overview
+    .map((t) => {
+      const dim = t.count === 0 ? ' zero' : '';
+      const bg = tileBg(t.code);
+      const ink = tileInk(t.code);
+      return `
+        <div class="hazmat-tile${dim}" style="background:${bg};color:${ink}">
+          <div class="tile-label">${esc(t.name)} - ${esc(t.code)}</div>
+          <div class="tile-count">${t.count}</div>
+        </div>`;
+    })
+    .join('');
+}
+
+// ─── Material rows (Part I-1 / I-2 / I-3 / II / III) ──────────────────────
+function renderMaterialTable(group: MaterialGroup, startNo = 1): string {
+  if (!group.rows || group.rows.length === 0) {
+    return `<div class="none-found">None of the relevant materials have been identified onboard</div>`;
+  }
+  const rows = group.rows
+    .map((r, i) => `
+      <tr>
+        <td style="text-align:center;">${startNo + i}</td>
+        <td style="text-align:center;">${esc(r.createdOn)}</td>
+        <td style="text-align:center;">${esc(r.updatedOn)}</td>
+        <td>${esc(r.name)}</td>
+        <td>${esc(r.location)}</td>
+        <td>${esc(r.classification)}</td>
+        <td>${esc(r.qty)}</td>
+        <td>${esc(r.partsWhereUsed)}</td>
+        <td>${esc(r.remarks)}</td>
+        <td>${esc(r.status)}</td>
+      </tr>`)
+    .join('');
+  return `
+    <table class="details">
+      <thead>
+        <tr>
+          <th>No.</th>
+          <th>Created On</th>
+          <th>Updated On</th>
+          <th>Name</th>
+          <th>Location</th>
+          <th>Material<br/>(Appendix 1)</th>
+          <th>Apprx. Qty<br/>Qty-UOM</th>
+          <th>Parts where used</th>
+          <th>Remarks</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ─── HM Marked Decks pages ────────────────────────────────────────────────
+// One page per material with a GA plan + pin. Materials without a plan
+// are skipped — including them would render an empty placeholder.
+function renderHmMarkedDecksPages(groups: MaterialGroup[]): string {
+  const allMaterials: MaterialRow[] = groups.flatMap((g) => g.rows);
+  const withPlan = allMaterials.filter(
+    (m) => m.gaPlanUrl && (m.pinX !== null || m.rect),
+  );
+  if (withPlan.length === 0) return '';
+
+  return withPlan
+    .map((m) => {
+      const planUrl = m.gaPlanUrl!;
+      // Pin coordinates: prefer (pinX,pinY) percentages; otherwise centre
+      // of the deck-area rect. Both schemes already in the data layer.
+      let pinTop = '50%';
+      let pinLeft = '50%';
+      if (m.pinX !== null && m.pinY !== null) {
+        pinLeft = `${(m.pinX * 100).toFixed(1)}%`;
+        pinTop = `${(m.pinY * 100).toFixed(1)}%`;
+      } else if (m.rect) {
+        pinLeft = `${((m.rect.x + m.rect.w / 2) * 100).toFixed(1)}%`;
+        pinTop = `${((m.rect.y + m.rect.h / 2) * 100).toFixed(1)}%`;
+      }
+      return `
+<section class="page">
+  ${BRAND_HEADER}
+  <table class="hm-meta">
+    <tr>
+      <th>Name</th><td colspan="3">${esc(m.name)}</td>
+    </tr>
+    <tr>
+      <th>Equipment</th><td>${esc(m.name)}</td>
+      <th>Part where used</th><td>${esc(m.partsWhereUsed) || '&mdash;'}</td>
+    </tr>
+    <tr>
+      <th>Deck Plan</th><td>${esc(m.location) || '&mdash;'}</td>
+      <th>Hazmat Compound</th><td>${esc(m.classification) || '&mdash;'}</td>
+    </tr>
+    <tr>
+      <th>Qty</th><td>${esc(m.qty) || '&mdash;'}</td>
+      <th>Status</th><td>${esc(m.status)}</td>
+    </tr>
+    <tr>
+      <th>Remarks</th><td colspan="3">${esc(m.remarks) || '&mdash;'}</td>
+    </tr>
+  </table>
+  <div class="deck-plan-area" style="background-image:url('${esc(planUrl)}'); background-size:contain; background-repeat:no-repeat; background-position:center; background-color:#FFFFFF;">
+    <div class="biohazard-marker" style="top:${pinTop}; left:${pinLeft};">☣</div>
+  </div>
+</section>`;
+    })
+    .join('');
+}
+
+// ─── Vessel photograph block ──────────────────────────────────────────────
+// Uses the real image when available; otherwise falls back to the
+// gradient placeholder from the finalized template.
+function renderVesselPhoto(image: string | null): string {
+  if (image && image.trim()) {
+    return `<div class="ship-image-real" style="background-image:url('${esc(image)}')"></div>`;
+  }
+  return `<div class="ship-image-placeholder"><span>Vessel Photograph</span></div>`;
+}
+
+// ─── Cover page ───────────────────────────────────────────────────────────
+function renderCoverPage(data: ReportData): string {
+  const periodLabel = `${data.period.start.toLocaleDateString('en-GB')} - ${data.period.end.toLocaleDateString('en-GB')}`;
+  return `
+<section class="page">
+  ${BRAND_HEADER}
+  <div class="cover-title">
+    <div class="report-heading">IHM Report (${esc(periodLabel)})</div>
+    <div class="vessel-line">${esc(data.vessel.name)} (IMO : ${esc(data.vessel.imoNumber)})</div>
+  </div>
+  ${renderVesselPhoto(data.vessel.image)}
+  <table class="cover-meta">
+    <tr><th>Document Number:</th><td>${esc(data.docNumber)}</td></tr>
+    <tr><th>Version #:</th><td>1.0.0</td></tr>
+    <tr><th>Generated By:</th><td>${esc(data.generatedBy) || 'Enviguide IHM'}</td></tr>
+    <tr><th>Date of Report Generation:</th><td>${esc(data.generatedAt)}</td></tr>
+    <tr><th>SOC Reference:</th><td>${dash(data.vessel.socReference)}</td></tr>
+    <tr><th>Initial IHM Reference:</th><td>${dash(data.vessel.ihmReference)}</td></tr>
+  </table>
+  <div class="compliance-block">
+    <div class="label">According to:</div>
+    <ul>
+      <li>Hong Kong International Convention for the Safe and Environmentally Sound Recycling of Ships (SR/CONF 45)</li>
+      <li>Guidelines for the Preparation of Inventory of Hazardous Materials (MEPC Res. 379(80))</li>
+      <li>EU Regulation on Ship Recycling (EU-SRR No. 1257/2013)</li>
+      <li>EMSA's Best Practice Guidance on the Inventory of Hazardous Materials</li>
+    </ul>
+  </div>
+</section>`;
+}
+
+// ─── Vessel specifications page ───────────────────────────────────────────
+function renderSpecsPage(data: ReportData): string {
+  const v = data.vessel;
+  return `
+<section class="page">
+  ${BRAND_HEADER}
+  <h2>Vessel Specifications and Ship Owner Information</h2>
+  <table class="specs">
+    <tr><th>IMO Number</th><td>${esc(v.imoNumber)}</td></tr>
+    <tr><th>Name of Ship</th><td>${esc(v.name)}</td></tr>
+    <tr><th>Type</th><td>${dash(v.vesselType)}</td></tr>
+    <tr><th>Flag State</th><td>${dash(v.flagState)}</td></tr>
+    <tr><th>Port of Registry</th><td>${dash(v.portOfRegistry)}</td></tr>
+    <tr><th>Vessel Class</th><td>${dash(v.vesselClass)}</td></tr>
+    <tr><th>Gross Tonnage (GT)</th><td>${dash(v.grossTonnage)}</td></tr>
+    <tr><th>Date Built</th><td>${dash(v.keelLaidDate)}</td></tr>
+    <tr><th>Date Delivered</th><td>${dash(v.deliveryDate)}</td></tr>
+    <tr><th>Ship Builder</th><td>${dash(v.shipBuilder)}</td></tr>
+    <tr><th>Ship Owner</th><td>${dash(v.registeredOwner)}</td></tr>
+    <tr><th>Ship Manager</th><td>${dash(v.shipManager)}</td></tr>
+  </table>
+</section>`;
+}
+
+// ─── Table of Contents ────────────────────────────────────────────────────
+function renderTocPage(): string {
+  return `
+<section class="page">
+  ${BRAND_HEADER}
+  <h3>Table of Contents</h3>
+  <ul class="toc-list">
+    <li><span class="toc-name">IHM Movement</span><span class="toc-dots"></span><span class="toc-pg">1</span></li>
+    <li><span class="toc-name">Ship Hazmat Overview</span><span class="toc-dots"></span><span class="toc-pg">2</span></li>
+    <li><span class="toc-name">IHM Details</span><span class="toc-dots"></span><span class="toc-pg">3</span></li>
+    <li><span class="toc-name">HM Marked Decks</span><span class="toc-dots"></span><span class="toc-pg">12</span></li>
+  </ul>
+</section>`;
+}
+
+// ─── IHM Movement page ────────────────────────────────────────────────────
+function renderMovementPage(data: ReportData): string {
+  const periodLabel = `${data.period.start.toLocaleDateString('en-GB')} to ${data.period.end.toLocaleDateString('en-GB')}`;
+  // Movement rows come from the data layer in Part I-1, I-2, I-3, II, III
+  // order — match that shape to the labels expected by the template.
+  const labels = ['Part I &ndash; I1', 'Part I &ndash; I2', 'Part I &ndash; I3', 'Part II', 'Part III'];
+  const rows = data.movement
+    .map((m, i) => `
+      <tr>
+        <th>${labels[i] ?? esc(m.partLabel)}</th>
+        <td>${m.startCount}</td>
+        <td>${m.added}</td>
+        <td>${m.updated}</td>
+        <td>0</td>
+        <td>${m.endCount}</td>
+      </tr>`)
+    .join('');
+  return `
+<section class="page">
+  ${BRAND_HEADER}
+  <h2>IHM Movement (${esc(periodLabel)})</h2>
+  <table class="movement">
+    <thead>
+      <tr>
+        <th></th>
+        <th>Total number of HMs<br/>"Date" (Last Quarter)</th>
+        <th>HMs Added in<br/>this Quarter</th>
+        <th>HMs Relocated<br/>in this Quarter</th>
+        <th>HMs Landed<br/>ashore</th>
+        <th>Total number of HMs "Date"<br/>(Present Quarter)</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <table class="summary">
+    <tr><th>Number of POs Received in this Quarter</th><td>${data.totals.posReceivedInQuarter}</td></tr>
+    <tr><th>No of MDs and SDoCs requested in this quarter</th><td>${data.totals.docsRequested}</td></tr>
+    <tr><th>No of MDs and SDoCs received in this quarter</th><td>${data.totals.docsReceived}</td></tr>
+  </table>
+</section>`;
+}
+
+// ─── Hazmat Overview page ─────────────────────────────────────────────────
+function renderHazmatPage(data: ReportData): string {
+  return `
+<section class="page">
+  ${BRAND_HEADER}
+  <h2>Ship Hazmat Overview</h2>
+  <div class="hazmat-section">
+    <div class="hazmat-grid-wrap">
+      <div class="hazmat-grid">${renderHazmatTiles(data.hazmatOverview)}</div>
+    </div>
+    ${renderPieChart(data.hazmatOverview)}
+  </div>
+</section>`;
+}
+
+// ─── IHM Details page ─────────────────────────────────────────────────────
+function renderDetailsPage(data: ReportData): string {
+  const findGroup = (key: MaterialGroup['groupKey']) =>
+    data.materialGroups.find((g) => g.groupKey === key)
+      ?? { groupKey: key, title: '', rows: [] };
+
+  const i1 = findGroup('I-1');
+  const i2 = findGroup('I-2');
+  const i3 = findGroup('I-3');
+  const partII = findGroup('II');
+  const partIII = findGroup('III');
+
+  // Continuous numbering across the three Part I sub-sections so the user
+  // can read row numbers as a vessel-wide index.
+  let no = 1;
+  const i1Block = renderMaterialTable(i1, no);
+  no += i1.rows.length;
+  const i2Block = renderMaterialTable(i2, no);
+  no += i2.rows.length;
+  const i3Block = renderMaterialTable(i3, no);
+  no += i3.rows.length;
+
+  // Part II / III start their own numbering — they are conceptually
+  // separate inventories.
+  const partIIBlock  = renderMaterialTable(partII, 1);
+  const partIIIBlock = renderMaterialTable(partIII, 1);
+
+  return `
+<section class="page">
+  ${BRAND_HEADER}
+  <h2>IHM Details</h2>
+  <h3>Part I Materials contained in ship structure or equipment</h3>
+  <div class="legend-box">
+    <div class="legend-title">LEGEND</div>
+    <div class="legend-row"><b>C/F:</b> Carried forward from last Quarter</div>
+    <div class="legend-row"><b>Added:</b> New Addition in the given period</div>
+    <div class="legend-row"><b>Removed:</b> Removed in the given period</div>
+    <div class="legend-row"><b>MTS:</b> Moved from Part I to Part II or Part III</div>
+    <div class="legend-row"><b>MFW:</b> Moved from Part II or Part III to Part I</div>
+  </div>
+  <h4>I-1 Paints and coating systems</h4>
+  ${i1Block}
+  <h4 style="clear: both;">I-2 Equipment and machinery</h4>
+  ${i2Block}
+  <h4>I-3 Structure and hull</h4>
+  ${i3Block}
+  <h3>Part II Operationally generated wastes</h3>
+  ${partIIBlock}
+  <h3>Part III Stores</h3>
+  ${partIIIBlock}
+</section>`;
+}
+
+// ─── Stylesheet (inlined — no external deps at render time) ───────────────
+const STYLESHEET = `
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  color: #000;
+  font-family: 'Carlito', 'Calibri', sans-serif;
+  font-size: 11pt;
+  line-height: 1.4;
+}
+
+.page { page-break-after: always; padding: 0 18mm; padding-top: 12mm; padding-bottom: 12mm; }
+.page:last-child { page-break-after: auto; }
+
+.brand-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10mm;
+}
+.brand-logo {
+  width: 42px; height: 42px;
+  background: linear-gradient(135deg, #0EA5E9 0%, #0369A1 100%);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.brand-logo svg { width: 26px; height: 26px; }
+.brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+.brand-name {
+  font-weight: 700;
+  font-size: 16pt;
+  color: #075985;
+  letter-spacing: -0.01em;
+}
+.brand-name span { color: #0EA5E9; }
+.brand-tagline {
+  font-size: 8pt;
+  color: #555555;
+  font-weight: 400;
+  margin-top: 2px;
+}
+
+h1 { font-size: 20pt; font-weight: 700; text-align: center; text-decoration: underline; margin-bottom: 6mm; }
+h2 { font-size: 14pt; font-weight: 700; text-align: center; text-decoration: underline; margin: 4mm 0 5mm; }
+h3 { font-size: 12pt; font-weight: 700; text-decoration: underline; margin: 5mm 0 3mm; }
+h4 { font-size: 11pt; font-weight: 700; margin: 4mm 0 2mm; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5pt;
+  margin: 3mm 0;
+}
+table th, table td {
+  border: 1px solid #000;
+  padding: 5px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+table th { font-weight: 700; }
+
+table.cover-meta { margin-top: 5mm; }
+table.cover-meta th { width: 35%; }
+
+table.specs th { width: 35%; }
+
+table.movement { font-size: 10pt; }
+table.movement th, table.movement td {
+  text-align: center;
+  vertical-align: middle;
+  padding: 8px 4px;
+}
+table.movement tbody th { text-align: left; padding-left: 8px; }
+
+table.summary { width: 70%; margin-top: 4mm; }
+table.summary td { width: 60px; text-align: center; }
+
+table.details { font-size: 9pt; }
+table.details th, table.details td {
+  padding: 4px 5px;
+  vertical-align: middle;
+}
+table.details thead th { text-align: center; line-height: 1.3; }
+
+table.hm-meta { font-size: 10.5pt; }
+table.hm-meta th { width: 22%; }
+
+.cover-title { text-align: center; margin-top: 2mm; }
+.cover-title .report-heading {
+  font-size: 18pt;
+  font-weight: 700;
+  text-decoration: underline;
+  margin-bottom: 4mm;
+}
+.cover-title .vessel-line {
+  font-size: 16pt;
+  margin-bottom: 5mm;
+}
+
+.ship-image-placeholder {
+  width: 100%; height: 60mm;
+  margin: 3mm 0 5mm;
+  background: linear-gradient(180deg, #B3D9F2 0%, #5FA3D8 60%, #2E7AB8 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.ship-image-placeholder span {
+  background: rgba(0,0,0,0.5);
+  color: #FFFFFF;
+  padding: 6px 16px;
+  font-size: 9pt;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.ship-image-real {
+  width: 100%; height: 60mm;
+  margin: 3mm 0 5mm;
+  background-color: #E2E8F0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.compliance-block { margin-top: 4mm; }
+.compliance-block .label { font-weight: 700; margin-bottom: 2mm; }
+.compliance-block ul { list-style: none; padding-left: 4mm; }
+.compliance-block li {
+  padding: 1mm 0 1mm 4mm;
+  position: relative;
+}
+.compliance-block li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  font-weight: 700;
+}
+
+.toc-list { list-style: none; margin-top: 4mm; }
+.toc-list li {
+  display: flex;
+  align-items: baseline;
+  font-size: 11pt;
+  padding: 2mm 0;
+}
+.toc-list .toc-name { font-weight: 700; }
+.toc-list .toc-dots {
+  flex: 1;
+  border-bottom: 1px dotted #000;
+  margin: 0 4px;
+  height: 1px;
+}
+.toc-list .toc-pg { font-weight: 700; }
+
+.hazmat-section {
+  display: flex;
+  gap: 6mm;
+  margin-top: 3mm;
+}
+.hazmat-grid-wrap { flex: 1.5; }
+.hazmat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+}
+.hazmat-tile {
+  height: 23mm;
+  padding: 4px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  text-align: center;
+}
+.hazmat-tile .tile-label { font-size: 7pt; font-weight: 700; line-height: 1.15; }
+.hazmat-tile .tile-count { font-size: 18pt; font-weight: 700; line-height: 1; }
+.hazmat-tile.zero { opacity: 0.55; }
+
+.pie-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 6mm;
+}
+.pie-wrapper svg { width: 50mm; height: 50mm; margin-bottom: 4mm; }
+.pie-empty {
+  font-style: italic;
+  color: #777;
+  font-size: 9.5pt;
+  text-align: center;
+  margin-top: 18mm;
+}
+.pie-labels { font-size: 9.5pt; }
+.pie-labels div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0;
+  white-space: nowrap;
+}
+.pie-labels .swatch {
+  width: 10px; height: 10px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.legend-box {
+  float: right;
+  width: 70mm;
+  border: 1px solid #BBBBBB;
+  padding: 3mm 4mm;
+  margin: 0 0 4mm 4mm;
+  font-size: 9.5pt;
+  font-style: italic;
+  background: #F8F8F8;
+}
+.legend-box .legend-title { font-weight: 700; text-align: center; margin-bottom: 2mm; }
+.legend-box .legend-row { line-height: 1.5; }
+.legend-box .legend-row b { font-style: normal; }
+
+.none-found {
+  font-style: italic;
+  font-size: 10.5pt;
+  padding: 3mm 0;
+  color: #555555;
+}
+
+.deck-plan-area {
+  margin-top: 4mm;
+  width: 100%;
+  height: 145mm;
+  border: 1px solid #000;
+  background:
+    repeating-linear-gradient(0deg, #FFFFFF 0, #FFFFFF 9px, #F2F2F2 9px, #F2F2F2 10px),
+    repeating-linear-gradient(90deg, #FFFFFF 0, #FFFFFF 9px, #F2F2F2 9px, #F2F2F2 10px);
+  position: relative;
+}
+.biohazard-marker {
+  position: absolute;
+  width: 38px; height: 38px;
+  background: #F08C3C;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #FFFFFF;
+  font-size: 18pt;
+  font-weight: 900;
+  transform: translate(-50%, -50%);
+}
+`;
+
+// ─── Main entry ───────────────────────────────────────────────────────────
+export function renderQuarterlyComplianceHtml(data: ReportData): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Enviguide IHM &mdash; IHM Report</title>
+<style>${STYLESHEET}</style>
+</head>
+<body>
+${renderCoverPage(data)}
+${renderSpecsPage(data)}
+${renderTocPage()}
+${renderMovementPage(data)}
+${renderHazmatPage(data)}
+${renderDetailsPage(data)}
+${renderHmMarkedDecksPages(data.materialGroups)}
+</body>
+</html>`;
+}
+
+// ─── Footer template (Puppeteer injects per-page) ─────────────────────────
+// Left: IMO • Right: page X of Y. Matches the cover-page convention from
+// the finalized template (the @page named-content rules in that HTML are
+// dropped because Puppeteer doesn't honor them; this is the equivalent).
+export function footerTemplate(data: ReportData): string {
+  return `
+    <div style="font-family: 'Carlito', 'Calibri', sans-serif; font-size: 9pt; color: #888888; width: 100%; padding: 0 18mm; display: flex; justify-content: space-between;">
+      <span>IMO &ndash; ${esc(data.vessel.imoNumber)}</span>
+      <span><span class="pageNumber"></span> | Page</span>
+    </div>`;
+}
