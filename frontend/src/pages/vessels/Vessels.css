@@ -6647,6 +6647,19 @@ body:has(.sidebar.collapsed) .vessel-page-main {
     animation: reportCardPulse 2s ease-in-out infinite;
 }
 
+/* "Generated <date>" meta line on cards that already have a cached run.
+ * Slim green pill so the user can spot at a glance which reports are
+ * ready to download vs which still need to be generated. */
+.report-card-meta.ready {
+    color: #166534;
+    background: #DCFCE7;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-weight: 700;
+    align-self: flex-start;
+    font-size: 11px;
+}
+
 @keyframes reportCardPulse {
     0%, 100% { box-shadow: 0 0 0 2px rgba(0, 178, 255, 0.18), 0 12px 28px rgba(15, 23, 42, 0.08); }
     50%      { box-shadow: 0 0 0 4px rgba(0, 178, 255, 0.28), 0 14px 32px rgba(15, 23, 42, 0.10); }

@@ -116,6 +116,20 @@ export default function Vessels() {
     // Standard Reports — tracks which card (by item id: 'overall'|'summary'|...)
     // is currently mid-generation so we can swap the button to a spinner.
     const [generatingStandard, setGeneratingStandard] = useState<string | null>(null);
+    // Latest persisted report per backend report_type for the active vessel.
+    // Populated from GET /vessels/:id/reports — used to swap the card UI
+    // from "Not yet generated / Generate Report" to "Generated <date> /
+    // Download + Re-generate" after a run completes.
+    interface StandardReportRow {
+        id: string;
+        reportType: string;
+        status: string;
+        fileName: string | null;
+        fileSize: number | null;
+        generatedBy: string | null;
+        createdAt: string;
+    }
+    const [standardLatestByType, setStandardLatestByType] = useState<Record<string, StandardReportRow>>({});
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const docInputRef = useRef<HTMLInputElement>(null);
@@ -362,6 +376,43 @@ export default function Vessels() {
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, activeReportTab, activeVesselData?.id, generatingQuarter]);
+
+    // Load the latest persisted Standard Report per backend type so the
+    // card swaps from "Not yet generated / Generate Report" to
+    // "Generated <date> / Download + Re-generate" once a run finishes.
+    // Refetches whenever a generation completes (generatingStandard
+    // transitions back to null).
+    useEffect(() => {
+        if (activeTab !== 'reports' || activeReportTab !== 'standard') return;
+        const vId = activeVesselData?.id;
+        if (!vId) { setStandardLatestByType({}); return; }
+        // Don't refetch while a generation is in flight — let it finish
+        // first so the post-generate row is included.
+        if (generatingStandard !== null) return;
+        let cancelled = false;
+        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+        const token = localStorage.getItem('ihm_token') || '';
+        fetch(`${base}/vessels/${vId}/reports`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`Failed (${r.status})`))))
+            .then((j) => {
+                if (cancelled || !Array.isArray(j?.data)) return;
+                // Backend orders rows DESC by created_at, so the first
+                // row per type is the most recent. Filter out anything
+                // that didn't reach status='ready' — partial/failed
+                // generations shouldn't be advertised as downloadable.
+                const latest: Record<string, StandardReportRow> = {};
+                for (const row of j.data as StandardReportRow[]) {
+                    if (row.status !== 'ready' || !row.fileName) continue;
+                    if (!latest[row.reportType]) latest[row.reportType] = row;
+                }
+                setStandardLatestByType(latest);
+            })
+            .catch(() => { if (!cancelled) setStandardLatestByType({}); });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab, activeReportTab, activeVesselData?.id, generatingStandard]);
 
     const handleVesselSelect = (vessel: Vessel) => {
         // Switching vessels abandons any in-progress add/edit draft. The
@@ -1196,9 +1247,16 @@ export default function Vessels() {
                                 {standardItems.map((item) => {
                                     const isGenerating = generatingStandard === item.id;
                                     const isDisabled = generatingStandard !== null && !isGenerating;
+                                    // Look up the latest persisted run for this card
+                                    // by mapping the UI item id to its backend type.
+                                    const latest = standardLatestByType[backendType('adhoc', item.id)];
+                                    const hasGenerated = Boolean(latest);
+                                    const generatedOnLabel = latest
+                                        ? new Date(latest.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                                        : null;
                                     return (
                                         <div
-                                            className={`report-card-v2${isGenerating ? ' is-generating' : ''}`}
+                                            className={`report-card-v2${isGenerating ? ' is-generating' : ''}${hasGenerated ? ' is-ready' : ''}`}
                                             key={item.id}
                                         >
                                             <div className="report-card-icon">
@@ -1207,31 +1265,56 @@ export default function Vessels() {
                                             <div className="report-card-body">
                                                 <h3>{item.name}</h3>
                                                 <p>{standardDescriptions[item.id] ?? 'Standard compliance report.'}</p>
-                                                {item.date ? (
-                                                    <span className="report-card-meta">{item.date}</span>
-                                                ) : (
-                                                    <span className="report-card-meta muted">
-                                                        {isGenerating ? 'Generating PDF…' : 'Not yet generated'}
+                                                {isGenerating ? (
+                                                    <span className="report-card-meta muted">Generating PDF…</span>
+                                                ) : hasGenerated ? (
+                                                    <span className="report-card-meta ready">
+                                                        Generated {generatedOnLabel}
                                                     </span>
+                                                ) : (
+                                                    <span className="report-card-meta muted">Not yet generated</span>
                                                 )}
                                             </div>
                                             <div className="report-card-actions">
-                                                <button
-                                                    type="button"
-                                                    className={`report-btn-primary full${isGenerating ? ' is-loading' : ''}`}
-                                                    onClick={() => startGenerate('adhoc', item.id)}
-                                                    disabled={isGenerating || isDisabled}
-                                                >
-                                                    {isGenerating ? (
-                                                        <>
-                                                            <span className="spinner" aria-hidden="true" /> Generating…
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <RotateCw size={14} /> Generate Report
-                                                        </>
-                                                    )}
-                                                </button>
+                                                {isGenerating ? (
+                                                    <button
+                                                        type="button"
+                                                        className="report-btn-primary full is-loading"
+                                                        disabled
+                                                    >
+                                                        <span className="spinner" aria-hidden="true" /> Generating…
+                                                    </button>
+                                                ) : hasGenerated && latest ? (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            className="report-btn-primary"
+                                                            onClick={() => downloadCachedQuarter(latest.id, latest.fileName ?? `${item.id}-report.pdf`)}
+                                                            disabled={isDisabled}
+                                                            title="Download the most recently generated PDF"
+                                                        >
+                                                            <Download size={14} /> Download
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="report-btn-secondary"
+                                                            onClick={() => startGenerate('adhoc', item.id)}
+                                                            disabled={isDisabled}
+                                                            title="Re-render with current data and replace the cached PDF"
+                                                        >
+                                                            <RotateCw size={14} /> Re-generate
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        className="report-btn-primary full"
+                                                        onClick={() => startGenerate('adhoc', item.id)}
+                                                        disabled={isDisabled}
+                                                    >
+                                                        <RotateCw size={14} /> Generate Report
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     );
