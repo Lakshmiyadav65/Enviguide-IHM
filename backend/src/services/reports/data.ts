@@ -86,12 +86,12 @@ export interface PoAppendixRow {
 export interface PoDetailRow {
   poNumber: string;
   supplier: string;
-  poDate: string;             // formatted dd/mm/yyyy (po_date if set, else created_at)
+  poDate: string;             // formatted dd/mm/yyyy (po_sent_date if set, else created_at)
+  receivedOn: string;         // formatted dd/mm/yyyy (audit_line_items.created_at)
   totalItems: number;
-  totalAmount: string;        // formatted with currency, '—' if null
-  status: string;             // pending / received / etc
-  suspectedCount: number;     // count of audit_line_items with is_suspected=Yes
-  description: string;
+  suspectedCount: number;     // line items with is_suspected = Yes
+  /** Up to ~80 chars of the first item description, for context. */
+  sampleItem: string;
 }
 
 export interface ReportData {
@@ -380,9 +380,13 @@ export async function buildQuarterlyComplianceData(
   }));
 
   // 5. Period totals — POs received, docs requested, docs received.
+  // POs live in audit_line_items (one row per line item). Distinct
+  // po_number = one PO. purchase_orders is a separate manual-entry
+  // table that this product flow doesn't populate.
   const posRes = await query(
-    `SELECT COUNT(*)::int AS c FROM purchase_orders
-      WHERE vessel_id = $1 AND created_at >= $2 AND created_at <= $3`,
+    `SELECT COUNT(DISTINCT po_number)::int AS c FROM audit_line_items
+      WHERE vessel_id = $1 AND created_at BETWEEN $2 AND $3
+        AND po_number IS NOT NULL AND po_number <> ''`,
     [vesselId, period.start, period.end],
   );
   const docsReqRes = await query(
@@ -408,7 +412,7 @@ export async function buildQuarterlyComplianceData(
     docsReceived: Number((docsRcvRes.rows[0] as { c: number }).c),
   };
 
-  // 6. PO appendices — three lists.
+  // 6. PO appendices — three lists, all sourced from audit_line_items.
   const appendixRows = (sql: string): Promise<PoAppendixRow[]> =>
     query(sql, [vesselId, period.start, period.end]).then((res) =>
       (res.rows as Array<Record<string, unknown>>).map((r) => ({
@@ -418,72 +422,75 @@ export async function buildQuarterlyComplianceData(
     );
 
   const [posWithHazmat, posAllHazmatFree, posAwaitingDeclaration] = await Promise.all([
+    // POs that have at least one suspected-hazmat line item.
     appendixRows(
-      // is_suspected is stored as VARCHAR ('Yes'/'No'), not a boolean —
-      // case-insensitive equality + LOWER guards against legacy 'YES'.
-      `SELECT DISTINCT po.po_number, po.created_at
-         FROM purchase_orders po
-         JOIN audit_line_items ali
-           ON ali.po_number = po.po_number AND ali.vessel_id = po.vessel_id
-        WHERE po.vessel_id = $1 AND po.created_at BETWEEN $2 AND $3
-          AND LOWER(ali.is_suspected) = 'yes'
-        ORDER BY po.created_at DESC`,
+      `SELECT po_number, MIN(created_at) AS created_at
+         FROM audit_line_items
+        WHERE vessel_id = $1 AND created_at BETWEEN $2 AND $3
+          AND po_number IS NOT NULL AND po_number <> ''
+        GROUP BY po_number
+       HAVING SUM(CASE WHEN LOWER(is_suspected) = 'yes' THEN 1 ELSE 0 END) > 0
+        ORDER BY MIN(created_at) DESC`,
     ),
+    // POs whose every line item is non-suspected (hazmat-free).
     appendixRows(
-      `SELECT po.po_number, po.created_at
-         FROM purchase_orders po
-        WHERE po.vessel_id = $1 AND po.created_at BETWEEN $2 AND $3
-          AND NOT EXISTS (
-            SELECT 1 FROM audit_line_items ali
-             WHERE ali.po_number = po.po_number
-               AND ali.vessel_id = po.vessel_id
-               AND LOWER(ali.is_suspected) = 'yes'
+      `SELECT po_number, MIN(created_at) AS created_at
+         FROM audit_line_items
+        WHERE vessel_id = $1 AND created_at BETWEEN $2 AND $3
+          AND po_number IS NOT NULL AND po_number <> ''
+        GROUP BY po_number
+       HAVING SUM(CASE WHEN LOWER(is_suspected) = 'yes' THEN 1 ELSE 0 END) = 0
+        ORDER BY MIN(created_at) DESC`,
+    ),
+    // POs awaiting declaration — joined to clarification_items at the
+    // vessel level (clarifications aren't keyed by po_number in this
+    // schema, so the link is vessel-wide). Empty when no pending
+    // MD/SDoC clarifications exist for the vessel.
+    appendixRows(
+      `SELECT DISTINCT ali.po_number, MIN(ali.created_at) AS created_at
+         FROM audit_line_items ali
+        WHERE ali.vessel_id = $1 AND ali.created_at BETWEEN $2 AND $3
+          AND ali.po_number IS NOT NULL AND ali.po_number <> ''
+          AND EXISTS (
+            SELECT 1 FROM clarification_items ci
+              JOIN clarification_requests cr ON ci.clarification_id = cr.id
+             WHERE cr.vessel_id = $1
+               AND (ci.mds_status = 'pending' OR ci.sdoc_status = 'pending')
           )
-        ORDER BY po.created_at DESC`,
-    ),
-    appendixRows(
-      `SELECT DISTINCT po.po_number, po.created_at
-         FROM purchase_orders po
-         JOIN clarification_requests cr ON cr.vessel_id = po.vessel_id
-         JOIN clarification_items   ci ON ci.clarification_id = cr.id
-        WHERE po.vessel_id = $1 AND po.created_at BETWEEN $2 AND $3
-          AND (ci.mds_status = 'pending' OR ci.sdoc_status = 'pending')
-        ORDER BY po.created_at DESC`,
+        GROUP BY ali.po_number
+        ORDER BY MIN(ali.created_at) DESC`,
     ),
   ]);
 
-  // 6b. Full PO listing with details + suspected-hazmat counts. Single
-  //     query with a subselect so we don't N+1 across each PO.
+  // 6b. Full PO listing with details + suspected-hazmat counts.
+  // Aggregates audit_line_items rows by po_number into one row per PO.
+  // MAX(vendor_name) and MIN(po_sent_date) are safe — every line of a
+  // single PO carries the same supplier and PO date in practice.
   const poDetailsRes = await query(
-    `SELECT po.po_number, po.supplier_name, po.po_date, po.created_at,
-            po.total_items, po.total_amount, po.currency, po.status,
-            po.description,
-            COALESCE((
-              SELECT COUNT(*)::int FROM audit_line_items ali
-               WHERE ali.po_number = po.po_number
-                 AND ali.vessel_id = po.vessel_id
-                 AND LOWER(ali.is_suspected) = 'yes'
-            ), 0) AS suspected_count
-       FROM purchase_orders po
-      WHERE po.vessel_id = $1 AND po.created_at BETWEEN $2 AND $3
-      ORDER BY po.created_at DESC`,
+    `SELECT po_number,
+            MAX(vendor_name)              AS supplier,
+            MIN(po_sent_date)             AS po_date,
+            MIN(created_at)               AS received_at,
+            COUNT(*)::int                 AS total_items,
+            SUM(CASE WHEN LOWER(is_suspected) = 'yes' THEN 1 ELSE 0 END)::int AS suspected_count,
+            (ARRAY_AGG(item_description ORDER BY row_index))[1] AS sample_item
+       FROM audit_line_items
+      WHERE vessel_id = $1 AND created_at BETWEEN $2 AND $3
+        AND po_number IS NOT NULL AND po_number <> ''
+      GROUP BY po_number
+      ORDER BY MIN(created_at) DESC`,
     [vesselId, period.start, period.end],
   );
   const purchaseOrders: PoDetailRow[] = (poDetailsRes.rows as Array<Record<string, unknown>>).map((r) => {
-    const amountRaw = r.total_amount;
-    const amountStr =
-      amountRaw === null || amountRaw === undefined || amountRaw === ''
-        ? '—'
-        : `${String(r.currency ?? 'USD')} ${Number(amountRaw).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const sample = String(r.sample_item ?? '').trim();
     return {
       poNumber: String(r.po_number ?? ''),
-      supplier: String(r.supplier_name ?? ''),
-      poDate: r.po_date ? String(r.po_date) : fmtDate(r.created_at),
+      supplier: String(r.supplier ?? ''),
+      poDate: r.po_date ? fmtDate(r.po_date) : '—',
+      receivedOn: fmtDate(r.received_at),
       totalItems: Number(r.total_items ?? 0),
-      totalAmount: amountStr,
-      status: String(r.status ?? 'pending'),
       suspectedCount: Number(r.suspected_count ?? 0),
-      description: String(r.description ?? ''),
+      sampleItem: sample.length > 60 ? sample.slice(0, 60) + '…' : sample,
     };
   });
 

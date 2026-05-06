@@ -464,9 +464,9 @@ export function renderPurchaseOrdersPage(data: ReportData): string {
           <td>${esc(p.poNumber)}</td>
           <td>${esc(p.supplier) || '&mdash;'}</td>
           <td style="text-align:center;">${esc(p.poDate)}</td>
+          <td style="text-align:center;">${esc(p.receivedOn)}</td>
           <td style="text-align:center;">${p.totalItems}</td>
-          <td style="text-align:right;">${esc(p.totalAmount)}</td>
-          <td style="text-align:center;">${esc(p.status)}</td>
+          <td>${esc(p.sampleItem) || '&mdash;'}</td>
           <td style="text-align:center;">${flag}</td>
         </tr>`;
     })
@@ -480,12 +480,12 @@ export function renderPurchaseOrdersPage(data: ReportData): string {
     <thead>
       <tr>
         <th style="width:10mm;">No.</th>
-        <th>PO Number</th>
+        <th style="width:34mm;">PO Number</th>
         <th>Supplier</th>
         <th style="width:22mm;">PO Date</th>
+        <th style="width:22mm;">Received On</th>
         <th style="width:14mm;">Items</th>
-        <th style="width:28mm;">Amount</th>
-        <th style="width:22mm;">Status</th>
+        <th>Sample item</th>
         <th style="width:24mm;">Hazmat</th>
       </tr>
     </thead>
