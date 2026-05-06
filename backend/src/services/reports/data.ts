@@ -83,6 +83,17 @@ export interface PoAppendixRow {
   receivedDate: string;
 }
 
+export interface PoDetailRow {
+  poNumber: string;
+  supplier: string;
+  poDate: string;             // formatted dd/mm/yyyy (po_date if set, else created_at)
+  totalItems: number;
+  totalAmount: string;        // formatted with currency, '—' if null
+  status: string;             // pending / received / etc
+  suspectedCount: number;     // count of audit_line_items with is_suspected=Yes
+  description: string;
+}
+
 export interface ReportData {
   vessel: VesselSpecs;
   period: ReportPeriod;
@@ -99,6 +110,10 @@ export interface ReportData {
     posAllHazmatFree: PoAppendixRow[];
     posAwaitingDeclaration: PoAppendixRow[];
   };
+  /** Full PO listing for the period — supplier, date, items, amount,
+   *  status, suspected-hazmat count. Used by the Purchase Orders page
+   *  in the Ship Overall and Compliance Summary reports. */
+  purchaseOrders: PoDetailRow[];
   /** Auto-generated doc number for the cover page. */
   docNumber: string;
   /** Operator who triggered the generation, for the cover. */
@@ -437,6 +452,41 @@ export async function buildQuarterlyComplianceData(
     ),
   ]);
 
+  // 6b. Full PO listing with details + suspected-hazmat counts. Single
+  //     query with a subselect so we don't N+1 across each PO.
+  const poDetailsRes = await query(
+    `SELECT po.po_number, po.supplier_name, po.po_date, po.created_at,
+            po.total_items, po.total_amount, po.currency, po.status,
+            po.description,
+            COALESCE((
+              SELECT COUNT(*)::int FROM audit_line_items ali
+               WHERE ali.po_number = po.po_number
+                 AND ali.vessel_id = po.vessel_id
+                 AND LOWER(ali.is_suspected) = 'yes'
+            ), 0) AS suspected_count
+       FROM purchase_orders po
+      WHERE po.vessel_id = $1 AND po.created_at BETWEEN $2 AND $3
+      ORDER BY po.created_at DESC`,
+    [vesselId, period.start, period.end],
+  );
+  const purchaseOrders: PoDetailRow[] = (poDetailsRes.rows as Array<Record<string, unknown>>).map((r) => {
+    const amountRaw = r.total_amount;
+    const amountStr =
+      amountRaw === null || amountRaw === undefined || amountRaw === ''
+        ? '—'
+        : `${String(r.currency ?? 'USD')} ${Number(amountRaw).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return {
+      poNumber: String(r.po_number ?? ''),
+      supplier: String(r.supplier_name ?? ''),
+      poDate: r.po_date ? String(r.po_date) : fmtDate(r.created_at),
+      totalItems: Number(r.total_items ?? 0),
+      totalAmount: amountStr,
+      status: String(r.status ?? 'pending'),
+      suspectedCount: Number(r.suspected_count ?? 0),
+      description: String(r.description ?? ''),
+    };
+  });
+
   // 7. Doc number — yyyymmdd-IMO-AD for ad-hoc, plain Q-style otherwise.
   const yyyymmdd = `${period.end.getUTCFullYear()}${String(period.end.getUTCMonth() + 1).padStart(2, '0')}${String(period.end.getUTCDate()).padStart(2, '0')}`;
   const docNumber = `EG | ${vessel.imoNumber} | ${yyyymmdd} | ${period.label.replace(/\s+/g, '')}`;
@@ -449,6 +499,7 @@ export async function buildQuarterlyComplianceData(
     hazmatOverview,
     materialGroups,
     appendices: { posWithHazmat, posAllHazmatFree, posAwaitingDeclaration },
+    purchaseOrders,
     docNumber,
     generatedBy,
     generatedAt: fmtDate(new Date()),

@@ -21,6 +21,7 @@ import {
   STYLESHEET,
   renderCoverPage,
   renderSpecsPage,
+  renderPurchaseOrdersPage,
 } from './quarterly-compliance.js';
 
 function renderComplianceSnapshotPage(data: ReportData): string {
@@ -149,6 +150,7 @@ ${renderCoverPage(data, 'Compliance Summary Report')}
 ${renderSpecsPage(data)}
 ${renderComplianceSnapshotPage(data)}
 ${renderActionItemsPage(data)}
+${renderPurchaseOrdersPage(data)}
 ${renderPeriodActivityPage(data)}
 </body>
 </html>`;

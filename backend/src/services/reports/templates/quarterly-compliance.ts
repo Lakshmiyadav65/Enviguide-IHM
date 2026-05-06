@@ -442,6 +442,58 @@ function renderHazmatPage(data: ReportData): string {
 </section>`;
 }
 
+// ─── Purchase Orders page ────────────────────────────────────────────────
+// Full listing of POs received in the period, with supplier, date,
+// item count, amount, status and a count of suspected-hazmat lines so
+// the reader can see at a glance which POs need further attention.
+export function renderPurchaseOrdersPage(data: ReportData): string {
+  // If there are no POs in the period, skip the section entirely so we
+  // don't waste a page on a "none" placeholder. The Movement page's
+  // "POs received in this Quarter: 0" already conveys the information.
+  if (!data.purchaseOrders || data.purchaseOrders.length === 0) return '';
+  const periodLabel = `${data.period.start.toLocaleDateString('en-GB')} to ${data.period.end.toLocaleDateString('en-GB')}`;
+
+  const rows = data.purchaseOrders
+    .map((p, i) => {
+      const flag = p.suspectedCount > 0
+        ? `<span class="po-flag">${p.suspectedCount} suspected</span>`
+        : `<span class="po-flag clean">Clean</span>`;
+      return `
+        <tr>
+          <td style="text-align:center;">${i + 1}</td>
+          <td>${esc(p.poNumber)}</td>
+          <td>${esc(p.supplier) || '&mdash;'}</td>
+          <td style="text-align:center;">${esc(p.poDate)}</td>
+          <td style="text-align:center;">${p.totalItems}</td>
+          <td style="text-align:right;">${esc(p.totalAmount)}</td>
+          <td style="text-align:center;">${esc(p.status)}</td>
+          <td style="text-align:center;">${flag}</td>
+        </tr>`;
+    })
+    .join('');
+
+  return `
+<section class="page">
+  ${BRAND_HEADER}
+  <h2>Purchase Orders (${esc(periodLabel)})</h2>
+  <table class="details po-table">
+    <thead>
+      <tr>
+        <th style="width:10mm;">No.</th>
+        <th>PO Number</th>
+        <th>Supplier</th>
+        <th style="width:22mm;">PO Date</th>
+        <th style="width:14mm;">Items</th>
+        <th style="width:28mm;">Amount</th>
+        <th style="width:22mm;">Status</th>
+        <th style="width:24mm;">Hazmat</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+</section>`;
+}
+
 // ─── IHM Details page ─────────────────────────────────────────────────────
 function renderDetailsPage(data: ReportData): string {
   const findGroup = (key: MaterialGroup['groupKey']) =>
@@ -755,6 +807,22 @@ table.hm-meta th { width: 22%; }
 }
 .hm-legend thead th { text-align: center; }
 .hm-legend tbody tr { page-break-inside: avoid; }
+
+table.po-table { font-size: 9pt; }
+table.po-table tbody tr { page-break-inside: avoid; }
+.po-flag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 8.5pt;
+  font-weight: 700;
+  background: #FEE2E2;
+  color: #991B1B;
+}
+.po-flag.clean {
+  background: #DCFCE7;
+  color: #166534;
+}
 `;
 
 // ─── Main entry ───────────────────────────────────────────────────────────
@@ -773,6 +841,7 @@ ${renderTocPage()}
 ${renderMovementPage(data)}
 ${renderHazmatPage(data)}
 ${renderDetailsPage(data)}
+${renderPurchaseOrdersPage(data)}
 ${renderHmMarkedDecksPages(data.materialGroups)}
 </body>
 </html>`;
