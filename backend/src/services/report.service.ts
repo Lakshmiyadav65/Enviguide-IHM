@@ -13,6 +13,7 @@ import { renderPdf } from './reports/renderer.js';
 import {
   buildQuarterlyComplianceData,
   quarterContaining,
+  quartersSince,
   type ReportPeriod,
 } from './reports/data.js';
 import {
@@ -145,5 +146,68 @@ export const ReportService = {
       generatedBy: row.generated_by,
       createdAt: row.created_at,
     }));
+  },
+
+  /** Quarterly Archive timeline.
+   *
+   *  Returns one entry per calendar quarter from the vessel's onboarding
+   *  date through the current quarter, oldest first. Each entry pairs
+   *  the period (label + start + end) with the most recent quarterly
+   *  report that's been generated for it (or null when no report has
+   *  been generated yet). The frontend uses this to render Download +
+   *  Generate buttons per card. */
+  async timeline(vesselId: string) {
+    const onboardRes = await query(
+      `SELECT created_at FROM vessels WHERE id = $1 LIMIT 1`,
+      [vesselId],
+    );
+    if (onboardRes.rows.length === 0) {
+      throw new Error('Vessel not found');
+    }
+    const onboardedAt = new Date(String((onboardRes.rows[0] as { created_at: string }).created_at));
+    const periods = quartersSince(onboardedAt);
+
+    // Pull all quarterly reports for this vessel and key by period_label
+    // so we can match them to the expected quarters in O(1).
+    const reportsRes = await query(
+      `SELECT id, period_label, period_start, period_end,
+              status, file_name, file_size, generated_by, created_at
+         FROM reports
+        WHERE vessel_id = $1 AND report_type = 'quarterly'
+        ORDER BY created_at DESC`,
+      [vesselId],
+    );
+    type Row = {
+      id: string; period_label: string; period_start: string; period_end: string;
+      status: string; file_name: string | null; file_size: number | null;
+      generated_by: string | null; created_at: string;
+    };
+    const byLabel = new Map<string, Row>();
+    for (const row of reportsRes.rows as Row[]) {
+      // Newest first wins per label (rows came back DESC).
+      if (!byLabel.has(row.period_label)) byLabel.set(row.period_label, row);
+    }
+
+    // Newest quarter first reads better in the UI.
+    return periods.reverse().map((p) => {
+      const r = byLabel.get(p.label);
+      return {
+        period: {
+          label: p.label,
+          start: p.start.toISOString(),
+          end: p.end.toISOString(),
+        },
+        report: r
+          ? {
+              id: String(r.id),
+              status: r.status,
+              fileName: r.file_name,
+              fileSize: r.file_size,
+              generatedBy: r.generated_by,
+              createdAt: r.created_at,
+            }
+          : null,
+      };
+    });
   },
 };

@@ -96,6 +96,24 @@ export default function Vessels() {
     // New Reports landing — tabs for Standard / Quarterly / Custom
     const [activeReportTab, setActiveReportTab] = useState<'standard' | 'quarterly' | 'custom'>('standard');
 
+    // Quarterly Archive timeline. Pulled from /reports/quarterly/timeline
+    // when the tab opens. One entry per calendar quarter from vessel
+    // onboarding through the current quarter; `report` is null when
+    // nothing has been generated for that quarter yet.
+    interface QuarterlyEntry {
+        period: { label: string; start: string; end: string };
+        report: {
+            id: string; status: string; fileName: string | null;
+            fileSize: number | null; generatedBy: string | null; createdAt: string;
+        } | null;
+    }
+    const [quarterlyTimeline, setQuarterlyTimeline] = useState<QuarterlyEntry[]>([]);
+    const [quarterlyLoading, setQuarterlyLoading] = useState(false);
+    // Track which quarter is currently being generated so the user gets
+    // immediate feedback ('Generating…') without us re-fetching after
+    // every click.
+    const [generatingQuarter, setGeneratingQuarter] = useState<string | null>(null);
+
     const fileInputRef = useRef<HTMLInputElement>(null);
     const docInputRef = useRef<HTMLInputElement>(null);
 
@@ -126,6 +144,29 @@ export default function Vessels() {
     }, []);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    // Pull the Quarterly Archive timeline whenever the user opens the
+    // Quarterly tab on a vessel. One entry per calendar quarter from
+    // the vessel's onboarding date through today's quarter, with the
+    // matching report row attached when one exists.
+    useEffect(() => {
+        if (activeTab !== 'reports' || activeReportTab !== 'quarterly') return;
+        const vId = activeVesselData?.id;
+        if (!vId) { setQuarterlyTimeline([]); return; }
+        let cancelled = false;
+        setQuarterlyLoading(true);
+        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+        const token = localStorage.getItem('ihm_token') || '';
+        fetch(`${base}/vessels/${vId}/reports/quarterly/timeline`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+            .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`Failed (${r.status})`))))
+            .then((j) => { if (!cancelled && Array.isArray(j?.data)) setQuarterlyTimeline(j.data); })
+            .catch(() => { if (!cancelled) setQuarterlyTimeline([]); })
+            .finally(() => { if (!cancelled) setQuarterlyLoading(false); });
+        return () => { cancelled = true; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab, activeReportTab, activeVesselData?.id, generatingQuarter]);
 
     // Scroll effect for report blurred cards (Accordion cards in Step 0)
     useEffect(() => {
@@ -952,11 +993,142 @@ export default function Vessels() {
                     hazmat: 'Vessel-wide hazardous materials overview — totals by category, threshold flags, and risk hot-spots.',
                 };
 
-                const startGenerate = (catId: string, itemName: string) => {
-                    setSelectedReportType(itemName);
-                    setSelectedReportCategory(catId);
-                    setReportStep(1);
+                // Map a UI report (Ad Hoc item or Quarterly entry) to the
+                // backend report type the generator understands.
+                const backendType = (catId: string, itemId: string): string => {
+                    if (catId === 'adhoc') {
+                        if (itemId === 'inventory') return 'inventory';
+                        if (itemId === 'hazmat') return 'hazmat';
+                        return 'compliance'; // summary or default
+                    }
+                    return 'quarterly';
                 };
+
+                const startGenerate = async (catId: string, itemId: string) => {
+                    const vId = activeVesselData?.id;
+                    if (!vId) {
+                        alert('This vessel is not backed by the database yet — add it first to generate a report.');
+                        return;
+                    }
+                    const type = backendType(catId, itemId);
+                    try {
+                        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+                        const url = `${base}/vessels/${vId}/reports/${type}/download`;
+                        const token = localStorage.getItem('ihm_token') || '';
+                        const res = await fetch(url, {
+                            headers: token ? { Authorization: `Bearer ${token}` } : {},
+                        });
+                        if (!res.ok) {
+                            const body = await res.text().catch(() => '');
+                            throw new Error(`Generate failed (${res.status}) ${body.slice(0, 200)}`);
+                        }
+                        const blob = await res.blob();
+                        const disposition = res.headers.get('Content-Disposition') ?? '';
+                        const matched = disposition.match(/filename="([^"]+)"/);
+                        const fileName = matched?.[1] ?? `${type}-report.pdf`;
+                        const objectUrl = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = objectUrl;
+                        a.download = fileName;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+                    } catch (err) {
+                        console.error('Report generation failed:', err);
+                        alert(`Could not generate the report.\n\n${(err as Error).message}`);
+                    }
+                };
+
+                // Download the PDF for a *specific* past quarter — passes
+                // the period start/end/label as query overrides so the
+                // backend renders that quarter instead of "current". Used
+                // by the Quarterly Archive cards.
+                const generateQuarter = async (entry: QuarterlyEntry) => {
+                    const vId = activeVesselData?.id;
+                    if (!vId) return;
+                    setGeneratingQuarter(entry.period.label);
+                    try {
+                        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+                        const params = new URLSearchParams({
+                            periodLabel: entry.period.label,
+                            periodStart: entry.period.start.slice(0, 10),
+                            periodEnd: entry.period.end.slice(0, 10),
+                        });
+                        const url = `${base}/vessels/${vId}/reports/quarterly/download?${params.toString()}`;
+                        const token = localStorage.getItem('ihm_token') || '';
+                        const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+                        if (!res.ok) {
+                            const body = await res.text().catch(() => '');
+                            throw new Error(`Generate failed (${res.status}) ${body.slice(0, 200)}`);
+                        }
+                        const blob = await res.blob();
+                        const disposition = res.headers.get('Content-Disposition') ?? '';
+                        const matched = disposition.match(/filename="([^"]+)"/);
+                        const fileName = matched?.[1] ?? `quarterly-${entry.period.label.replace(/\s+/g, '-')}.pdf`;
+                        const objectUrl = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = objectUrl;
+                        a.download = fileName;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+                    } catch (err) {
+                        console.error('Quarterly report generation failed:', err);
+                        alert(`Could not generate the quarterly report.\n\n${(err as Error).message}`);
+                    } finally {
+                        setGeneratingQuarter(null);
+                    }
+                };
+
+                // Re-stream a previously-cached PDF straight from the
+                // server (no re-render). Cheap.
+                const downloadCachedQuarter = async (reportId: string, fileName: string) => {
+                    const vId = activeVesselData?.id;
+                    if (!vId) return;
+                    try {
+                        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+                        const url = `${base}/vessels/${vId}/reports/file/${reportId}`;
+                        const token = localStorage.getItem('ihm_token') || '';
+                        const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+                        if (!res.ok) throw new Error(`Download failed (${res.status})`);
+                        const blob = await res.blob();
+                        const objectUrl = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = objectUrl;
+                        a.download = fileName;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+                    } catch (err) {
+                        console.error('Cached download failed:', err);
+                        alert(`Could not download the cached report.\n\n${(err as Error).message}`);
+                    }
+                };
+
+                // Quarter month-range label, e.g. 'Apr – Jun 2026'.
+                const formatQuarterRange = (start: string, end: string) => {
+                    const s = new Date(start);
+                    const e = new Date(end);
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    return `${months[s.getUTCMonth()]} – ${months[e.getUTCMonth()]} ${e.getUTCFullYear()}`;
+                };
+
+                // Group the timeline by year for the Quarterly Archive
+                // header ('2026 — 2 reports').
+                const timelineByYear: { year: string; entries: QuarterlyEntry[] }[] = (() => {
+                    const map = new Map<string, QuarterlyEntry[]>();
+                    for (const e of quarterlyTimeline) {
+                        const y = e.period.label.split(' ')[1] ?? new Date(e.period.start).getUTCFullYear().toString();
+                        if (!map.has(y)) map.set(y, []);
+                        map.get(y)!.push(e);
+                    }
+                    return Array.from(map.entries())
+                        .sort((a, b) => Number(b[0]) - Number(a[0]))
+                        .map(([year, entries]) => ({ year, entries }));
+                })();
 
                 return (
                     <div className="reports-landing-v2">
@@ -1036,59 +1208,84 @@ export default function Vessels() {
                             </div>
                         )}
 
-                        {/* Quarterly Archive — populated from real generated
-                            reports once that table exists; empty state until then. */}
+                        {/* Quarterly Archive — one card per calendar quarter
+                            since the vessel was onboarded. Quarters with a
+                            cached report show Download; the rest show
+                            Generate (which renders that quarter on demand
+                            and downloads the PDF). */}
                         {activeReportTab === 'quarterly' && (
-                            quarterlyByYear.length > 0 ? (
-                                <div className="quarterly-archive">
-                                    {quarterlyByYear.map(({ year, quarters }) => (
-                                        <div className="year-group" key={year}>
-                                            <div className="year-group-header">
-                                                <Calendar size={14} />
-                                                <span className="year-label">{year}</span>
-                                                <span className="year-count">{quarters.length} reports</span>
-                                            </div>
-                                            <div className="year-quarters">
-                                                {quarters.map((q) => {
-                                                    const item = q.items[0];
-                                                    const range = q.title.match(/\(([^)]+)\)/)?.[1] ?? '';
-                                                    const label = q.title.split(' ')[0];
-                                                    return (
-                                                        <div className="quarter-row" key={q.id}>
-                                                            <div className="quarter-info">
-                                                                <strong>{label}</strong>
-                                                                <span>{range}</span>
-                                                            </div>
-                                                            <div className="quarter-meta">{item.date}</div>
-                                                            <div className="quarter-actions">
-                                                                <button
-                                                                    type="button"
-                                                                    className="report-btn-mini primary"
-                                                                    onClick={() => startGenerate(q.id, item.name)}
-                                                                >
-                                                                    <RotateCw size={12} /> Generate
-                                                                </button>
-                                                                <button type="button" className="report-btn-mini">
-                                                                    <Download size={12} />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    ))}
+                            quarterlyLoading ? (
+                                <div className="reports-empty-state">
+                                    <div className="reports-empty-icon"><Calendar size={28} /></div>
+                                    <h3>Loading quarters…</h3>
+                                </div>
+                            ) : timelineByYear.length === 0 ? (
+                                <div className="reports-empty-state">
+                                    <div className="reports-empty-icon"><Calendar size={28} /></div>
+                                    <h3>No quarters yet</h3>
+                                    <p>
+                                        Quarterly reports become available once the vessel has been
+                                        onboarded for at least one calendar quarter. Add a vessel
+                                        first or wait until the next quarter starts.
+                                    </p>
                                 </div>
                             ) : (
-                                <div className="reports-empty-state">
-                                    <div className="reports-empty-icon">
-                                        <Calendar size={28} />
-                                    </div>
-                                    <h3>No quarterly reports yet</h3>
-                                    <p>
-                                        Once you generate a report for a quarter, it will be archived here so the team
-                                        can re-download it later.
-                                    </p>
+                                <div className="quarterly-archive">
+                                    {timelineByYear.map(({ year, entries }) => {
+                                        const generatedCount = entries.filter((e) => e.report).length;
+                                        return (
+                                            <div className="year-group" key={year}>
+                                                <div className="year-group-header">
+                                                    <Calendar size={14} />
+                                                    <span className="year-label">{year}</span>
+                                                    <span className="year-count">
+                                                        {entries.length} {entries.length === 1 ? 'quarter' : 'quarters'} · {generatedCount} generated
+                                                    </span>
+                                                </div>
+                                                <div className="year-quarters">
+                                                    {entries.map((entry) => {
+                                                        const label = entry.period.label.split(' ')[0]; // 'Q2'
+                                                        const range = formatQuarterRange(entry.period.start, entry.period.end);
+                                                        const hasReport = !!entry.report;
+                                                        const isGenerating = generatingQuarter === entry.period.label;
+                                                        const dateMeta = hasReport
+                                                            ? `Generated ${new Date(entry.report!.createdAt).toLocaleDateString()}`
+                                                            : 'Not generated yet';
+                                                        return (
+                                                            <div className="quarter-row" key={entry.period.label}>
+                                                                <div className="quarter-info">
+                                                                    <strong>{label}</strong>
+                                                                    <span>{range}</span>
+                                                                </div>
+                                                                <div className="quarter-meta">{dateMeta}</div>
+                                                                <div className="quarter-actions">
+                                                                    {hasReport && entry.report?.fileName && (
+                                                                        <button
+                                                                            type="button"
+                                                                            className="report-btn-mini primary"
+                                                                            onClick={() => downloadCachedQuarter(entry.report!.id, entry.report!.fileName!)}
+                                                                            title="Download the cached PDF"
+                                                                        >
+                                                                            <Download size={12} /> Download
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        type="button"
+                                                                        className={`report-btn-mini${hasReport ? '' : ' primary'}`}
+                                                                        onClick={() => generateQuarter(entry)}
+                                                                        disabled={isGenerating}
+                                                                        title={hasReport ? 'Re-generate from latest data' : 'Generate this quarter\'s report'}
+                                                                    >
+                                                                        <RotateCw size={12} /> {isGenerating ? 'Generating…' : (hasReport ? 'Re-generate' : 'Generate')}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )
                         )}

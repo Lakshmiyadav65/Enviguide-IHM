@@ -35,7 +35,15 @@ export async function listReports(req: Request, res: Response, next: NextFunctio
   } catch (err) { next(err); }
 }
 
-/** GET /vessels/:vesselId/reports/:type/download */
+/** GET /vessels/:vesselId/reports/:type/download
+ *
+ *  Optional query overrides for quarterly reports — used by the
+ *  Quarterly Archive Generate buttons to render a *specific* past
+ *  quarter rather than the current one:
+ *    ?periodLabel=Q2%202026
+ *    &periodStart=2026-04-01
+ *    &periodEnd=2026-06-30
+ *  All three must be supplied together; partial sets are ignored. */
 export async function downloadReport(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const vesselId = req.params.vesselId as string;
@@ -45,12 +53,40 @@ export async function downloadReport(req: Request, res: Response, next: NextFunc
     const type = parseType(req.params.type);
     const generatedBy = req.user?.email || 'Unknown';
 
-    const result = await ReportService.generate({ vesselId, type, generatedBy });
+    const { periodLabel, periodStart, periodEnd } = req.query as {
+      periodLabel?: string; periodStart?: string; periodEnd?: string;
+    };
+    const period =
+      periodLabel && periodStart && periodEnd
+        ? {
+            label: periodLabel,
+            start: new Date(periodStart),
+            end: new Date(periodEnd),
+          }
+        : undefined;
+
+    const result = await ReportService.generate({ vesselId, type, generatedBy, period });
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${result.fileName}"`);
     res.setHeader('Content-Length', String(result.fileSize));
     res.send(result.pdf);
+  } catch (err) { next(err); }
+}
+
+/** GET /vessels/:vesselId/reports/quarterly/timeline
+ *
+ *  Returns one row per calendar quarter from the vessel's onboarding
+ *  date through the current quarter, with the matching report row
+ *  attached (or null when no report has been generated yet for that
+ *  quarter). The Quarterly Archive tab renders one card per row. */
+export async function listQuarterlyTimeline(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const vesselId = req.params.vesselId as string;
+    const vessel = await VesselService.getVesselByIdForUser(vesselId, req.user!.userId);
+    if (!vessel) return next(createError('Vessel not found', 404));
+    const timeline = await ReportService.timeline(vesselId);
+    res.json({ success: true, data: timeline });
   } catch (err) { next(err); }
 }
 

@@ -174,6 +174,31 @@ export function quarterContaining(ref: Date = new Date()): ReportPeriod {
   return { start, end, label: `Q${q + 1} ${y}` };
 }
 
+/** Walks every calendar quarter from the one containing `from` through
+ *  the one containing `until` (inclusive), oldest first. Used to build
+ *  the Quarterly Archive timeline — one card per elapsed quarter since
+ *  the vessel was onboarded. */
+export function quartersSince(from: Date, until: Date = new Date()): ReportPeriod[] {
+  const out: ReportPeriod[] = [];
+  let y = from.getUTCFullYear();
+  let q = Math.floor(from.getUTCMonth() / 3); // 0..3
+  const endY = until.getUTCFullYear();
+  const endQ = Math.floor(until.getUTCMonth() / 3);
+
+  // Hard guard against runaway loops if a bad date sneaks in (e.g. a
+  // vessel created_at far in the future would never satisfy the
+  // termination condition).
+  let safety = 0;
+  while ((y < endY || (y === endY && q <= endQ)) && safety++ < 200) {
+    const start = new Date(Date.UTC(y, q * 3, 1, 0, 0, 0));
+    const end = new Date(Date.UTC(y, q * 3 + 3, 0, 23, 59, 59));
+    out.push({ start, end, label: `Q${q + 1} ${y}` });
+    q += 1;
+    if (q > 3) { q = 0; y += 1; }
+  }
+  return out;
+}
+
 // ─── Main entry ───────────────────────────────────────────────────────────
 
 export async function buildQuarterlyComplianceData(
