@@ -196,8 +196,11 @@ function renderMaterialTable(group: MaterialGroup, startNo = 1): string {
 }
 
 // ─── HM Marked Decks pages ────────────────────────────────────────────────
-// One page per material with a GA plan + pin. Materials without a plan
-// are skipped — including them would render an empty placeholder.
+// One page per GA plan (= per deck). Each page shows the plan once with
+// numbered pin markers for every material on that deck, plus a legend
+// table below mapping number → material details. This collapses what
+// would otherwise be one page per material (100+ pages for a real vessel)
+// into one page per deck (~5).
 function renderHmMarkedDecksPages(groups: MaterialGroup[]): string {
   const allMaterials: MaterialRow[] = groups.flatMap((g) => g.rows);
   const withPlan = allMaterials.filter(
@@ -205,49 +208,66 @@ function renderHmMarkedDecksPages(groups: MaterialGroup[]): string {
   );
   if (withPlan.length === 0) return '';
 
-  return withPlan
-    .map((m) => {
-      const planUrl = m.gaPlanUrl!;
-      // Pin coordinates: prefer (pinX,pinY) percentages; otherwise centre
-      // of the deck-area rect. Both schemes already in the data layer.
-      let pinTop = '50%';
-      let pinLeft = '50%';
-      if (m.pinX !== null && m.pinY !== null) {
-        pinLeft = `${(m.pinX * 100).toFixed(1)}%`;
-        pinTop = `${(m.pinY * 100).toFixed(1)}%`;
-      } else if (m.rect) {
-        pinLeft = `${((m.rect.x + m.rect.w / 2) * 100).toFixed(1)}%`;
-        pinTop = `${((m.rect.y + m.rect.h / 2) * 100).toFixed(1)}%`;
-      }
-      return `
+  // Group by GA plan URL. Order of insertion preserves Part I → III flow.
+  const byPlan = new Map<string, MaterialRow[]>();
+  for (const m of withPlan) {
+    const key = m.gaPlanUrl!;
+    if (!byPlan.has(key)) byPlan.set(key, []);
+    byPlan.get(key)!.push(m);
+  }
+
+  const pages: string[] = [];
+  for (const [planUrl, materials] of byPlan.entries()) {
+    const deckName = materials[0]?.gaPlanName || materials[0]?.location || 'Deck';
+
+    const markers = materials
+      .map((m, idx) => {
+        let pinTop = '50%';
+        let pinLeft = '50%';
+        if (m.pinX !== null && m.pinY !== null) {
+          pinLeft = `${(m.pinX * 100).toFixed(1)}%`;
+          pinTop = `${(m.pinY * 100).toFixed(1)}%`;
+        } else if (m.rect) {
+          pinLeft = `${((m.rect.x + m.rect.w / 2) * 100).toFixed(1)}%`;
+          pinTop = `${((m.rect.y + m.rect.h / 2) * 100).toFixed(1)}%`;
+        }
+        return `<div class="pin-number" style="top:${pinTop}; left:${pinLeft};">${idx + 1}</div>`;
+      })
+      .join('');
+
+    const legendRows = materials
+      .map((m, idx) => `
+        <tr>
+          <td style="text-align:center;">${idx + 1}</td>
+          <td>${esc(m.name)}</td>
+          <td>${esc(m.classification) || '&mdash;'}</td>
+          <td>${esc(m.qty) || '&mdash;'}</td>
+          <td>${esc(m.status)}</td>
+        </tr>`)
+      .join('');
+
+    pages.push(`
 <section class="page">
   ${BRAND_HEADER}
-  <table class="hm-meta">
-    <tr>
-      <th>Name</th><td colspan="3">${esc(m.name)}</td>
-    </tr>
-    <tr>
-      <th>Equipment</th><td>${esc(m.name)}</td>
-      <th>Part where used</th><td>${esc(m.partsWhereUsed) || '&mdash;'}</td>
-    </tr>
-    <tr>
-      <th>Deck Plan</th><td>${esc(m.location) || '&mdash;'}</td>
-      <th>Hazmat Compound</th><td>${esc(m.classification) || '&mdash;'}</td>
-    </tr>
-    <tr>
-      <th>Qty</th><td>${esc(m.qty) || '&mdash;'}</td>
-      <th>Status</th><td>${esc(m.status)}</td>
-    </tr>
-    <tr>
-      <th>Remarks</th><td colspan="3">${esc(m.remarks) || '&mdash;'}</td>
-    </tr>
-  </table>
+  <h3>HM Marked Decks &mdash; ${esc(deckName)}</h3>
   <div class="deck-plan-area" style="background-image:url('${esc(planUrl)}'); background-size:contain; background-repeat:no-repeat; background-position:center; background-color:#FFFFFF;">
-    <div class="biohazard-marker" style="top:${pinTop}; left:${pinLeft};">☣</div>
+    ${markers}
   </div>
-</section>`;
-    })
-    .join('');
+  <table class="hm-legend">
+    <thead>
+      <tr>
+        <th style="width:10mm;">No</th>
+        <th>Name</th>
+        <th>Hazmat</th>
+        <th>Qty</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>${legendRows}</tbody>
+  </table>
+</section>`);
+  }
+  return pages.join('');
 }
 
 // ─── Vessel photograph block ──────────────────────────────────────────────
@@ -451,7 +471,7 @@ html, body {
   line-height: 1.4;
 }
 
-.page { page-break-after: always; padding: 0 18mm; padding-top: 12mm; padding-bottom: 12mm; }
+.page { page-break-after: always; padding: 0 14mm; padding-top: 6mm; padding-bottom: 6mm; }
 .page:last-child { page-break-after: auto; }
 
 .brand-header {
@@ -666,26 +686,39 @@ table.hm-meta th { width: 22%; }
 }
 
 .deck-plan-area {
-  margin-top: 4mm;
+  margin-top: 3mm;
   width: 100%;
-  height: 145mm;
+  height: 110mm;
   border: 1px solid #000;
   background:
     repeating-linear-gradient(0deg, #FFFFFF 0, #FFFFFF 9px, #F2F2F2 9px, #F2F2F2 10px),
     repeating-linear-gradient(90deg, #FFFFFF 0, #FFFFFF 9px, #F2F2F2 9px, #F2F2F2 10px);
   position: relative;
 }
-.biohazard-marker {
+.pin-number {
   position: absolute;
-  width: 38px; height: 38px;
+  width: 22px; height: 22px;
   background: #F08C3C;
+  border: 1.5px solid #FFFFFF;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   color: #FFFFFF;
-  font-size: 18pt;
-  font-weight: 900;
+  font-size: 9pt;
+  font-weight: 700;
   transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px #8C4A1F;
 }
+.hm-legend {
+  font-size: 9pt;
+  margin-top: 3mm;
+  page-break-inside: auto;
+}
+.hm-legend th, .hm-legend td {
+  padding: 3px 5px;
+  vertical-align: middle;
+}
+.hm-legend thead th { text-align: center; }
+.hm-legend tbody tr { page-break-inside: avoid; }
 `;
 
 // ─── Main entry ───────────────────────────────────────────────────────────

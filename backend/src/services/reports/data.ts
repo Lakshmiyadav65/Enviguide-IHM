@@ -66,6 +66,7 @@ export interface MaterialRow {
   status: 'Added' | 'Updated' | 'Carried Forward';
   /** For HM Marked Decks page — null if no GA plan / pin set. */
   gaPlanUrl: string | null;
+  gaPlanName: string | null;
   pinX: number | null;
   pinY: number | null;
   rect: { x: number; y: number; w: number; h: number } | null;
@@ -248,7 +249,8 @@ export async function buildQuarterlyComplianceData(
             da.y           AS rect_y,
             da.width       AS rect_w,
             da.height      AS rect_h,
-            gp.file_path   AS ga_file_path
+            gp.file_path   AS ga_file_path,
+            gp.name        AS ga_plan_name
        FROM materials m
        LEFT JOIN deck_areas da ON m.deck_area_id = da.id
        LEFT JOIN ga_plans   gp ON da.ga_plan_id   = gp.id
@@ -298,6 +300,7 @@ export async function buildQuarterlyComplianceData(
       remarks: String(row.remarks ?? ''),
       status: statusOf(createdAt, updatedAt, period),
       gaPlanUrl: (row.ga_file_path as string) ?? null,
+      gaPlanName: (row.ga_plan_name as string) ?? null,
       pinX: row.pin_x !== null && row.pin_x !== undefined ? Number(row.pin_x) : null,
       pinY: row.pin_y !== null && row.pin_y !== undefined ? Number(row.pin_y) : null,
       rect,
