@@ -90,6 +90,32 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
         return [];
     });
 
+    // Backend-sourced material list per deck-area id, populated when the
+    // vessel is real (has a vesselId). Keyed by deck.id which matches the
+    // backend's deck_areas.id and is what the mapping page passes as
+    // deckAreaId when it POSTs new materials. Empty for demo vessels —
+    // those still read from localStorage further down.
+    interface DeckMaterial {
+        id: string;
+        name: string;
+        ihmPart?: string;
+        category?: string;
+        hazardType?: string;
+        compartment?: string;
+        equipment?: string;
+        component?: string;
+        material?: string;
+        materialName?: string;
+        quantity?: string;
+        unit?: string;
+        description?: string;
+        pin?: { x: number; y: number };
+        pinX?: number | null;
+        pinY?: number | null;
+        hmStatus?: string;
+    }
+    const [materialsByDeck, setMaterialsByDeck] = useState<Record<string, DeckMaterial[]>>({});
+
     // Save plans to localStorage
     useEffect(() => {
         localStorage.setItem(`vessel_plans_${vesselName}`, JSON.stringify(uploadedPlans));
@@ -461,15 +487,90 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
         };
     }, [vesselName]);
 
-    // Read fresh mapped items count directly from localStorage (fallback if state is stale)
-    const getFreshItemCount = (deckTitle: string): number => {
+    // ── Backend material loader (replaces the localStorage-only path
+    //    for backed vessels) ────────────────────────────────────────
+    // Pulls every material for a given deck.id (== deck_areas.id on the
+    // backend) and stashes it under that key in materialsByDeck. Cheap
+    // and idempotent — safe to call on every visibilitychange / focus
+    // so the count auto-updates when the user comes back from the
+    // Hazardous Material Mapping page.
+    const loadDeckMaterialsFromBackend = useCallback(async (deckId: string) => {
+        if (!vesselId) return;
         try {
-            const inv = localStorage.getItem(`inventory_${vesselName}_${deckTitle}`);
-            return inv ? JSON.parse(inv).length : 0;
+            const url = `${ENDPOINTS.MATERIALS.LIST(vesselId)}?deckAreaId=${encodeURIComponent(deckId)}`;
+            const res = await api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(url);
+            const rows = (res.data || []) as Array<Record<string, unknown>>;
+            const mapped: DeckMaterial[] = rows.map((r) => ({
+                id: String(r.id ?? ''),
+                name: String(r.name ?? ''),
+                ihmPart: r.ihmPart ? String(r.ihmPart) : undefined,
+                category: r.category ? String(r.category) : undefined,
+                hazardType: r.hazardType ? String(r.hazardType) : undefined,
+                compartment: r.compartment ? String(r.compartment) : undefined,
+                equipment: r.equipment ? String(r.equipment) : undefined,
+                component: r.component ? String(r.component) : undefined,
+                material: r.material ? String(r.material) : undefined,
+                materialName: r.materialName ? String(r.materialName) : undefined,
+                quantity: r.quantity ? String(r.quantity) : undefined,
+                unit: r.unit ? String(r.unit) : undefined,
+                description: r.description ? String(r.description) : undefined,
+                pinX: r.pinX != null ? Number(r.pinX) : null,
+                pinY: r.pinY != null ? Number(r.pinY) : null,
+                pin: r.pinX != null && r.pinY != null
+                    ? { x: Number(r.pinX), y: Number(r.pinY) }
+                    : undefined,
+                hmStatus: r.hmStatus ? String(r.hmStatus) : undefined,
+            }));
+            setMaterialsByDeck((prev) => ({ ...prev, [deckId]: mapped }));
+        } catch (err) {
+            // Soft-fail: don't blank the existing entry on a transient
+            // error, just log so the user isn't left with an empty deck.
+            console.error(`Failed to load materials for deck ${deckId}:`, err);
+        }
+    }, [vesselId]);
+
+    // Bulk-load materials for every visible deck whenever the section
+    // list changes or the vessel changes. Single mount + every time
+    // mappedSections gets a new entry.
+    useEffect(() => {
+        if (!vesselId || mappedSections.length === 0) return;
+        for (const s of mappedSections) loadDeckMaterialsFromBackend(s.id);
+    }, [vesselId, mappedSections, loadDeckMaterialsFromBackend]);
+
+    // Refresh on tab refocus — covers the most common flow: user clicks
+    // Add Material → goes to /mapping → adds the item → comes back here.
+    // Without this the count stays stale until a hard reload.
+    useEffect(() => {
+        if (!vesselId) return;
+        const refresh = () => {
+            if (document.visibilityState !== 'visible') return;
+            for (const s of mappedSections) loadDeckMaterialsFromBackend(s.id);
+        };
+        window.addEventListener('focus', refresh);
+        document.addEventListener('visibilitychange', refresh);
+        return () => {
+            window.removeEventListener('focus', refresh);
+            document.removeEventListener('visibilitychange', refresh);
+        };
+    }, [vesselId, mappedSections, loadDeckMaterialsFromBackend]);
+
+    // Resolve the materials for a deck row. Backed vessels read from
+    // materialsByDeck (populated by the backend fetch above); demo
+    // vessels still read from the legacy localStorage key so they
+    // continue to work without a server.
+    const materialsForDeck = (deck: MappedSection): DeckMaterial[] => {
+        if (vesselId) return materialsByDeck[deck.id] ?? [];
+        try {
+            const stored = localStorage.getItem(`inventory_${vesselName}_${deck.title}`);
+            return stored ? (JSON.parse(stored) as DeckMaterial[]) : [];
         } catch {
-            return 0;
+            return [];
         }
     };
+
+    // Mapped item count helper. Used by the deck row header. Returns
+    // the live count from whichever source `materialsForDeck` resolved.
+    const getFreshItemCount = (deck: MappedSection): number => materialsForDeck(deck).length;
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -965,7 +1066,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                                     </div>
                                                     <div className="deck-meta-row">
                                                         <Compass size={12} />
-                                                        <span>{Math.max(deck.itemsCount || 0, getFreshItemCount(deck.title))} Mapped Items</span>
+                                                        <span>{Math.max(deck.itemsCount || 0, getFreshItemCount(deck))} Mapped Items</span>
                                                         <span className="meta-dot"></span>
                                                         <span>Ready for Inspection</span>
                                                     </div>
@@ -991,8 +1092,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                                             <span className="log-title-text">MATERIAL LOG FOR {deck.title.toUpperCase()}</span>
                                                         </div>
                                                         {(() => {
-                                                            const stored = localStorage.getItem(`inventory_${vesselName}_${deck.title}`);
-                                                            const items = stored ? JSON.parse(stored) : [];
+                                                            const items = materialsForDeck(deck);
                                                             return items.length > 3 && (
                                                                 <button
                                                                     className="show-more-materials-btn"
@@ -1021,8 +1121,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
 
                                                     <div className="materials-grid-v2">
                                                         {(() => {
-                                                            const stored = localStorage.getItem(`inventory_${vesselName}_${deck.title}`);
-                                                            const items = stored ? JSON.parse(stored) : [];
+                                                            const items = materialsForDeck(deck);
                                                             if (items.length === 0) return (
                                                                 <div className="no-materials-placeholder-v2">
                                                                     <p>No materials mapped yet.</p>
