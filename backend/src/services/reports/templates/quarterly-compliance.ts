@@ -24,7 +24,7 @@ import type {
 } from '../data.js';
 
 // ─── HTML escape ──────────────────────────────────────────────────────────
-function esc(value: unknown): string {
+export function esc(value: unknown): string {
   if (value === null || value === undefined) return '';
   return String(value)
     .replace(/&/g, '&amp;')
@@ -34,7 +34,7 @@ function esc(value: unknown): string {
     .replace(/'/g, '&#39;');
 }
 
-const dash = (s: string | null | undefined) => (s && String(s).trim() ? esc(s) : '&mdash;');
+export const dash = (s: string | null | undefined) => (s && String(s).trim() ? esc(s) : '&mdash;');
 
 // ─── Hazmat tile colours (from finalized template) ────────────────────────
 // Each entry maps the catalog `code` to {bg, ink}. Used for both the
@@ -58,11 +58,11 @@ const TILE_COLOURS: Record<string, { bg: string; ink: string }> = {
   Cb:    { bg: '#5DCFC0', ink: '#1F5752' },
 };
 
-const tileBg  = (code: string) => TILE_COLOURS[code]?.bg  ?? '#94A3B8';
-const tileInk = (code: string) => TILE_COLOURS[code]?.ink ?? '#FFFFFF';
+export const tileBg  = (code: string) => TILE_COLOURS[code]?.bg  ?? '#94A3B8';
+export const tileInk = (code: string) => TILE_COLOURS[code]?.ink ?? '#FFFFFF';
 
 // ─── Brand header (used on every page) ────────────────────────────────────
-const BRAND_HEADER = `
+export const BRAND_HEADER = `
 <div class="brand-header">
   <div class="brand-logo">
     <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -82,7 +82,7 @@ const BRAND_HEADER = `
 // ─── Pie chart (dynamic, by hazmat counts) ────────────────────────────────
 // Builds an SVG pie from the non-zero hazmat tiles. Each slice's colour
 // comes from TILE_COLOURS so the legend matches the dashboard above.
-function renderPieChart(overview: HazmatTile[]): string {
+export function renderPieChart(overview: HazmatTile[]): string {
   const slices = overview.filter((t) => t.count > 0);
   const total = slices.reduce((sum, t) => sum + t.count, 0);
 
@@ -140,7 +140,7 @@ function renderPieChart(overview: HazmatTile[]): string {
 }
 
 // ─── Hazmat tile grid (16 tiles, all rendered, dimmed when count === 0) ──
-function renderHazmatTiles(overview: HazmatTile[]): string {
+export function renderHazmatTiles(overview: HazmatTile[]): string {
   return overview
     .map((t) => {
       const dim = t.count === 0 ? ' zero' : '';
@@ -201,7 +201,7 @@ function renderMaterialTable(group: MaterialGroup, startNo = 1): string {
 // table below mapping number → material details. This collapses what
 // would otherwise be one page per material (100+ pages for a real vessel)
 // into one page per deck (~5).
-function renderHmMarkedDecksPages(groups: MaterialGroup[]): string {
+export function renderHmMarkedDecksPages(groups: MaterialGroup[]): string {
   const allMaterials: MaterialRow[] = groups.flatMap((g) => g.rows);
   const withPlan = allMaterials.filter(
     (m) => m.gaPlanUrl && (m.pinX !== null || m.rect),
@@ -273,7 +273,7 @@ function renderHmMarkedDecksPages(groups: MaterialGroup[]): string {
 // ─── Vessel photograph block ──────────────────────────────────────────────
 // Uses the real image when available; otherwise falls back to the
 // gradient placeholder from the finalized template.
-function renderVesselPhoto(image: string | null): string {
+export function renderVesselPhoto(image: string | null): string {
   if (image && image.trim()) {
     return `<div class="ship-image-real" style="background-image:url('${esc(image)}')"></div>`;
   }
@@ -281,13 +281,13 @@ function renderVesselPhoto(image: string | null): string {
 }
 
 // ─── Cover page ───────────────────────────────────────────────────────────
-function renderCoverPage(data: ReportData): string {
+export function renderCoverPage(data: ReportData, title = 'IHM Report'): string {
   const periodLabel = `${data.period.start.toLocaleDateString('en-GB')} - ${data.period.end.toLocaleDateString('en-GB')}`;
   return `
 <section class="page">
   ${BRAND_HEADER}
   <div class="cover-title">
-    <div class="report-heading">IHM Report (${esc(periodLabel)})</div>
+    <div class="report-heading">${esc(title)} (${esc(periodLabel)})</div>
     <div class="vessel-line">${esc(data.vessel.name)} (IMO : ${esc(data.vessel.imoNumber)})</div>
   </div>
   ${renderVesselPhoto(data.vessel.image)}
@@ -312,7 +312,7 @@ function renderCoverPage(data: ReportData): string {
 }
 
 // ─── Vessel specifications page ───────────────────────────────────────────
-function renderSpecsPage(data: ReportData): string {
+export function renderSpecsPage(data: ReportData): string {
   const v = data.vessel;
   return `
 <section class="page">
@@ -461,7 +461,7 @@ function renderDetailsPage(data: ReportData): string {
 }
 
 // ─── Stylesheet (inlined — no external deps at render time) ───────────────
-const STYLESHEET = `
+export const STYLESHEET = `
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
@@ -722,16 +722,16 @@ table.hm-meta th { width: 22%; }
 `;
 
 // ─── Main entry ───────────────────────────────────────────────────────────
-export function renderQuarterlyComplianceHtml(data: ReportData): string {
+export function renderQuarterlyComplianceHtml(data: ReportData, coverTitle = 'IHM Report'): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Enviguide IHM &mdash; IHM Report</title>
+<title>Enviguide IHM &mdash; ${esc(coverTitle)}</title>
 <style>${STYLESHEET}</style>
 </head>
 <body>
-${renderCoverPage(data)}
+${renderCoverPage(data, coverTitle)}
 ${renderSpecsPage(data)}
 ${renderTocPage()}
 ${renderMovementPage(data)}

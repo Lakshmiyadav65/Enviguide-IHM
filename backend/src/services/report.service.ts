@@ -21,6 +21,10 @@ import {
   renderQuarterlyComplianceHtml,
   footerTemplate,
 } from './reports/templates/quarterly-compliance.js';
+import { renderComplianceSummaryHtml } from './reports/templates/compliance-summary.js';
+import { renderMaterialsInventoryHtml } from './reports/templates/materials-inventory.js';
+import { renderHazmatOverviewHtml } from './reports/templates/hazmat-overview.js';
+import type { ReportData } from './reports/data.js';
 
 const log = logger.child('report');
 
@@ -45,6 +49,20 @@ function reportTitle(type: ReportType): string {
 
 function fileSafe(s: string): string {
   return s.replace(/[^a-zA-Z0-9._-]+/g, '_');
+}
+
+/** Pick the right HTML template per report type. The 'overall' and
+ *  'quarterly' types share the comprehensive renderer (just with
+ *  different cover-page titles + period semantics); the other three
+ *  have purpose-built templates with their own page sets. */
+function renderHtmlForType(type: ReportType, data: ReportData): string {
+  switch (type) {
+    case 'compliance': return renderComplianceSummaryHtml(data);
+    case 'inventory':  return renderMaterialsInventoryHtml(data);
+    case 'hazmat':     return renderHazmatOverviewHtml(data);
+    case 'overall':    return renderQuarterlyComplianceHtml(data, 'Ship Overall Report');
+    case 'quarterly':  return renderQuarterlyComplianceHtml(data, 'Quarterly IHM Report');
+  }
 }
 
 export interface GenerateOptions {
@@ -76,8 +94,6 @@ export const ReportService = {
       ?? (opts.type === 'overall' ? await lifetimePeriod(opts.vesselId) : quarterContaining());
     const t0 = Date.now();
     log.info(`generate start type=${opts.type} vessel=${opts.vesselId} period=${period.label}`);
-    // For now every report type renders the Quarterly Compliance
-    // template. Slice 2 will swap templates per type.
     const data = await buildQuarterlyComplianceData(
       opts.vesselId,
       period,
@@ -97,7 +113,7 @@ export const ReportService = {
 
     try {
       const tRender0 = Date.now();
-      const html = renderQuarterlyComplianceHtml(data);
+      const html = renderHtmlForType(opts.type, data);
       const pdf = await renderPdf(html, {
         displayHeaderFooter: true,
         footerTemplate: footerTemplate(data),
