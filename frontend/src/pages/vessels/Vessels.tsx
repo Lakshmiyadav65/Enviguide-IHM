@@ -113,6 +113,9 @@ export default function Vessels() {
     // immediate feedback ('Generating…') without us re-fetching after
     // every click.
     const [generatingQuarter, setGeneratingQuarter] = useState<string | null>(null);
+    // Standard Reports — tracks which card (by item id: 'overall'|'summary'|...)
+    // is currently mid-generation so we can swap the button to a spinner.
+    const [generatingStandard, setGeneratingStandard] = useState<string | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const docInputRef = useRef<HTMLInputElement>(null);
@@ -1016,7 +1019,9 @@ export default function Vessels() {
                         alert('This vessel is not backed by the database yet — add it first to generate a report.');
                         return;
                     }
+                    if (generatingStandard) return; // already generating something — ignore double-click
                     const type = backendType(catId, itemId);
+                    setGeneratingStandard(itemId);
                     try {
                         const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
                         const url = `${base}/vessels/${vId}/reports/${type}/download`;
@@ -1043,6 +1048,8 @@ export default function Vessels() {
                     } catch (err) {
                         console.error('Report generation failed:', err);
                         alert(`Could not generate the report.\n\n${(err as Error).message}`);
+                    } finally {
+                        setGeneratingStandard(null);
                     }
                 };
 
@@ -1186,31 +1193,49 @@ export default function Vessels() {
                         {/* Standard Reports — card grid */}
                         {activeReportTab === 'standard' && (
                             <div className="report-cards-grid">
-                                {standardItems.map((item) => (
-                                    <div className="report-card-v2" key={item.id}>
-                                        <div className="report-card-icon">
-                                            <FileText size={22} />
+                                {standardItems.map((item) => {
+                                    const isGenerating = generatingStandard === item.id;
+                                    const isDisabled = generatingStandard !== null && !isGenerating;
+                                    return (
+                                        <div
+                                            className={`report-card-v2${isGenerating ? ' is-generating' : ''}`}
+                                            key={item.id}
+                                        >
+                                            <div className="report-card-icon">
+                                                <FileText size={22} />
+                                            </div>
+                                            <div className="report-card-body">
+                                                <h3>{item.name}</h3>
+                                                <p>{standardDescriptions[item.id] ?? 'Standard compliance report.'}</p>
+                                                {item.date ? (
+                                                    <span className="report-card-meta">{item.date}</span>
+                                                ) : (
+                                                    <span className="report-card-meta muted">
+                                                        {isGenerating ? 'Generating PDF…' : 'Not yet generated'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="report-card-actions">
+                                                <button
+                                                    type="button"
+                                                    className={`report-btn-primary full${isGenerating ? ' is-loading' : ''}`}
+                                                    onClick={() => startGenerate('adhoc', item.id)}
+                                                    disabled={isGenerating || isDisabled}
+                                                >
+                                                    {isGenerating ? (
+                                                        <>
+                                                            <span className="spinner" aria-hidden="true" /> Generating…
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <RotateCw size={14} /> Generate Report
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
                                         </div>
-                                        <div className="report-card-body">
-                                            <h3>{item.name}</h3>
-                                            <p>{standardDescriptions[item.id] ?? 'Standard compliance report.'}</p>
-                                            {item.date ? (
-                                                <span className="report-card-meta">{item.date}</span>
-                                            ) : (
-                                                <span className="report-card-meta muted">Not yet generated</span>
-                                            )}
-                                        </div>
-                                        <div className="report-card-actions">
-                                            <button
-                                                type="button"
-                                                className="report-btn-primary full"
-                                                onClick={() => startGenerate('adhoc', item.id)}
-                                            >
-                                                <RotateCw size={14} /> Generate Report
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
 

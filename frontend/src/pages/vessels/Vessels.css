@@ -6587,6 +6587,71 @@ body:has(.sidebar.collapsed) .vessel-page-main {
     box-shadow: 0 6px 14px rgba(0, 178, 255, 0.32);
 }
 
+.report-btn-primary:disabled,
+.report-btn-secondary:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+    transform: none;
+}
+
+.report-btn-primary:disabled:hover,
+.report-btn-secondary:disabled:hover {
+    transform: none;
+}
+
+/* Generating state — shimmering progress sweep on the button. The
+ * card itself also pulses softly so the user can see at a glance which
+ * report is currently rendering on the server. */
+.report-btn-primary.is-loading {
+    background: linear-gradient(
+        90deg,
+        #00B2FF 0%, #00B2FF 35%,
+        #5cd0ff 50%,
+        #00B2FF 65%, #00B2FF 100%
+    );
+    background-size: 220% 100%;
+    animation: reportBtnSweep 1.3s linear infinite;
+    cursor: progress;
+    color: #FFFFFF;
+    opacity: 1; /* override the :disabled fade */
+}
+
+.report-btn-primary.is-loading:hover {
+    transform: none;
+    background-position: 100% 0;
+}
+
+@keyframes reportBtnSweep {
+    0%   { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+}
+
+.report-btn-primary .spinner,
+.report-btn-secondary .spinner {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #FFFFFF;
+    animation: reportSpin 0.7s linear infinite;
+    display: inline-block;
+}
+
+@keyframes reportSpin {
+    to { transform: rotate(360deg); }
+}
+
+.report-card-v2.is-generating {
+    border-color: #00B2FF;
+    box-shadow: 0 0 0 2px rgba(0, 178, 255, 0.18), 0 12px 28px rgba(15, 23, 42, 0.08);
+    animation: reportCardPulse 2s ease-in-out infinite;
+}
+
+@keyframes reportCardPulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(0, 178, 255, 0.18), 0 12px 28px rgba(15, 23, 42, 0.08); }
+    50%      { box-shadow: 0 0 0 4px rgba(0, 178, 255, 0.28), 0 14px 32px rgba(15, 23, 42, 0.10); }
+}
+
 .report-btn-secondary {
     background: #FFFFFF;
     color: #475569;
