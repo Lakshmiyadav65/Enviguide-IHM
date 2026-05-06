@@ -90,8 +90,24 @@ export interface PoDetailRow {
   receivedOn: string;         // formatted dd/mm/yyyy (audit_line_items.created_at)
   totalItems: number;
   suspectedCount: number;     // line items with is_suspected = Yes
-  /** Up to ~80 chars of the first item description, for context. */
+  /** Up to ~60 chars of the first item description, for context. */
   sampleItem: string;
+}
+
+/** Row in the Suspected Hazmat section — one entry per suspected
+ *  line item, grouped by supplier in the renderer. */
+export interface SuspectedItemRow {
+  supplier: string;
+  poNumber: string;
+  poDate: string;
+  receivedOn: string;
+  itemDescription: string;
+  equipment: string;
+  maker: string;
+  partNumber: string;
+  quantity: string;
+  unit: string;
+  vendorRemark: string;
 }
 
 export interface ReportData {
@@ -114,6 +130,9 @@ export interface ReportData {
    *  status, suspected-hazmat count. Used by the Purchase Orders page
    *  in the Ship Overall and Compliance Summary reports. */
   purchaseOrders: PoDetailRow[];
+  /** Just the suspected-hazmat line items, one row each, sorted by
+   *  supplier so the renderer can produce a per-supplier breakdown. */
+  suspectedItems: SuspectedItemRow[];
   /** Auto-generated doc number for the cover page. */
   docNumber: string;
   /** Operator who triggered the generation, for the cover. */
@@ -494,6 +513,33 @@ export async function buildQuarterlyComplianceData(
     };
   });
 
+  // 6c. Suspected-hazmat line items — one row per audit_line_items
+  //     entry where is_suspected = Yes. Sorted by supplier so the
+  //     renderer can group them under per-supplier sub-headings.
+  const suspectedRes = await query(
+    `SELECT po_number, vendor_name, po_sent_date, created_at,
+            item_description, equipment_name, maker, part_number,
+            quantity, unit, vendor_remark
+       FROM audit_line_items
+      WHERE vessel_id = $1 AND created_at BETWEEN $2 AND $3
+        AND LOWER(is_suspected) = 'yes'
+      ORDER BY vendor_name ASC, po_number ASC, row_index ASC`,
+    [vesselId, period.start, period.end],
+  );
+  const suspectedItems: SuspectedItemRow[] = (suspectedRes.rows as Array<Record<string, unknown>>).map((r) => ({
+    supplier: String(r.vendor_name ?? '').trim() || 'Unknown supplier',
+    poNumber: String(r.po_number ?? ''),
+    poDate: r.po_sent_date ? fmtDate(r.po_sent_date) : '—',
+    receivedOn: fmtDate(r.created_at),
+    itemDescription: String(r.item_description ?? '').trim(),
+    equipment: String(r.equipment_name ?? '').trim(),
+    maker: String(r.maker ?? '').trim(),
+    partNumber: String(r.part_number ?? '').trim(),
+    quantity: String(r.quantity ?? '').trim(),
+    unit: String(r.unit ?? '').trim(),
+    vendorRemark: String(r.vendor_remark ?? '').trim(),
+  }));
+
   // 7. Doc number — yyyymmdd-IMO-AD for ad-hoc, plain Q-style otherwise.
   const yyyymmdd = `${period.end.getUTCFullYear()}${String(period.end.getUTCMonth() + 1).padStart(2, '0')}${String(period.end.getUTCDate()).padStart(2, '0')}`;
   const docNumber = `EG | ${vessel.imoNumber} | ${yyyymmdd} | ${period.label.replace(/\s+/g, '')}`;
@@ -507,6 +553,7 @@ export async function buildQuarterlyComplianceData(
     materialGroups,
     appendices: { posWithHazmat, posAllHazmatFree, posAwaitingDeclaration },
     purchaseOrders,
+    suspectedItems,
     docNumber,
     generatedBy,
     generatedAt: fmtDate(new Date()),

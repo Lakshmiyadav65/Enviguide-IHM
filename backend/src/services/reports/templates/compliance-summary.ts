@@ -22,6 +22,7 @@ import {
   renderCoverPage,
   renderSpecsPage,
   renderPurchaseOrdersPage,
+  renderSuspectedHazmatPage,
 } from './quarterly-compliance.js';
 
 function renderComplianceSnapshotPage(data: ReportData): string {
@@ -151,6 +152,7 @@ ${renderSpecsPage(data)}
 ${renderComplianceSnapshotPage(data)}
 ${renderActionItemsPage(data)}
 ${renderPurchaseOrdersPage(data)}
+${renderSuspectedHazmatPage(data)}
 ${renderPeriodActivityPage(data)}
 </body>
 </html>`;

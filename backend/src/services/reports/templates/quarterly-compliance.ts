@@ -494,6 +494,72 @@ export function renderPurchaseOrdersPage(data: ReportData): string {
 </section>`;
 }
 
+// ─── Suspected Hazmat — by Supplier page ─────────────────────────────────
+// Drill-down for the suspected items called out in the main PO listing.
+// Grouped per supplier so the reader can see at a glance which vendors
+// are responsible for the suspected-hazmat lines.
+export function renderSuspectedHazmatPage(data: ReportData): string {
+  if (!data.suspectedItems || data.suspectedItems.length === 0) return '';
+  const periodLabel = `${data.period.start.toLocaleDateString('en-GB')} to ${data.period.end.toLocaleDateString('en-GB')}`;
+
+  // Group items by supplier preserving the SQL ORDER BY (already
+  // supplier-sorted, so a single pass keeps suppliers in alpha order).
+  const bySupplier = new Map<string, typeof data.suspectedItems>();
+  for (const item of data.suspectedItems) {
+    if (!bySupplier.has(item.supplier)) bySupplier.set(item.supplier, []);
+    bySupplier.get(item.supplier)!.push(item);
+  }
+
+  const supplierBlocks = Array.from(bySupplier.entries())
+    .map(([supplier, items]) => {
+      const distinctPoNumbers = new Set(items.map((i) => i.poNumber)).size;
+      const rows = items
+        .map((it, i) => `
+          <tr>
+            <td style="text-align:center;">${i + 1}</td>
+            <td>${esc(it.poNumber)}</td>
+            <td style="text-align:center;">${esc(it.poDate)}</td>
+            <td>${esc(it.itemDescription) || '&mdash;'}</td>
+            <td>${esc(it.equipment) || '&mdash;'}</td>
+            <td>${esc(it.maker) || '&mdash;'}</td>
+            <td>${esc(it.partNumber) || '&mdash;'}</td>
+            <td style="text-align:center;">${esc(it.quantity)}${it.unit ? ' ' + esc(it.unit) : ''}</td>
+          </tr>`)
+        .join('');
+      return `
+        <div class="supplier-block">
+          <div class="supplier-head">
+            <span class="supplier-name">${esc(supplier)}</span>
+            <span class="supplier-stat">${items.length} suspected ${items.length === 1 ? 'item' : 'items'} across ${distinctPoNumbers} ${distinctPoNumbers === 1 ? 'PO' : 'POs'}</span>
+          </div>
+          <table class="details suspected-table">
+            <thead>
+              <tr>
+                <th style="width:9mm;">No.</th>
+                <th style="width:32mm;">PO Number</th>
+                <th style="width:20mm;">PO Date</th>
+                <th>Item Description</th>
+                <th>Equipment</th>
+                <th>Maker</th>
+                <th>Part #</th>
+                <th style="width:18mm;">Qty</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    })
+    .join('');
+
+  return `
+<section class="page">
+  ${BRAND_HEADER}
+  <h2>Suspected Hazmat &mdash; By Supplier (${esc(periodLabel)})</h2>
+  <p class="caption">${data.suspectedItems.length} suspected line ${data.suspectedItems.length === 1 ? 'item' : 'items'} across ${bySupplier.size} ${bySupplier.size === 1 ? 'supplier' : 'suppliers'}. Each block below lists every line item the audit flagged as suspected for that supplier.</p>
+  ${supplierBlocks}
+</section>`;
+}
+
 // ─── IHM Details page ─────────────────────────────────────────────────────
 function renderDetailsPage(data: ReportData): string {
   const findGroup = (key: MaterialGroup['groupKey']) =>
@@ -823,6 +889,25 @@ table.po-table tbody tr { page-break-inside: avoid; }
   background: #DCFCE7;
   color: #166534;
 }
+
+.caption { font-size: 9.5pt; color: #475569; margin: 2mm 0 4mm; }
+.supplier-block {
+  margin: 4mm 0;
+  page-break-inside: avoid;
+}
+.supplier-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  background: #FEF3C7;
+  border-left: 3px solid #F59E0B;
+  padding: 2mm 4mm;
+  margin-bottom: 1mm;
+}
+.supplier-name { font-weight: 700; font-size: 11pt; color: #78350F; }
+.supplier-stat { font-size: 9pt; color: #92400E; }
+table.suspected-table { font-size: 8.5pt; margin-top: 0; }
+table.suspected-table tbody tr { page-break-inside: avoid; }
 `;
 
 // ─── Main entry ───────────────────────────────────────────────────────────
@@ -842,6 +927,7 @@ ${renderMovementPage(data)}
 ${renderHazmatPage(data)}
 ${renderDetailsPage(data)}
 ${renderPurchaseOrdersPage(data)}
+${renderSuspectedHazmatPage(data)}
 ${renderHmMarkedDecksPages(data.materialGroups)}
 </body>
 </html>`;
