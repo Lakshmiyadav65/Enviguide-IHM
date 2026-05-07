@@ -527,6 +527,90 @@ export function renderPurchaseOrdersPage(data: ReportData): string {
 </section>`;
 }
 
+// ─── MD/SDoC Tracking page ───────────────────────────────────────────────
+// Surfaces clarification-request KPIs (vendors contacted, submitted vs
+// pending, reminders sent) and a per-vendor breakdown so the reader
+// can see which suppliers still owe documentation.
+export function renderMdSdocPage(data: ReportData): string {
+  const periodLabel = `${data.period.start.toLocaleDateString('en-GB')} to ${data.period.end.toLocaleDateString('en-GB')}`;
+  const t = data.mdSdoc.totals;
+  if (t.totalRequests === 0) return '';
+
+  const respondPct =
+    t.totalRequests > 0
+      ? `${Math.round((t.submittedRequests / t.totalRequests) * 100)}%`
+      : '—';
+
+  const kpis = `
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-num">${t.distinctVendors}</div><div class="kpi-label">Vendors contacted</div></div>
+      <div class="kpi-card"><div class="kpi-num">${t.totalRequests}</div><div class="kpi-label">Clarification requests</div></div>
+      <div class="kpi-card good"><div class="kpi-num">${t.submittedRequests}</div><div class="kpi-label">Submitted by vendor</div></div>
+      <div class="kpi-card warn"><div class="kpi-num">${t.pendingRequests}</div><div class="kpi-label">Awaiting response</div></div>
+      <div class="kpi-card"><div class="kpi-num">${t.totalReminders}</div><div class="kpi-label">Reminders sent</div></div>
+      <div class="kpi-card"><div class="kpi-num">${respondPct}</div><div class="kpi-label">Response rate</div></div>
+    </div>
+    <table class="summary md-totals">
+      <tr><th>MDs received / requested</th><td>${t.mdsReceived} / ${t.mdsReceived + t.mdsPending}</td></tr>
+      <tr><th>SDoCs received / requested</th><td>${t.sdocsReceived} / ${t.sdocsReceived + t.sdocsPending}</td></tr>
+      <tr><th>Total line items in clarifications</th><td>${t.totalItems}</td></tr>
+    </table>`;
+
+  const vendorRows = data.mdSdoc.byVendor
+    .map((v, i) => {
+      const respondedAll = v.pending === 0 && v.submitted > 0;
+      const statusBadge = respondedAll
+        ? `<span class="po-flag clean">Submitted</span>`
+        : v.submitted > 0
+          ? `<span class="po-flag partial">Partial</span>`
+          : `<span class="po-flag">Awaiting</span>`;
+      return `
+        <tr>
+          <td style="text-align:center;">${i + 1}</td>
+          <td>${esc(v.vendor)}<div class="vendor-email">${esc(v.email)}</div></td>
+          <td style="text-align:center;">${v.totalRequests}</td>
+          <td style="text-align:center;">${v.submitted}</td>
+          <td style="text-align:center;">${v.pending}</td>
+          <td style="text-align:center;">${v.reminders}</td>
+          <td style="text-align:center;">${v.mdsReceived} / ${v.mdsRequested}</td>
+          <td style="text-align:center;">${v.sdocsReceived} / ${v.sdocsRequested}</td>
+          <td style="text-align:center;">${esc(v.lastSentAt)}</td>
+          <td style="text-align:center;">${statusBadge}</td>
+        </tr>`;
+    })
+    .join('');
+
+  const vendorBlock = data.mdSdoc.byVendor.length > 0
+    ? `
+      <h3>By Vendor</h3>
+      <table class="details md-vendor-table">
+        <thead>
+          <tr>
+            <th style="width:9mm;">No.</th>
+            <th>Vendor</th>
+            <th style="width:20mm;">Requests</th>
+            <th style="width:20mm;">Submitted</th>
+            <th style="width:20mm;">Pending</th>
+            <th style="width:20mm;">Reminders</th>
+            <th style="width:24mm;">MDs (recv/req)</th>
+            <th style="width:24mm;">SDoCs (recv/req)</th>
+            <th style="width:22mm;">Last Sent</th>
+            <th style="width:22mm;">Status</th>
+          </tr>
+        </thead>
+        <tbody>${vendorRows}</tbody>
+      </table>`
+    : '';
+
+  return `
+<section class="page">
+  ${BRAND_HEADER}
+  <h2>MD &amp; SDoC Tracking (${esc(periodLabel)})</h2>
+  ${kpis}
+  ${vendorBlock}
+</section>`;
+}
+
 // ─── Suspected Hazmat — by Supplier page ─────────────────────────────────
 // Drill-down for the suspected items called out in the main PO listing.
 // Grouped per supplier so the reader can see at a glance which vendors
@@ -946,6 +1030,35 @@ table.po-table tbody tr { page-break-inside: avoid; }
 .supplier-stat { font-size: 9pt; color: #92400E; }
 table.suspected-table { font-size: 8.5pt; margin-top: 0; }
 table.suspected-table tbody tr { page-break-inside: avoid; }
+
+.po-flag.partial { background: #FEF3C7; color: #92400E; }
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3mm;
+  margin: 3mm 0 4mm;
+}
+.kpi-card {
+  border: 1px solid #CBD5E1;
+  border-radius: 4px;
+  padding: 3mm 4mm;
+  text-align: center;
+  background: #F8FAFC;
+  page-break-inside: avoid;
+}
+.kpi-card.good { background: #DCFCE7; border-color: #86EFAC; }
+.kpi-card.warn { background: #FEF3C7; border-color: #FCD34D; }
+.kpi-num { font-size: 18pt; font-weight: 700; line-height: 1.1; }
+.kpi-label { font-size: 8.5pt; color: #475569; margin-top: 1mm; }
+
+table.summary.md-totals { width: 100%; margin-top: 2mm; }
+table.summary.md-totals th { width: 70%; }
+table.summary.md-totals td { width: 30%; text-align: center; }
+
+table.md-vendor-table { font-size: 9pt; }
+table.md-vendor-table tbody tr { page-break-inside: avoid; }
+.vendor-email { font-size: 8pt; color: #64748B; margin-top: 1px; }
 `;
 
 // ─── Main entry ───────────────────────────────────────────────────────────
@@ -964,6 +1077,7 @@ ${renderTocPage()}
 ${renderMovementPage(data)}
 ${renderHazmatPage(data)}
 ${renderDetailsPage(data)}
+${renderMdSdocPage(data)}
 ${renderSuspectedHazmatPage(data)}
 ${renderHmMarkedDecksPages(data.materialGroups)}
 ${DECK_CROP_SCRIPT}

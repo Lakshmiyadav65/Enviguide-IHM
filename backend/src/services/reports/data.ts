@@ -94,6 +94,38 @@ export interface PoDetailRow {
   sampleItem: string;
 }
 
+/** Aggregate + per-vendor breakdown for the MD/SDoC tracking section.
+ *  Sourced from clarification_requests + clarification_items. */
+export interface MdSdocVendorRow {
+  vendor: string;
+  email: string;
+  totalRequests: number;
+  submitted: number;
+  pending: number;
+  reminders: number;
+  mdsRequested: number;
+  mdsReceived: number;
+  sdocsRequested: number;
+  sdocsReceived: number;
+  lastSentAt: string;
+}
+
+export interface MdSdocStats {
+  totals: {
+    totalRequests: number;
+    distinctVendors: number;
+    submittedRequests: number;
+    pendingRequests: number;
+    totalReminders: number;
+    totalItems: number;
+    mdsPending: number;
+    mdsReceived: number;
+    sdocsPending: number;
+    sdocsReceived: number;
+  };
+  byVendor: MdSdocVendorRow[];
+}
+
 /** Row in the Suspected Hazmat section — one entry per suspected
  *  line item, grouped by supplier in the renderer. */
 export interface SuspectedItemRow {
@@ -133,6 +165,8 @@ export interface ReportData {
   /** Just the suspected-hazmat line items, one row each, sorted by
    *  supplier so the renderer can produce a per-supplier breakdown. */
   suspectedItems: SuspectedItemRow[];
+  /** MD/SDoC tracking — aggregate KPIs and per-vendor breakdown. */
+  mdSdoc: MdSdocStats;
   /** Auto-generated doc number for the cover page. */
   docNumber: string;
   /** Operator who triggered the generation, for the cover. */
@@ -540,6 +574,128 @@ export async function buildQuarterlyComplianceData(
     vendorRemark: String(r.vendor_remark ?? '').trim(),
   }));
 
+  // 6d. MD/SDoC tracking — vendor outreach status, reminders sent,
+  //     and items received vs pending. Sourced from
+  //     clarification_requests + clarification_items. Period filter
+  //     uses cr.created_at so the report covers requests opened
+  //     during the period.
+  // Reminders are stored per clarification_item (each item carries its
+  // own reminder_count), but reminders are sent per *request* email. We
+  // take MAX(reminder_count) per request so a 4-item request that was
+  // reminded once is counted as 1 reminder, not 4.
+  const totalsRes = await query(
+    `WITH per_req AS (
+       SELECT cr.id, cr.status, cr.recipient_emails, cr.created_at,
+              COALESCE(MAX(ci.reminder_count), 0) AS req_reminders
+         FROM clarification_requests cr
+         LEFT JOIN clarification_items ci ON ci.clarification_id = cr.id
+        WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
+        GROUP BY cr.id, cr.status, cr.recipient_emails, cr.created_at
+     )
+     SELECT
+        COUNT(*)::int                                             AS total_requests,
+        COUNT(DISTINCT recipient_emails)::int                     AS distinct_vendors,
+        COUNT(*) FILTER (WHERE status = 'submitted')::int         AS submitted_requests,
+        COUNT(*) FILTER (WHERE status = 'sent')::int              AS pending_requests,
+        COALESCE(SUM(req_reminders), 0)::int                      AS total_reminders,
+        (SELECT COUNT(*)::int FROM clarification_items ci
+           JOIN clarification_requests cr ON ci.clarification_id = cr.id
+          WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3) AS total_items,
+        (SELECT COUNT(*)::int FROM clarification_items ci
+           JOIN clarification_requests cr ON ci.clarification_id = cr.id
+          WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
+            AND ci.mds_status  = 'pending') AS mds_pending,
+        (SELECT COUNT(*)::int FROM clarification_items ci
+           JOIN clarification_requests cr ON ci.clarification_id = cr.id
+          WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
+            AND ci.mds_received_at IS NOT NULL) AS mds_received,
+        (SELECT COUNT(*)::int FROM clarification_items ci
+           JOIN clarification_requests cr ON ci.clarification_id = cr.id
+          WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
+            AND ci.sdoc_status = 'pending') AS sdoc_pending,
+        (SELECT COUNT(*)::int FROM clarification_items ci
+           JOIN clarification_requests cr ON ci.clarification_id = cr.id
+          WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
+            AND ci.sdoc_received_at IS NOT NULL) AS sdoc_received
+       FROM per_req`,
+    [vesselId, period.start, period.end],
+  );
+  const totalsRow = (totalsRes.rows[0] ?? {}) as Record<string, number>;
+
+  // Group by recipient_emails so each unique vendor appears once,
+  // even when only some of their requests have supplier_company filled
+  // in (it's NULL on 'sent' requests until the supplier submits the
+  // portal form). The displayed vendor name picks any non-empty
+  // supplier_company seen for that email; otherwise falls back to the
+  // email itself.
+  const byVendorRes = await query(
+    `WITH per_req AS (
+       SELECT cr.id, cr.status, cr.recipient_emails, cr.supplier_company, cr.created_at,
+              COALESCE(MAX(ci.reminder_count), 0) AS req_reminders
+         FROM clarification_requests cr
+         LEFT JOIN clarification_items ci ON ci.clarification_id = cr.id
+        WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
+        GROUP BY cr.id, cr.status, cr.recipient_emails, cr.supplier_company, cr.created_at
+     )
+     SELECT
+        COALESCE(MAX(NULLIF(pr.supplier_company, '')), pr.recipient_emails) AS vendor,
+        pr.recipient_emails                                                  AS email,
+        COUNT(*)::int                                                        AS total_requests,
+        COUNT(*) FILTER (WHERE pr.status = 'submitted')::int                 AS submitted,
+        COUNT(*) FILTER (WHERE pr.status = 'sent')::int                      AS pending,
+        COALESCE(SUM(pr.req_reminders), 0)::int                              AS reminders,
+        (SELECT COUNT(*)::int FROM clarification_items ci
+           JOIN clarification_requests cr2 ON ci.clarification_id = cr2.id
+          WHERE cr2.vessel_id = $1 AND cr2.created_at BETWEEN $2 AND $3
+            AND cr2.recipient_emails = pr.recipient_emails) AS mds_requested,
+        (SELECT COUNT(*)::int FROM clarification_items ci
+           JOIN clarification_requests cr2 ON ci.clarification_id = cr2.id
+          WHERE cr2.vessel_id = $1 AND cr2.created_at BETWEEN $2 AND $3
+            AND cr2.recipient_emails = pr.recipient_emails
+            AND ci.mds_received_at IS NOT NULL) AS mds_received,
+        (SELECT COUNT(*)::int FROM clarification_items ci
+           JOIN clarification_requests cr2 ON ci.clarification_id = cr2.id
+          WHERE cr2.vessel_id = $1 AND cr2.created_at BETWEEN $2 AND $3
+            AND cr2.recipient_emails = pr.recipient_emails) AS sdocs_requested,
+        (SELECT COUNT(*)::int FROM clarification_items ci
+           JOIN clarification_requests cr2 ON ci.clarification_id = cr2.id
+          WHERE cr2.vessel_id = $1 AND cr2.created_at BETWEEN $2 AND $3
+            AND cr2.recipient_emails = pr.recipient_emails
+            AND ci.sdoc_received_at IS NOT NULL) AS sdocs_received,
+        MAX(pr.created_at)                                                   AS last_sent_at
+       FROM per_req pr
+      GROUP BY pr.recipient_emails
+      ORDER BY MAX(pr.created_at) DESC`,
+    [vesselId, period.start, period.end],
+  );
+  const mdSdoc: MdSdocStats = {
+    totals: {
+      totalRequests:     Number(totalsRow.total_requests     ?? 0),
+      distinctVendors:   Number(totalsRow.distinct_vendors   ?? 0),
+      submittedRequests: Number(totalsRow.submitted_requests ?? 0),
+      pendingRequests:   Number(totalsRow.pending_requests   ?? 0),
+      totalReminders:    Number(totalsRow.total_reminders    ?? 0),
+      totalItems:        Number(totalsRow.total_items        ?? 0),
+      mdsPending:        Number(totalsRow.mds_pending        ?? 0),
+      mdsReceived:       Number(totalsRow.mds_received       ?? 0),
+      sdocsPending:      Number(totalsRow.sdoc_pending       ?? 0),
+      sdocsReceived:     Number(totalsRow.sdoc_received      ?? 0),
+    },
+    byVendor: (byVendorRes.rows as Array<Record<string, unknown>>).map((r) => ({
+      vendor:          String(r.vendor ?? '').trim() || 'Unknown vendor',
+      email:           String(r.email ?? '').trim(),
+      totalRequests:   Number(r.total_requests   ?? 0),
+      submitted:       Number(r.submitted        ?? 0),
+      pending:         Number(r.pending          ?? 0),
+      reminders:       Number(r.reminders        ?? 0),
+      mdsRequested:    Number(r.mds_requested    ?? 0),
+      mdsReceived:     Number(r.mds_received     ?? 0),
+      sdocsRequested:  Number(r.sdocs_requested  ?? 0),
+      sdocsReceived:   Number(r.sdocs_received   ?? 0),
+      lastSentAt:      fmtDate(r.last_sent_at),
+    })),
+  };
+
   // 7. Doc number — yyyymmdd-IMO-AD for ad-hoc, plain Q-style otherwise.
   const yyyymmdd = `${period.end.getUTCFullYear()}${String(period.end.getUTCMonth() + 1).padStart(2, '0')}${String(period.end.getUTCDate()).padStart(2, '0')}`;
   const docNumber = `EG | ${vessel.imoNumber} | ${yyyymmdd} | ${period.label.replace(/\s+/g, '')}`;
@@ -554,6 +710,7 @@ export async function buildQuarterlyComplianceData(
     appendices: { posWithHazmat, posAllHazmatFree, posAwaitingDeclaration },
     purchaseOrders,
     suspectedItems,
+    mdSdoc,
     docNumber,
     generatedBy,
     generatedAt: fmtDate(new Date()),
