@@ -1203,10 +1203,7 @@ export default function Vessels() {
                             </div>
                             <div className="reports-hero-text">
                                 <h1>Reports &amp; Analytics</h1>
-                                <p>
-                                    Generate compliance, inventory, and quarterly reports for{' '}
-                                    <strong>{vesselDisplayName}</strong>.
-                                </p>
+                                <p>Generate compliance, inventory, and quarterly reports for the selected vessel.</p>
                             </div>
                         </div>
 
