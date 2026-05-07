@@ -964,7 +964,6 @@ ${renderTocPage()}
 ${renderMovementPage(data)}
 ${renderHazmatPage(data)}
 ${renderDetailsPage(data)}
-${renderPurchaseOrdersPage(data)}
 ${renderSuspectedHazmatPage(data)}
 ${renderHmMarkedDecksPages(data.materialGroups)}
 ${DECK_CROP_SCRIPT}
