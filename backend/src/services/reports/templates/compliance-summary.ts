@@ -21,7 +21,6 @@ import {
   STYLESHEET,
   renderCoverPage,
   renderSpecsPage,
-  renderPurchaseOrdersPage,
   renderSuspectedHazmatPage,
   renderMdSdocPage,
 } from './quarterly-compliance.js';
@@ -152,7 +151,6 @@ ${renderCoverPage(data, 'Compliance Summary Report')}
 ${renderSpecsPage(data)}
 ${renderComplianceSnapshotPage(data)}
 ${renderActionItemsPage(data)}
-${renderPurchaseOrdersPage(data)}
 ${renderMdSdocPage(data)}
 ${renderSuspectedHazmatPage(data)}
 ${renderPeriodActivityPage(data)}
