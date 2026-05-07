@@ -1,9 +1,14 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
 import './PendingAudits.css';
+// Reuse the Pending Reviews registry layout (registry-header,
+// registry-table-card, header-actions, search-wrapper, export-btn,
+// table-footer) so both administration pages share one compact pattern
+// instead of the audits page using a wider, looser top-bar shape.
+import './PendingReviews.css';
 import './AuditEditor.css';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
-import { Search, ChevronDown, Download, Edit2, Send, Trash2, X, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Download, Edit2, Send, Trash2, X, CheckCircle2, XCircle } from 'lucide-react';
 
 import type { AuditSummary } from '../../types';
 import { api } from '../../lib/apiClient';
@@ -505,7 +510,6 @@ const AuditEditorOverlay = ({ imo, vesselName, onClose, onSave }: AuditEditorPro
 
 export default function PendingAudits() {
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortBy, setSortBy] = useState('createDate');
     const [currentPage, setCurrentPage] = useState(1);
     const recordsPerPage = 10;
     const [allRecords, setAllRecords] = useState<AuditSummary[]>([]);
@@ -543,12 +547,11 @@ export default function PendingAudits() {
         r.imoNumber.includes(searchQuery)
     );
 
-    // Sorting Logic
-    const sortedRecords = [...filteredRecords].sort((a, b) => {
-        if (sortBy === 'vesselName') return a.vesselName.localeCompare(b.vesselName);
-        if (sortBy === 'imoNumber') return a.imoNumber.localeCompare(b.imoNumber);
-        return b.createDate.localeCompare(a.createDate); // Default Newest first
-    });
+    // Sort newest first by create date — matches the Pending Reviews
+    // page (which doesn't expose a sort dropdown either).
+    const sortedRecords = [...filteredRecords].sort((a, b) =>
+        b.createDate.localeCompare(a.createDate),
+    );
 
     // Pagination Logic
     const totalPages = Math.ceil(sortedRecords.length / recordsPerPage);
@@ -639,48 +642,40 @@ export default function PendingAudits() {
                 <Header />
 
                 <div className="pending-audits-content">
-                    <div className="md-header">
-                        <div className="md-title-area">
-                            <h1>Pending Audits Registry</h1>
-                            <p>Manage and review the latest audits before sending for final review.</p>
+                    {/* Same registry-header shape used by Pending Reviews —
+                        title left, search + Export List inline on the right. */}
+                    <div className="registry-header">
+                        <div className="header-title-area" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                            <div>
+                                <h1>Pending Audits Registry</h1>
+                                <p>Manage and review the latest audits before sending for final review.</p>
+                            </div>
+                        </div>
+                        <div className="header-actions">
+                            <div className="search-wrapper">
+                                <Search size={24} className="search-icon" />
+                                <input
+                                    type="text"
+                                    placeholder="Search Vessel Name or IMO..."
+                                    value={searchQuery}
+                                    onChange={(e) => {
+                                        setSearchQuery(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                />
+                            </div>
+                            <button className="export-btn">
+                                <Download size={18} />
+                                EXPORT LIST
+                            </button>
                         </div>
                     </div>
 
-                    <div className="audits-top-bar">
-                        <div className="search-box">
-                            <Search size={24} className="search-icon" />
-                            <input
-                                type="text"
-                                placeholder="Search by IMO or Vessel Name..."
-                                value={searchQuery}
-                                onChange={(e) => {
-                                    setSearchQuery(e.target.value);
-                                    setCurrentPage(1);
-                                }}
-                            />
-                        </div>
-
-                        <div className="top-bar-right">
-                            <div className="sort-dropdown">
-                                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-                                    <option value="createDate">Sort by Create Date</option>
-                                    <option value="vesselName">Sort by Vessel Name</option>
-                                    <option value="imoNumber">Sort by IMO Number</option>
-                                </select>
-                                <ChevronDown size={16} className="dropdown-icon" />
-                            </div>
-
-                            <div className="active-vessels-badge">
-                                <span className="badge-label">ACTIVE VESSELS</span>
-                                <span className="badge-count">{filteredRecords.length} Active Cases</span>
-                            </div>
-
-                            <button className="download-btn"><Download size={18} /></button>
-                        </div>
-                    </div>
-
-                    <div className="table-container">
-                        <div className="table-scroll-wrapper">
+                    {/* Single registry card containing table + pagination
+                        footer — collapses the empty whitespace the looser
+                        layout used to leave behind. */}
+                    <div className="registry-table-card" style={{ width: '100%', maxWidth: 'none' }}>
+                        <div className="table-wrapper">
                             <table className="audits-table">
                                 <thead>
                                     <tr>
@@ -717,7 +712,6 @@ export default function PendingAudits() {
                                                 </span>
                                             </td>
                                             <td>{record.createDate}</td>
-                                            {/* -- REVIEW STATUS - its own dedicated column -- */}
                                             <td>
                                                 {record.status === 'PENDING REVIEW' ? (
                                                     <div className="v3-status-badge pending">
@@ -728,7 +722,6 @@ export default function PendingAudits() {
                                                     <span className="status-dash">-</span>
                                                 )}
                                             </td>
-                                            {/* -- ACTION - icon buttons only -- */}
                                             <td className="action-column">
                                                 <div className="action-buttons">
                                                     {(record.duplicatePO ?? 0) > 0 && (
@@ -743,25 +736,25 @@ export default function PendingAudits() {
                                 </tbody>
                             </table>
                         </div>
-                    </div>
 
-                    <div className="pagination">
-                        <span className="pagination-info">
-                            Showing {startIndex + 1} to {Math.min(startIndex + recordsPerPage, sortedRecords.length)} of {sortedRecords.length} vessel records
-                        </span>
-                        <div className="pagination-buttons">
-                            <button className="page-btn" style={{ width: 'auto', padding: '0 12px' }} onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>Previous</button>
-                            {[...Array(totalPages)].map((_, idx) => {
-                                const pageNum = idx + 1;
-                                if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
-                                    return (
-                                        <button key={pageNum} className={`page-btn ${currentPage === pageNum ? 'active' : ''}`} onClick={() => setCurrentPage(pageNum)}>{pageNum}</button>
-                                    );
-                                }
-                                if (pageNum === currentPage - 2 || pageNum === currentPage + 2) return <span key={pageNum} className="pagination-dots">...</span>;
-                                return null;
-                            })}
-                            <button className="page-btn" style={{ width: 'auto', padding: '0 12px' }} onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>Next</button>
+                        <div className="table-footer">
+                            <span className="pagination-info">
+                                Showing {startIndex + 1} to {Math.min(startIndex + recordsPerPage, sortedRecords.length)} of {sortedRecords.length} vessel records
+                            </span>
+                            <div className="pagination-buttons">
+                                <button className="page-btn" style={{ width: 'auto', padding: '0 12px' }} onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>Previous</button>
+                                {[...Array(totalPages)].map((_, idx) => {
+                                    const pageNum = idx + 1;
+                                    if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+                                        return (
+                                            <button key={pageNum} className={`page-btn ${currentPage === pageNum ? 'active' : ''}`} onClick={() => setCurrentPage(pageNum)}>{pageNum}</button>
+                                        );
+                                    }
+                                    if (pageNum === currentPage - 2 || pageNum === currentPage + 2) return <span key={pageNum} className="pagination-dots">...</span>;
+                                    return null;
+                                })}
+                                <button className="page-btn" style={{ width: 'auto', padding: '0 12px' }} onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>Next</button>
+                            </div>
                         </div>
                     </div>
                 </div>
