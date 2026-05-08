@@ -14,7 +14,9 @@
     flex: 1;
     margin-left: var(--sidebar-width, 240px);
     width: calc(100% - var(--sidebar-width, 240px));
-    padding: 24px 32px 48px;
+    /* Top padding clears the fixed 72px Header so the hero card
+       isn't tucked behind it (matches PendingAudits / PendingReviews). */
+    padding: 92px 32px 48px;
 }
 
 /* ── Hero ──────────────────────────────────────────────────── */
