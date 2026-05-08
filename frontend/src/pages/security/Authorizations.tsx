@@ -500,12 +500,25 @@ export default function Authorizations() {
                 </button>
               </header>
 
-              <div className="sm-modal-body">
+              {/* Wrapping in a <form> with autoComplete="off" prevents
+                  the browser from stuffing saved emails / passwords into
+                  unrelated fields (the Country field used to render the
+                  logged-in admin's email). Each input still gets a
+                  precise autocomplete hint so password managers can do
+                  the right thing. */}
+              <form
+                className="sm-modal-body"
+                autoComplete="off"
+                onSubmit={(e) => { e.preventDefault(); submitShipManager(); }}
+              >
                 <div className="sm-row sm-row-2">
                   <div className="sm-field">
-                    <label>Full Name <span className="sm-required">*</span></label>
+                    <label htmlFor="sm-name">Full Name <span className="sm-required">*</span></label>
                     <input
+                      id="sm-name"
+                      name="sm-name"
                       type="text"
+                      autoComplete="off"
                       value={smForm.name}
                       onChange={(e) => setSmForm((f) => ({ ...f, name: e.target.value }))}
                       placeholder="e.g. Frank Shaw"
@@ -513,9 +526,12 @@ export default function Authorizations() {
                     />
                   </div>
                   <div className="sm-field">
-                    <label>Email <span className="sm-required">*</span></label>
+                    <label htmlFor="sm-email">Email <span className="sm-required">*</span></label>
                     <input
+                      id="sm-email"
+                      name="sm-email"
                       type="email"
+                      autoComplete="off"
                       value={smForm.email}
                       onChange={(e) => setSmForm((f) => ({ ...f, email: e.target.value }))}
                       placeholder="manager@company.com"
@@ -524,18 +540,24 @@ export default function Authorizations() {
                 </div>
                 <div className="sm-row sm-row-2">
                   <div className="sm-field">
-                    <label>Phone</label>
+                    <label htmlFor="sm-phone">Phone</label>
                     <input
+                      id="sm-phone"
+                      name="sm-phone"
                       type="tel"
+                      autoComplete="off"
                       value={smForm.phone}
                       onChange={(e) => setSmForm((f) => ({ ...f, phone: e.target.value }))}
                       placeholder="+91 9876543210"
                     />
                   </div>
                   <div className="sm-field">
-                    <label>Country</label>
+                    <label htmlFor="sm-country">Country</label>
                     <input
+                      id="sm-country"
+                      name="sm-country"
                       type="text"
+                      autoComplete="off"
                       value={smForm.country}
                       onChange={(e) => setSmForm((f) => ({ ...f, country: e.target.value }))}
                       placeholder="India"
@@ -544,18 +566,24 @@ export default function Authorizations() {
                 </div>
                 <div className="sm-row sm-row-2">
                   <div className="sm-field">
-                    <label>Temporary Password <span className="sm-required">*</span></label>
+                    <label htmlFor="sm-password">Temporary Password <span className="sm-required">*</span></label>
                     <input
+                      id="sm-password"
+                      name="sm-password"
                       type="password"
+                      autoComplete="new-password"
                       value={smForm.password}
                       onChange={(e) => setSmForm((f) => ({ ...f, password: e.target.value }))}
                       placeholder="At least 6 characters"
                     />
                   </div>
                   <div className="sm-field">
-                    <label>Confirm Password <span className="sm-required">*</span></label>
+                    <label htmlFor="sm-confirm-password">Confirm Password <span className="sm-required">*</span></label>
                     <input
+                      id="sm-confirm-password"
+                      name="sm-confirm-password"
                       type="password"
+                      autoComplete="new-password"
                       value={smForm.confirmPassword}
                       onChange={(e) => setSmForm((f) => ({ ...f, confirmPassword: e.target.value }))}
                       placeholder="Re-enter password"
@@ -569,7 +597,7 @@ export default function Authorizations() {
                 </p>
 
                 {smError && <div className="sm-error">{smError}</div>}
-              </div>
+              </form>
 
               <footer className="sm-modal-footer">
                 <button type="button" className="auth-btn ghost" onClick={() => setShowAddModal(false)} disabled={smSaving}>
