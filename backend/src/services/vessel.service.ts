@@ -1,4 +1,5 @@
 import { query } from '../config/database.js';
+import { isUserAdmin } from './access.js';
 
 // Column mapping: camelCase (API) -> snake_case (DB)
 const FIELD_MAP: Record<string, string> = {
@@ -51,8 +52,16 @@ function extractFields(data: Record<string, unknown>): { columns: string[]; valu
 }
 
 export const VesselService = {
-  /** Get all vessels belonging to a specific user */
+  /** Get all vessels visible to the caller. Admins see the whole
+   *  fleet; non-admin roles see only the vessels they themselves
+   *  onboarded (vessels.created_by_id match). */
   async getVesselsByUser(userId: string) {
+    if (await isUserAdmin(userId)) {
+      const result = await query(
+        'SELECT * FROM vessels ORDER BY created_at DESC',
+      );
+      return result.rows.map(toApi);
+    }
     const result = await query(
       'SELECT * FROM vessels WHERE created_by_id = $1 ORDER BY created_at DESC',
       [userId],
@@ -60,8 +69,16 @@ export const VesselService = {
     return result.rows.map(toApi);
   },
 
-  /** Get a single vessel only if it belongs to the user */
+  /** Get a single vessel by id. Admins can fetch any vessel; non-admin
+   *  roles get the row only when they own it (created_by_id match). */
   async getVesselByIdForUser(id: string, userId: string) {
+    if (await isUserAdmin(userId)) {
+      const result = await query(
+        'SELECT * FROM vessels WHERE id = $1',
+        [id],
+      );
+      return result.rows[0] ? toApi(result.rows[0]) : null;
+    }
     const result = await query(
       'SELECT * FROM vessels WHERE id = $1 AND created_by_id = $2',
       [id, userId],

@@ -1,4 +1,5 @@
 import { query } from '../config/database.js';
+import { isUserAdmin } from './access.js';
 
 const FIELD_MAP: Record<string, string> = {
   imoNumber: 'imo_number',
@@ -41,14 +42,16 @@ function extractFields(data: Record<string, unknown>) {
 }
 
 export const AuditService = {
-  /** Get all audits (optionally filter by status) */
+  /** Get all audits (optionally filter by status). Admins see audits
+   *  for the whole fleet; non-admin roles get audits for vessels they
+   *  themselves onboarded. */
   async getAudits(filters?: { status?: string; userId?: string }) {
     let sql = `SELECT a.*, v.created_by_id FROM audit_summaries a
                LEFT JOIN vessels v ON a.vessel_id = v.id WHERE 1=1`;
     const params: unknown[] = [];
     let i = 1;
 
-    if (filters?.userId) {
+    if (filters?.userId && !(await isUserAdmin(filters.userId))) {
       sql += ` AND v.created_by_id = $${i++}`;
       params.push(filters.userId);
     }
@@ -71,6 +74,15 @@ export const AuditService = {
    * audit back to 'In Progress'. No clarification-existence subquery needed.
    */
   async getPendingAudits(userId: string) {
+    if (await isUserAdmin(userId)) {
+      const r = await query(
+        `SELECT a.* FROM audit_summaries a
+           JOIN vessels v ON a.vessel_id = v.id
+          WHERE a.status IN ('In Progress', 'Pending')
+          ORDER BY a.last_activity DESC`,
+      );
+      return r.rows.map((row: Record<string, unknown>) => toApi(row));
+    }
     const r = await query(
       `SELECT a.* FROM audit_summaries a
          JOIN vessels v ON a.vessel_id = v.id
@@ -87,6 +99,18 @@ export const AuditService = {
    *  POs, Total Items Audit, Pending Audits) reflect reality across the
    *  full audit lifecycle, not just one stage. */
   async getActiveAudits(userId: string) {
+    if (await isUserAdmin(userId)) {
+      const r = await query(
+        `SELECT a.* FROM audit_summaries a
+           JOIN vessels v ON a.vessel_id = v.id
+          WHERE a.status IN (
+              'In Progress', 'Pending', 'Pending Review',
+              'Awaiting Clarification', 'submitted'
+            )
+          ORDER BY a.last_activity DESC`,
+      );
+      return r.rows.map((row: Record<string, unknown>) => toApi(row));
+    }
     const r = await query(
       `SELECT a.* FROM audit_summaries a
          JOIN vessels v ON a.vessel_id = v.id
@@ -108,6 +132,15 @@ export const AuditService = {
     // so post-clarification rows naturally fall out of this query — no
     // clarification-existence subquery needed (and historic clarifications
     // shouldn't disqualify a fresh Send-for-Review).
+    if (await isUserAdmin(userId)) {
+      const r = await query(
+        `SELECT a.* FROM audit_summaries a
+           JOIN vessels v ON a.vessel_id = v.id
+          WHERE a.status = 'Pending Review'
+          ORDER BY a.last_activity DESC`,
+      );
+      return r.rows.map((row: Record<string, unknown>) => toApi(row));
+    }
     const r = await query(
       `SELECT a.* FROM audit_summaries a
          JOIN vessels v ON a.vessel_id = v.id
@@ -121,6 +154,15 @@ export const AuditService = {
 
   /** Get a specific audit by IMO */
   async getAuditByImo(imoNumber: string, userId: string) {
+    if (await isUserAdmin(userId)) {
+      const r = await query(
+        `SELECT a.* FROM audit_summaries a
+         WHERE a.imo_number = $1
+         LIMIT 1`,
+        [imoNumber],
+      );
+      return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    }
     const r = await query(
       `SELECT a.* FROM audit_summaries a
        JOIN vessels v ON a.vessel_id = v.id
@@ -133,6 +175,13 @@ export const AuditService = {
 
   /** Get a single audit by ID */
   async getAuditById(id: string, userId: string) {
+    if (await isUserAdmin(userId)) {
+      const r = await query(
+        `SELECT a.* FROM audit_summaries a WHERE a.id = $1`,
+        [id],
+      );
+      return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    }
     const r = await query(
       `SELECT a.* FROM audit_summaries a
        JOIN vessels v ON a.vessel_id = v.id
@@ -351,8 +400,8 @@ export const AuditService = {
    * that has at least one clarification item, with counts + last submission.
    */
   async getMdsPendingOverview(userId: string) {
-    const r = await query(
-      `SELECT
+    const admin = await isUserAdmin(userId);
+    const baseSelect = `SELECT
           a.imo_number,
           a.vessel_name,
           a.total_po,
@@ -381,13 +430,13 @@ export const AuditService = {
         FROM audit_summaries a
         JOIN vessels v ON v.id = a.vessel_id
         LEFT JOIN clarification_requests cr ON cr.vessel_id = a.vessel_id
-        LEFT JOIN clarification_items ci   ON ci.clarification_id = cr.id
-       WHERE v.created_by_id = $1
-       GROUP BY a.id
+        LEFT JOIN clarification_items ci   ON ci.clarification_id = cr.id`;
+    const tail = ` GROUP BY a.id
        HAVING COUNT(ci.id) > 0
-       ORDER BY MAX(COALESCE(ci.mds_received_at, cr.created_at)) DESC NULLS LAST`,
-      [userId],
-    );
+       ORDER BY MAX(COALESCE(ci.mds_received_at, cr.created_at)) DESC NULLS LAST`;
+    const r = admin
+      ? await query(baseSelect + tail)
+      : await query(`${baseSelect} WHERE v.created_by_id = $1${tail}`, [userId]);
     return r.rows as Array<Record<string, unknown>>;
   },
 
@@ -401,13 +450,23 @@ export const AuditService = {
    * still return them as synthetic rows so the admin can see what's pending.
    */
   async getVesselPoItems(vesselId: string, userId: string) {
-    // Verify the caller owns this vessel before returning anything.
-    const ownershipRes = await query(
-      `SELECT 1 FROM vessels WHERE id = $1 AND created_by_id = $2 LIMIT 1`,
-      [vesselId, userId],
-    );
-    if (ownershipRes.rows.length === 0) {
-      return { items: [] as Array<Record<string, unknown>>, auditId: null };
+    // Admins skip the ownership check; non-admin roles must own the vessel.
+    if (!(await isUserAdmin(userId))) {
+      const ownershipRes = await query(
+        `SELECT 1 FROM vessels WHERE id = $1 AND created_by_id = $2 LIMIT 1`,
+        [vesselId, userId],
+      );
+      if (ownershipRes.rows.length === 0) {
+        return { items: [] as Array<Record<string, unknown>>, auditId: null };
+      }
+    } else {
+      const existsRes = await query(
+        `SELECT 1 FROM vessels WHERE id = $1 LIMIT 1`,
+        [vesselId],
+      );
+      if (existsRes.rows.length === 0) {
+        return { items: [] as Array<Record<string, unknown>>, auditId: null };
+      }
     }
 
     // Pick the newest non-Completed audit for the vessel — may be null.

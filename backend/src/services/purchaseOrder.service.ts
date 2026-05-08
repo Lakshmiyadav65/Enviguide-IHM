@@ -1,4 +1,5 @@
 import { query } from '../config/database.js';
+import { isUserAdmin } from './access.js';
 
 const PO_FIELD_MAP: Record<string, string> = {
   poNumber: 'po_number',
@@ -41,11 +42,16 @@ function extract(data: Record<string, unknown>) {
 
 export const PurchaseOrderService = {
   async listForUser(userId: string, filters?: { vesselId?: string; status?: string; supplierName?: string }) {
+    const admin = await isUserAdmin(userId);
     let sql = `SELECT po.*, v.name AS vessel_name FROM purchase_orders po
                JOIN vessels v ON po.vessel_id = v.id
-               WHERE v.created_by_id = $1`;
-    const params: unknown[] = [userId];
-    let i = 2;
+               WHERE 1=1`;
+    const params: unknown[] = [];
+    let i = 1;
+    if (!admin) {
+      sql += ` AND v.created_by_id = $${i++}`;
+      params.push(userId);
+    }
 
     if (filters?.vesselId) { sql += ` AND po.vessel_id = $${i++}`; params.push(filters.vesselId); }
     if (filters?.status) { sql += ` AND po.status = $${i++}`; params.push(filters.status); }
@@ -60,6 +66,13 @@ export const PurchaseOrderService = {
   },
 
   async getById(id: string, userId: string) {
+    if (await isUserAdmin(userId)) {
+      const r = await query(
+        `SELECT po.* FROM purchase_orders po WHERE po.id = $1`,
+        [id],
+      );
+      return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    }
     const r = await query(
       `SELECT po.* FROM purchase_orders po
        JOIN vessels v ON po.vessel_id = v.id
