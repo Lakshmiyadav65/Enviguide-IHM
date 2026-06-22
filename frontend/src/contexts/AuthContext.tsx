@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { api } from '../lib/apiClient';
-import { ENDPOINTS } from '../config/api.config';
+import { ENDPOINTS, API_CONFIG } from '../config/api.config';
 
 export interface AuthUser {
   id: string;
@@ -62,6 +62,26 @@ function meToAuthUser(d: MeResponse['data'], token: string): AuthUser {
   };
 }
 
+// Fake admin used when running in mock mode (no backend). isAdmin=true so
+// every permission check passes and the whole app is browsable.
+const MOCK_TOKEN = 'mock-token';
+
+// The only credential accepted in mock mode (no backend).
+const MOCK_EMAIL = 'sivaprasad@enviguide.com';
+const MOCK_PASSWORD = 'Envi123';
+
+function makeMockUser(email: string): AuthUser {
+  return {
+    id: 'mock-admin',
+    name: email.split('@')[0] || 'Admin',
+    email: email || MOCK_EMAIL,
+    role: 'admin',
+    isAdmin: true,
+    permissions: [],
+    token: MOCK_TOKEN,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
     const stored = localStorage.getItem('ihm_user');
@@ -81,6 +101,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchMe = useCallback(async (token: string) => {
+    // Mock mode: rebuild the cached admin instead of hitting /auth/me.
+    if (API_CONFIG.USE_MOCK) {
+      const stored = localStorage.getItem('ihm_user');
+      const u = stored ? (JSON.parse(stored) as AuthUser) : makeMockUser('admin@enviguide.com');
+      setUser(u);
+      return u;
+    }
     const res = await api.get<MeResponse>(ENDPOINTS.AUTH.ME);
     const u = meToAuthUser(res.data, token);
     localStorage.setItem('ihm_user', JSON.stringify(u));
@@ -106,6 +133,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
+      // Mock mode: no backend — only the fixed demo credential is accepted.
+      if (API_CONFIG.USE_MOCK) {
+        const emailOk = email.trim().toLowerCase() === MOCK_EMAIL.toLowerCase();
+        if (!emailOk || password !== MOCK_PASSWORD) {
+          throw new Error('Invalid email or password');
+        }
+        const u = makeMockUser(MOCK_EMAIL);
+        localStorage.setItem('ihm_token', u.token);
+        localStorage.setItem('ihm_user', JSON.stringify(u));
+        setUser(u);
+        return;
+      }
       // Generous timeout — the first login after the backend has been
       // idle (Render Free) can take 30-50s while the service cold-starts.
       const res = await api.post<LoginResponse>(

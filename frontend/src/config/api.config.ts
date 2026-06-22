@@ -6,7 +6,9 @@
 
 export const API_CONFIG = {
   BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
-  USE_MOCK: import.meta.env.VITE_USE_MOCK === 'true',
+  // Mock mode is ON by default so the app works without a backend.
+  // Set VITE_USE_MOCK=false (and a real VITE_API_BASE_URL) to use the API.
+  USE_MOCK: import.meta.env.VITE_USE_MOCK !== 'false',
   TIMEOUT: 15000, // ms
 };
 
