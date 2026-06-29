@@ -11,7 +11,6 @@ let db: Db | null = null;
 export async function connectDb(): Promise<Db> {
   if (db) return db;
   dbLog.info('Connecting to MongoDB...');
-  // The provided MONGODB_URI is: mongodb+srv://enviguideofficial_db_user:K0vh286q8JFkjtW3@ihm.kltlone.mongodb.net
   // We append the database name 'ihm_enviguide' to the URI if it's not already there.
   let uri = env.MONGODB_URI;
   if (uri && !uri.includes('ihm.kltlone.mongodb.net/')) {
