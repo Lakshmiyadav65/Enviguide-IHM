@@ -1,4 +1,5 @@
-import { query } from '../config/database.js';
+import crypto from 'crypto';
+import { getDb } from '../config/database.js';
 import { isUserAdmin } from './access.js';
 
 const PO_FIELD_MAP: Record<string, string> = {
@@ -22,107 +23,181 @@ REVERSE['vessel_id'] = 'vesselId';
 REVERSE['created_at'] = 'createdAt';
 REVERSE['updated_at'] = 'updatedAt';
 
-function toApi(row: Record<string, unknown>) {
+function toApi(row: any) {
+  if (!row) return null;
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) out[REVERSE[k] || k] = v;
+  for (const [k, v] of Object.entries(row)) {
+    if (k === '_id') {
+      out['id'] = v;
+    } else {
+      out[REVERSE[k] || k] = v;
+    }
+  }
   return out;
 }
 
 function extract(data: Record<string, unknown>) {
-  const cols: string[] = [];
-  const vals: unknown[] = [];
+  const fields: Record<string, unknown> = {};
   for (const [c, s] of Object.entries(PO_FIELD_MAP)) {
     if (c in data && data[c] !== undefined) {
-      cols.push(s);
-      vals.push(data[c]);
+      fields[s] = data[c];
     }
   }
-  return { cols, vals };
+  return fields;
 }
 
 export const PurchaseOrderService = {
   async listForUser(userId: string, filters?: { vesselId?: string; status?: string; supplierName?: string }) {
+    const db = getDb();
     const admin = await isUserAdmin(userId);
-    let sql = `SELECT po.*, v.name AS vessel_name FROM purchase_orders po
-               JOIN vessels v ON po.vessel_id = v.id
-               WHERE 1=1`;
-    const params: unknown[] = [];
-    let i = 1;
+
+    const pipeline: any[] = [];
+
+    // Lookup vessel to get vessel_name and filter by created_by_id if not admin
+    pipeline.push({
+      $lookup: {
+        from: 'vessels',
+        localField: 'vessel_id',
+        foreignField: '_id',
+        as: 'vessel'
+      }
+    });
+    pipeline.push({ $unwind: '$vessel' });
+
+    const match: any = {};
     if (!admin) {
-      sql += ` AND v.created_by_id = $${i++}`;
-      params.push(userId);
+      match['vessel.created_by_id'] = userId;
     }
-
-    if (filters?.vesselId) { sql += ` AND po.vessel_id = $${i++}`; params.push(filters.vesselId); }
-    if (filters?.status) { sql += ` AND po.status = $${i++}`; params.push(filters.status); }
+    if (filters?.vesselId) {
+      match['vessel_id'] = filters.vesselId;
+    }
+    if (filters?.status) {
+      match['status'] = filters.status;
+    }
     if (filters?.supplierName) {
-      sql += ` AND po.supplier_name ILIKE $${i++}`;
-      params.push(`%${filters.supplierName}%`);
+      match['supplier_name'] = { $regex: filters.supplierName, $options: 'i' };
     }
+    pipeline.push({ $match: match });
 
-    sql += ' ORDER BY po.created_at DESC';
-    const r = await query(sql, params);
-    return r.rows.map((row: Record<string, unknown>) => ({ ...toApi(row), vesselName: row.vessel_name }));
+    pipeline.push({
+      $project: {
+        _id: 1,
+        po_number: 1,
+        supplier_name: 1,
+        supplier_code: 1,
+        status: 1,
+        total_items: 1,
+        total_amount: 1,
+        currency: 1,
+        po_date: 1,
+        description: 1,
+        file_name: 1,
+        file_path: 1,
+        vessel_id: 1,
+        created_at: 1,
+        updated_at: 1,
+        vessel_name: '$vessel.name'
+      }
+    });
+
+    pipeline.push({ $sort: { created_at: -1 } });
+
+    const rows = await db.collection('purchase_orders').aggregate(pipeline).toArray();
+    return rows.map((row) => ({ ...toApi(row), vesselName: row.vessel_name }));
   },
 
   async getById(id: string, userId: string) {
-    if (await isUserAdmin(userId)) {
-      const r = await query(
-        `SELECT po.* FROM purchase_orders po WHERE po.id = $1`,
-        [id],
-      );
-      return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const db = getDb();
+    const admin = await isUserAdmin(userId);
+
+    if (admin) {
+      const doc = await db.collection('purchase_orders').findOne({ _id: id });
+      return doc ? toApi(doc) : null;
     }
-    const r = await query(
-      `SELECT po.* FROM purchase_orders po
-       JOIN vessels v ON po.vessel_id = v.id
-       WHERE po.id = $1 AND v.created_by_id = $2`,
-      [id, userId],
-    );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+
+    const pipeline: any[] = [
+      { $match: { _id: id } },
+      {
+        $lookup: {
+          from: 'vessels',
+          localField: 'vessel_id',
+          foreignField: '_id',
+          as: 'vessel'
+        }
+      },
+      { $unwind: '$vessel' },
+      { $match: { 'vessel.created_by_id': userId } }
+    ];
+    const rows = await db.collection('purchase_orders').aggregate(pipeline).toArray();
+    return rows[0] ? toApi(rows[0]) : null;
   },
 
   async create(data: Record<string, unknown>, vesselId: string) {
-    const { cols, vals } = extract(data);
-    cols.push('vessel_id');
-    vals.push(vesselId);
-    const ph = vals.map((_, i) => `$${i + 1}`).join(', ');
-    const r = await query(
-      `INSERT INTO purchase_orders (${cols.join(', ')}) VALUES (${ph}) RETURNING *`,
-      vals,
-    );
-    return toApi(r.rows[0] as Record<string, unknown>);
+    const db = getDb();
+    const fields = extract(data);
+    fields['vessel_id'] = vesselId;
+    fields['created_at'] = new Date();
+    fields['updated_at'] = new Date();
+    const _id = crypto.randomUUID();
+
+    await db.collection('purchase_orders').insertOne({
+      _id,
+      ...fields
+    });
+    const created = await db.collection('purchase_orders').findOne({ _id });
+    return toApi(created);
   },
 
   async update(id: string, data: Record<string, unknown>) {
-    const { cols, vals } = extract(data);
-    if (cols.length === 0) return null;
-    const setClauses = cols.map((c, i) => `${c} = $${i + 1}`);
-    setClauses.push('updated_at = NOW()');
-    vals.push(id);
-    const r = await query(
-      `UPDATE purchase_orders SET ${setClauses.join(', ')} WHERE id = $${vals.length} RETURNING *`,
-      vals,
+    const db = getDb();
+    const fields = extract(data);
+    if (Object.keys(fields).length === 0) return null;
+
+    fields['updated_at'] = new Date();
+    await db.collection('purchase_orders').updateOne(
+      { _id: id },
+      { $set: fields }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('purchase_orders').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   async delete(id: string) {
-    await query('DELETE FROM purchase_orders WHERE id = $1', [id]);
+    const db = getDb();
+    await db.collection('purchase_orders').deleteOne({ _id: id });
   },
 
   /** Group POs by supplier — for the supplier-mapped view */
   async getBySupplierForVessel(vesselId: string) {
-    const r = await query(
-      `SELECT supplier_name, supplier_code, COUNT(*)::int AS po_count,
-              SUM(total_items)::int AS total_items,
-              array_agg(json_build_object('id', id, 'poNumber', po_number, 'status', status)) AS pos
-       FROM purchase_orders
-       WHERE vessel_id = $1
-       GROUP BY supplier_name, supplier_code
-       ORDER BY supplier_name`,
-      [vesselId],
-    );
-    return r.rows;
+    const db = getDb();
+    const rows = await db.collection('purchase_orders').aggregate([
+      { $match: { vessel_id: vesselId } },
+      {
+        $group: {
+          _id: { supplier_name: '$supplier_name', supplier_code: '$supplier_code' },
+          po_count: { $sum: 1 },
+          total_items: { $sum: '$total_items' },
+          pos: {
+            $push: {
+              id: '$_id',
+              poNumber: '$po_number',
+              status: '$status'
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          supplier_name: '$_id.supplier_name',
+          supplier_code: '$_id.supplier_code',
+          po_count: 1,
+          total_items: 1,
+          pos: 1
+        }
+      },
+      { $sort: { supplier_name: 1 } }
+    ]).toArray();
+    return rows;
   },
 };

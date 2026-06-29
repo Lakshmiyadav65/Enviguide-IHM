@@ -1,5 +1,5 @@
-// -- User Categories Service --------------------------------
-import { query } from '../config/database.js';
+import crypto from 'crypto';
+import { getCollection } from '../config/database.js';
 
 const FIELD_MAP: Record<string, string> = {
   name: 'name',
@@ -14,95 +14,126 @@ REVERSE['id'] = 'id';
 REVERSE['created_at'] = 'createdAt';
 REVERSE['updated_at'] = 'updatedAt';
 
-function toApi(row: Record<string, unknown>) {
+function toApi(row: any) {
+  if (!row) return null;
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) out[REVERSE[k] || k] = v;
+  for (const [k, v] of Object.entries(row)) {
+    if (k === '_id') {
+      out['id'] = v;
+    } else {
+      out[REVERSE[k] || k] = v;
+    }
+  }
   return out;
 }
 
 function extract(data: Record<string, unknown>) {
-  const cols: string[] = [];
-  const vals: unknown[] = [];
+  const fields: Record<string, unknown> = {};
   for (const [c, s] of Object.entries(FIELD_MAP)) {
     if (c in data && data[c] !== undefined) {
-      cols.push(s);
-      vals.push(data[c]);
+      fields[s] = data[c];
     }
   }
-  return { cols, vals };
+  return fields;
 }
 
 export const UserCategoryService = {
   async list(filters?: { archived?: boolean; search?: string }) {
-    let sql = `SELECT c.*, COALESCE(uc.user_count, 0)::int AS user_count
-               FROM user_categories c
-               LEFT JOIN (
-                 SELECT category, COUNT(*) AS user_count FROM users GROUP BY category
-               ) uc ON uc.category = c.name
-               WHERE 1=1`;
-    const params: unknown[] = [];
-    let i = 1;
+    const coll = getCollection('user_categories');
+    const pipeline: any[] = [];
 
+    const match: any = {};
     if (filters?.archived !== undefined) {
-      sql += ` AND c.archived = $${i++}`;
-      params.push(filters.archived);
+      match.archived = filters.archived;
     }
     if (filters?.search) {
-      sql += ` AND c.name ILIKE $${i++}`;
-      params.push(`%${filters.search}%`);
+      match.name = { $regex: filters.search, $options: 'i' };
     }
+    pipeline.push({ $match: match });
 
-    sql += ' ORDER BY c.name ASC';
-    const r = await query(sql, params);
-    return r.rows.map((row: Record<string, unknown>) => ({
+    // Lookup to count users per category name
+    pipeline.push({
+      $lookup: {
+        from: 'users',
+        localField: 'name',
+        foreignField: 'category',
+        as: 'matched_users'
+      }
+    });
+
+    pipeline.push({
+      $project: {
+        _id: 1,
+        name: 1,
+        description: 1,
+        status: 1,
+        archived: 1,
+        created_at: 1,
+        updated_at: 1,
+        userCount: { $size: '$matched_users' }
+      }
+    });
+
+    pipeline.push({ $sort: { name: 1 } });
+
+    const rows = await coll.aggregate(pipeline).toArray();
+    return rows.map((row) => ({
       ...toApi(row),
-      userCount: row.user_count,
+      userCount: row.userCount,
     }));
   },
 
   async getById(id: string) {
-    const r = await query('SELECT * FROM user_categories WHERE id = $1', [id]);
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const coll = getCollection('user_categories');
+    const doc = await coll.findOne({ _id: id });
+    return doc ? toApi(doc) : null;
   },
 
   async create(data: Record<string, unknown>) {
     if (!data.name) throw new Error('name is required');
-    const existing = await query('SELECT id FROM user_categories WHERE name = $1', [data.name]);
-    if (existing.rows[0]) throw new Error('Category name already exists');
+    const coll = getCollection('user_categories');
+    const existing = await coll.findOne({ name: data.name });
+    if (existing) throw new Error('Category name already exists');
 
-    const { cols, vals } = extract(data);
-    const ph = vals.map((_, i) => `$${i + 1}`).join(', ');
-    const r = await query(
-      `INSERT INTO user_categories (${cols.join(', ')}) VALUES (${ph}) RETURNING *`,
-      vals,
-    );
-    return toApi(r.rows[0] as Record<string, unknown>);
+    const fields = extract(data);
+    fields['created_at'] = new Date();
+    fields['updated_at'] = new Date();
+    const _id = crypto.randomUUID();
+
+    await coll.insertOne({
+      _id,
+      ...fields
+    });
+    const created = await coll.findOne({ _id });
+    return toApi(created);
   },
 
   async update(id: string, data: Record<string, unknown>) {
-    const { cols, vals } = extract(data);
-    if (cols.length === 0) return null;
+    const coll = getCollection('user_categories');
+    const fields = extract(data);
+    if (Object.keys(fields).length === 0) return null;
 
-    const setClauses = cols.map((c, i) => `${c} = $${i + 1}`);
-    setClauses.push('updated_at = NOW()');
-    vals.push(id);
-
-    const r = await query(
-      `UPDATE user_categories SET ${setClauses.join(', ')} WHERE id = $${vals.length} RETURNING *`,
-      vals,
+    fields['updated_at'] = new Date();
+    await coll.updateOne(
+      { _id: id },
+      { $set: fields }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await coll.findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   async delete(id: string) {
-    await query('DELETE FROM user_categories WHERE id = $1', [id]);
+    const coll = getCollection('user_categories');
+    await coll.deleteOne({ _id: id });
   },
 
   async setArchived(id: string, archived: boolean) {
-    const r = await query(
-      `UPDATE user_categories SET archived = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
-      [archived, id],
+    const coll = getCollection('user_categories');
+    await coll.updateOne(
+      { _id: id },
+      { $set: { archived, updated_at: new Date() } }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await coll.findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 };

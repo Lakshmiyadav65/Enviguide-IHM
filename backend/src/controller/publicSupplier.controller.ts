@@ -4,7 +4,7 @@
 // provides their email which must match one of the email's recipients.
 
 import type { Request, Response, NextFunction } from 'express';
-import { query } from '../config/database.js';
+import { getDb } from '../config/database.js';
 import { persistUploadedFile, deleteStoredFile } from '../services/storage.service.js';
 import { createError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
@@ -28,34 +28,32 @@ interface ClarificationRow {
 }
 
 async function getByTokenIfValid(token: string): Promise<ClarificationRow | null> {
-  const r = await query(
-    `SELECT id, imo_number, vessel_name, subject, suspected_items,
-            public_token, public_token_expires_at, created_at,
-            recipient_emails, cc_emails,
-            supplier_company, supplier_contact_name, supplier_comments,
-            prepared_date, submitted_at
-       FROM clarification_requests
-      WHERE public_token = $1 LIMIT 1`,
-    [token],
-  );
-  const row = r.rows[0] as ClarificationRow | undefined;
+  const db = getDb();
+  const row = await db.collection('clarification_requests').findOne({ public_token: token });
   if (!row) return null;
   if (row.public_token_expires_at) {
     const exp = new Date(row.public_token_expires_at as string);
     if (Date.now() > exp.getTime()) return null;
   }
-  return row;
+  return {
+    id: row._id,
+    imo_number: row.imo_number,
+    vessel_name: row.vessel_name,
+    subject: row.subject,
+    suspected_items: row.suspected_items,
+    public_token: row.public_token,
+    public_token_expires_at: row.public_token_expires_at,
+    created_at: row.created_at,
+    recipient_emails: row.recipient_emails,
+    cc_emails: row.cc_emails,
+    supplier_company: row.supplier_company,
+    supplier_contact_name: row.supplier_contact_name,
+    supplier_comments: row.supplier_comments,
+    prepared_date: row.prepared_date,
+    submitted_at: row.submitted_at,
+  };
 }
 
-/** Does the email the supplier typed match anyone the email was addressed to?
- *
- *  Test-mode escape hatch: when EMAIL_TEST_REDIRECT_TO is set, the actual
- *  outgoing mail is rerouted to that single address, so the tester needs to
- *  be able to authenticate as any vendor from the redirect inbox. We accept
- *  the redirect address as a valid uploader for any clarification when the
- *  env var is present. Clearing the env var (production setup) restores
- *  strict per-recipient matching automatically.
- */
 function emailMatchesRecipients(email: string, clarification: ClarificationRow): boolean {
   const normalized = email.trim().toLowerCase();
   const redirect = env.EMAIL_TEST_REDIRECT_TO?.trim().toLowerCase();
@@ -78,26 +76,17 @@ export async function getPublicClarification(req: Request, res: Response, next: 
       ? clarification.suspected_items as unknown[][]
       : [];
 
-    const itemsRes = await query(
-      `SELECT item_index,
-              mds_status,  mds_file_name,  mds_file_path,  mds_received_at,
-              sdoc_status, sdoc_file_name, sdoc_file_path, sdoc_received_at,
-              uploaded_by_email
-         FROM clarification_items
-        WHERE clarification_id = $1
-        ORDER BY item_index ASC`,
-      [clarification.id],
-    );
-    const stateByIdx = new Map<number, Record<string, unknown>>();
-    for (const s of itemsRes.rows as Array<Record<string, unknown>>) {
+    const db = getDb();
+    const itemsRes = await db.collection('clarification_items')
+      .find({ clarification_id: clarification.id })
+      .sort({ item_index: 1 })
+      .toArray();
+
+    const stateByIdx = new Map<number, any>();
+    for (const s of itemsRes) {
       stateByIdx.set(Number(s.item_index), s);
     }
 
-    // Return only the fields the supplier needs. Don't leak emails, internal
-    // IDs, or full audit context. Each item now carries TWO independent doc
-    // slots: md (Material Declaration) and sdoc (Supplier Declaration of
-    // Conformity). The legacy mds* fields remain for back-compat and mirror
-    // the MD slot.
     const items = suspected.map((row, idx) => {
       const r = Array.isArray(row) ? row : [];
       const state = stateByIdx.get(idx) ?? {};
@@ -121,7 +110,7 @@ export async function getPublicClarification(req: Request, res: Response, next: 
           filePath: state.sdoc_file_path ? String(state.sdoc_file_path) : null,
           receivedAt: state.sdoc_received_at ? String(state.sdoc_received_at) : null,
         },
-        // Legacy mirrors of MD slot — older clients still read these.
+        // Legacy mirrors of MD slot
         mdsStatus: mdStatus,
         mdsFileName: state.mds_file_name ? String(state.mds_file_name) : null,
         mdsFilePath: state.mds_file_path ? String(state.mds_file_path) : null,
@@ -147,7 +136,6 @@ export async function getPublicClarification(req: Request, res: Response, next: 
   } catch (err) { next(err); }
 }
 
-/** Coerce a path/body kind value to one of the two supported document slots. */
 function parseKind(raw: unknown): 'md' | 'sdoc' | null {
   const s = String(raw ?? '').trim().toLowerCase();
   if (s === 'md' || s === 'mds') return 'md';
@@ -155,7 +143,6 @@ function parseKind(raw: unknown): 'md' | 'sdoc' | null {
   return null;
 }
 
-/** Column tuple for the requested document slot. MD reuses legacy mds_*. */
 function colsForKind(kind: 'md' | 'sdoc') {
   return kind === 'sdoc'
     ? { status: 'sdoc_status', path: 'sdoc_file_path', name: 'sdoc_file_name', at: 'sdoc_received_at' }
@@ -164,14 +151,6 @@ function colsForKind(kind: 'md' | 'sdoc') {
 
 /**
  * POST /api/v1/public/clarifications/:token/items/:idx/document/:kind
- * kind ∈ { 'md', 'sdoc' }
- * multipart: file (PDF/image/office doc), email (must match recipients),
- *            supplierCompany (required), supplierContactName (required),
- *            supplierComments (optional), preparedDate (optional)
- *
- * Upload is blocked until supplierCompany + supplierContactName are set.
- * Each item carries two independent doc slots — MD and SDoC — populated
- * separately by the supplier. The slot is selected by the :kind segment.
  */
 export async function uploadPublicMdsDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -209,44 +188,59 @@ export async function uploadPublicMdsDocument(req: Request, res: Response, next:
       || req.socket.remoteAddress
       || null;
 
+    const db = getDb();
+
     // Persist supplier fields on the clarification request (last write wins).
-    await query(
-      `UPDATE clarification_requests
-          SET supplier_company = $2,
-              supplier_contact_name = $3,
-              supplier_comments = COALESCE($4, supplier_comments),
-              prepared_date = COALESCE($5, prepared_date)
-        WHERE id = $1`,
-      [clarification.id, supplierCompany, supplierContactName, supplierComments, preparedDate],
+    await db.collection('clarification_requests').updateOne(
+      { _id: clarification.id },
+      {
+        $set: {
+          supplier_company: supplierCompany,
+          supplier_contact_name: supplierContactName,
+          supplier_comments: supplierComments || clarification.supplier_comments,
+          prepared_date: preparedDate || clarification.prepared_date
+        }
+      }
     );
 
     const c = colsForKind(kind);
-    const upd = await query(
-      `UPDATE clarification_items
-          SET ${c.status} = 'received',
-              ${c.path}   = $3,
-              ${c.name}   = $4,
-              ${c.at}     = NOW(),
-              uploaded_by_email = $5,
-              uploaded_by_ip    = $6,
-              updated_at        = NOW()
-        WHERE clarification_id = $1 AND item_index = $2
-      RETURNING item_index,
-                mds_status,  mds_file_name,  mds_file_path,  mds_received_at,
-                sdoc_status, sdoc_file_name, sdoc_file_path, sdoc_received_at`,
-      [clarification.id, itemIndex, stored.url, stored.name, uploaderEmail, ip],
+    await db.collection('clarification_items').updateOne(
+      { clarification_id: clarification.id, item_index: itemIndex },
+      {
+        $set: {
+          [c.status]: 'received',
+          [c.path]: stored.url,
+          [c.name]: stored.name,
+          [c.at]: new Date(),
+          uploaded_by_email: uploaderEmail,
+          uploaded_by_ip: ip,
+          updated_at: new Date()
+        }
+      }
     );
-    if (upd.rows.length === 0) return next(createError('Item not found for this link', 404));
 
-    res.json({ success: true, data: upd.rows[0] });
+    const updatedItem = await db.collection('clarification_items').findOne({ clarification_id: clarification.id, item_index: itemIndex });
+    if (!updatedItem) return next(createError('Item not found for this link', 404));
+
+    res.json({
+      success: true,
+      data: {
+        item_index: updatedItem.item_index,
+        mds_status: updatedItem.mds_status,
+        mds_file_name: updatedItem.mds_file_name,
+        mds_file_path: updatedItem.mds_file_path,
+        mds_received_at: updatedItem.mds_received_at,
+        sdoc_status: updatedItem.sdoc_status,
+        sdoc_file_name: updatedItem.sdoc_file_name,
+        sdoc_file_path: updatedItem.sdoc_file_path,
+        sdoc_received_at: updatedItem.sdoc_received_at,
+      }
+    });
   } catch (err) { next(err); }
 }
 
 /**
  * DELETE /api/v1/public/clarifications/:token/items/:idx/document/:kind
- * kind ∈ { 'md', 'sdoc' }
- * Removes the uploaded document for one slot of one item so the supplier
- * can re-upload. Requires the matching email in the request body.
  */
 export async function deletePublicMdsDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -267,28 +261,26 @@ export async function deletePublicMdsDocument(req: Request, res: Response, next:
     }
 
     const c = colsForKind(kind);
-    const existing = await query(
-      `SELECT ${c.path} AS file_path FROM clarification_items
-        WHERE clarification_id = $1 AND item_index = $2`,
-      [clarification.id, itemIndex],
-    );
-    const filePath = existing.rows[0]?.file_path as string | undefined;
+    const db = getDb();
+    const existing = await db.collection('clarification_items').findOne({ clarification_id: clarification.id, item_index: itemIndex });
+    const filePath = existing?.[c.path] as string | undefined;
 
-    // Best-effort remove from R2/Supabase. Skip if we can't derive a key.
     if (filePath) {
-      const key = filePath.split('/').slice(-2).join('/'); // e.g. "md/xxx.pdf" or "sdoc/xxx.pdf"
+      const key = filePath.split('/').slice(-2).join('/');
       await deleteStoredFile(key);
     }
 
-    await query(
-      `UPDATE clarification_items
-          SET ${c.status} = 'pending',
-              ${c.path}   = NULL,
-              ${c.name}   = NULL,
-              ${c.at}     = NULL,
-              updated_at  = NOW()
-        WHERE clarification_id = $1 AND item_index = $2`,
-      [clarification.id, itemIndex],
+    await db.collection('clarification_items').updateOne(
+      { clarification_id: clarification.id, item_index: itemIndex },
+      {
+        $set: {
+          [c.status]: 'pending',
+          [c.path]: null,
+          [c.name]: null,
+          [c.at]: null,
+          updated_at: new Date()
+        }
+      }
     );
 
     res.json({ success: true });
@@ -297,9 +289,6 @@ export async function deletePublicMdsDocument(req: Request, res: Response, next:
 
 /**
  * POST /api/v1/public/clarifications/:token/submit
- * Supplier finalises their submission. Marks submitted_at on the
- * clarification; items already uploaded keep status='received', items
- * without a doc stay 'pending' (admin can chase them separately).
  */
 export async function submitPublicClarification(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -322,17 +311,21 @@ export async function submitPublicClarification(req: Request, res: Response, nex
       || req.socket.remoteAddress
       || null;
 
-    await query(
-      `UPDATE clarification_requests
-          SET supplier_company = COALESCE($2, supplier_company),
-              supplier_contact_name = COALESCE($3, supplier_contact_name),
-              supplier_comments = COALESCE($4, supplier_comments),
-              prepared_date = COALESCE($5, prepared_date),
-              submitted_at = NOW(),
-              submitted_by_ip = $6,
-              status = 'submitted'
-        WHERE id = $1`,
-      [clarification.id, supplierCompany, supplierContactName, supplierComments, preparedDate, ip],
+    const db = getDb();
+
+    await db.collection('clarification_requests').updateOne(
+      { _id: clarification.id },
+      {
+        $set: {
+          supplier_company: supplierCompany || clarification.supplier_company,
+          supplier_contact_name: supplierContactName || clarification.supplier_contact_name,
+          supplier_comments: supplierComments || clarification.supplier_comments,
+          prepared_date: preparedDate || clarification.prepared_date,
+          submitted_at: new Date(),
+          submitted_by_ip: ip,
+          status: 'submitted'
+        }
+      }
     );
 
     res.json({ success: true });

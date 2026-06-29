@@ -4,7 +4,7 @@
 // not in the template, so the template stays pure presentation and easy
 // to swap when the design lands.
 
-import { query } from '../../config/database.js';
+import { getDb } from '../../config/database.js';
 
 export interface ReportPeriod {
   start: Date;
@@ -215,9 +215,6 @@ function partGroupOf(
   if (s.includes('part iii')) return 'III';
   if (s.includes('part ii')) return 'II';
 
-  // Within Part I, route by name/hazard type since we don't carry a
-  // sub-class column. Falls back to I-2 (Equipment & Machinery) which
-  // is the most common bucket.
   const nm = `${name ?? ''} ${hazard ?? ''}`.toLowerCase();
   if (/(paint|coating|primer|varnish)/.test(nm)) return 'I-1';
   if (/(hull|structur(e|al)|deck plate|frame)/.test(nm)) return 'I-3';
@@ -246,12 +243,10 @@ export function quarterContaining(ref: Date = new Date()): ReportPeriod {
 /** Vessel-lifetime period — onboarding date through today. Used by the
  *  'overall' report type which is a full snapshot rather than a quarter. */
 export async function lifetimePeriod(vesselId: string): Promise<ReportPeriod> {
-  const r = await query(
-    `SELECT created_at FROM vessels WHERE id = $1 LIMIT 1`,
-    [vesselId],
-  );
-  if (r.rows.length === 0) throw new Error('Vessel not found');
-  const start = new Date(String((r.rows[0] as { created_at: string }).created_at));
+  const db = getDb();
+  const vessel = await db.collection('vessels').findOne({ _id: vesselId }, { projection: { created_at: 1 } });
+  if (!vessel) throw new Error('Vessel not found');
+  const start = new Date(vessel.created_at);
   const end = new Date();
   return { start, end, label: 'Overall' };
 }
@@ -267,9 +262,6 @@ export function quartersSince(from: Date, until: Date = new Date()): ReportPerio
   const endY = until.getUTCFullYear();
   const endQ = Math.floor(until.getUTCMonth() / 3);
 
-  // Hard guard against runaway loops if a bad date sneaks in (e.g. a
-  // vessel created_at far in the future would never satisfy the
-  // termination condition).
   let safety = 0;
   while ((y < endY || (y === endY && q <= endQ)) && safety++ < 200) {
     const start = new Date(Date.UTC(y, q * 3, 1, 0, 0, 0));
@@ -288,19 +280,14 @@ export async function buildQuarterlyComplianceData(
   period: ReportPeriod,
   generatedBy: string,
 ): Promise<ReportData> {
+  const db = getDb();
+
   // 1. Vessel specs
-  const vesselRes = await query(
-    `SELECT id, name, imo_number, vessel_type, flag_state, port_of_registry,
-            vessel_class, gross_tonnage, keel_laid_date, delivery_date,
-            registered_owner, ship_manager, name_of_yard, image,
-            soc_reference, ihm_reference
-       FROM vessels WHERE id = $1 LIMIT 1`,
-    [vesselId],
-  );
-  const v = vesselRes.rows[0] as Record<string, unknown> | undefined;
+  const v = await db.collection('vessels').findOne({ _id: vesselId });
   if (!v) throw new Error('Vessel not found');
+
   const vessel: VesselSpecs = {
-    id: String(v.id),
+    id: String(v._id),
     name: String(v.name ?? ''),
     imoNumber: String(v.imo_number ?? ''),
     vesselType: (v.vessel_type as string) ?? null,
@@ -319,36 +306,47 @@ export async function buildQuarterlyComplianceData(
   };
 
   // 2. All materials for this vessel + their location + GA plan + rect
-  //    (so the per-item HM Marked Decks pages can render the pin overlay).
-  const materialsRes = await query(
-    `SELECT m.id, m.name, m.ihm_part, m.hazard_type, m.material_name,
-            m.quantity, m.unit, m.no_of_pieces, m.component, m.equipment,
-            m.compartment, m.position, m.remarks, m.created_at, m.updated_at,
-            m.pin_x, m.pin_y,
-            da.name        AS area_name,
-            da.x           AS rect_x,
-            da.y           AS rect_y,
-            da.width       AS rect_w,
-            da.height      AS rect_h,
-            gp.file_path   AS ga_file_path,
-            gp.name        AS ga_plan_name
-       FROM materials m
-       LEFT JOIN deck_areas da ON m.deck_area_id = da.id
-       LEFT JOIN ga_plans   gp ON da.ga_plan_id   = gp.id
-      WHERE m.vessel_id = $1
-      ORDER BY m.ihm_part, m.created_at ASC`,
-    [vesselId],
-  );
+  const materialsRows = await db.collection('materials').aggregate([
+    { $match: { vessel_id: vesselId } },
+    {
+      $lookup: {
+        from: 'decks',
+        localField: 'deck_id',
+        foreignField: '_id',
+        as: 'deck'
+      }
+    },
+    { $unwind: { path: '$deck', preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: 'deck_areas',
+        localField: 'deck_area_id',
+        foreignField: '_id',
+        as: 'deck_area'
+      }
+    },
+    { $unwind: { path: '$deck_area', preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: 'ga_plans',
+        localField: 'deck_area.ga_plan_id',
+        foreignField: '_id',
+        as: 'ga_plan'
+      }
+    },
+    { $unwind: { path: '$ga_plan', preserveNullAndEmptyArrays: true } },
+    { $sort: { ihm_part: 1, created_at: 1 } }
+  ]).toArray();
 
   const groupsByKey: Record<MaterialGroup['groupKey'], MaterialRow[]> = {
     'I-1': [], 'I-2': [], 'I-3': [], 'II': [], 'III': [],
   };
 
   let no = 0;
-  for (const row of materialsRes.rows as Array<Record<string, unknown>>) {
+  for (const row of materialsRows) {
     no += 1;
-    const createdAt = new Date(String(row.created_at));
-    const updatedAt = new Date(String(row.updated_at));
+    const createdAt = new Date(row.created_at);
+    const updatedAt = new Date(row.updated_at);
     const group = partGroupOf(
       (row.ihm_part as string) ?? null,
       (row.name as string) ?? null,
@@ -359,29 +357,29 @@ export async function buildQuarterlyComplianceData(
     if (row.quantity) qtyParts.push(`${row.quantity}${row.unit ? ' ' + row.unit : ''}`);
     const qty = qtyParts.join(' | ') || '-';
 
-    const rect = row.rect_w && row.rect_h
+    const rect = row.deck_area?.width && row.deck_area?.height
       ? {
-          x: Number(row.rect_x ?? 0),
-          y: Number(row.rect_y ?? 0),
-          w: Number(row.rect_w),
-          h: Number(row.rect_h),
+          x: Number(row.deck_area.x ?? 0),
+          y: Number(row.deck_area.y ?? 0),
+          w: Number(row.deck_area.width),
+          h: Number(row.deck_area.height),
         }
       : null;
 
     const mat: MaterialRow = {
-      id: String(row.id),
+      id: String(row._id),
       no,
       createdOn: fmtDate(row.created_at),
       updatedOn: fmtDate(row.updated_at),
       name: String(row.name ?? ''),
-      location: String(row.area_name ?? row.compartment ?? row.position ?? ''),
+      location: String(row.deck_area?.name ?? row.compartment ?? row.position ?? ''),
       classification: String(row.hazard_type ?? row.material_name ?? ''),
       qty,
       partsWhereUsed: String(row.component ?? row.equipment ?? ''),
       remarks: String(row.remarks ?? ''),
       status: statusOf(createdAt, updatedAt, period),
-      gaPlanUrl: (row.ga_file_path as string) ?? null,
-      gaPlanName: (row.ga_plan_name as string) ?? null,
+      gaPlanUrl: (row.ga_plan?.file_path as string) ?? null,
+      gaPlanName: (row.ga_plan?.name as string) ?? null,
       pinX: row.pin_x !== null && row.pin_x !== undefined ? Number(row.pin_x) : null,
       pinY: row.pin_y !== null && row.pin_y !== undefined ? Number(row.pin_y) : null,
       rect,
@@ -398,7 +396,6 @@ export async function buildQuarterlyComplianceData(
   ];
 
   // 3. IHM Movement counts — start, added, updated, end — per Part group.
-  //    Done on the already-fetched rows so we don't re-query.
   const movement: MovementRow[] = materialGroups.map((g) => {
     let startCount = 0, added = 0, updated = 0, endCount = 0;
     for (const r of g.rows) {
@@ -415,16 +412,14 @@ export async function buildQuarterlyComplianceData(
   });
 
   // 4. Hazmat overview — count materials per compound code.
-  const overviewRes = await query(
-    `SELECT hazard_type, COUNT(*)::int AS count
-       FROM materials
-      WHERE vessel_id = $1 AND hazard_type IS NOT NULL AND hazard_type <> ''
-      GROUP BY hazard_type`,
-    [vesselId],
-  );
+  const overviewRows = await db.collection('materials').aggregate([
+    { $match: { vessel_id: vesselId, hazard_type: { $nin: [null, ''] } } },
+    { $group: { _id: '$hazard_type', count: { $sum: 1 } } }
+  ]).toArray();
+
   const countsByName = new Map<string, number>();
-  for (const r of overviewRes.rows as Array<{ hazard_type: string; count: number }>) {
-    countsByName.set((r.hazard_type || '').trim().toLowerCase(), Number(r.count));
+  for (const r of overviewRows) {
+    countsByName.set((r._id || '').trim().toLowerCase(), Number(r.count));
   }
   const hazmatOverview: HazmatTile[] = HAZMAT_CATALOG.map(({ code, name }) => ({
     code,
@@ -432,135 +427,113 @@ export async function buildQuarterlyComplianceData(
     count: countsByName.get(name.toLowerCase()) ?? 0,
   }));
 
-  // 5. Period totals — POs received, docs requested, docs received.
-  // POs live in audit_line_items (one row per line item). Distinct
-  // po_number = one PO. purchase_orders is a separate manual-entry
-  // table that this product flow doesn't populate.
-  const posRes = await query(
-    `SELECT COUNT(DISTINCT po_number)::int AS c FROM audit_line_items
-      WHERE vessel_id = $1 AND created_at BETWEEN $2 AND $3
-        AND po_number IS NOT NULL AND po_number <> ''`,
-    [vesselId, period.start, period.end],
-  );
-  const docsReqRes = await query(
-    `SELECT COUNT(*)::int AS c
-       FROM clarification_items ci
-       JOIN clarification_requests cr ON ci.clarification_id = cr.id
-      WHERE cr.vessel_id = $1
-        AND cr.created_at >= $2 AND cr.created_at <= $3`,
-    [vesselId, period.start, period.end],
-  );
-  const docsRcvRes = await query(
-    `SELECT COUNT(*)::int AS c
-       FROM clarification_items ci
-       JOIN clarification_requests cr ON ci.clarification_id = cr.id
-      WHERE cr.vessel_id = $1
-        AND (ci.mds_received_at BETWEEN $2 AND $3
-          OR ci.sdoc_received_at BETWEEN $2 AND $3)`,
-    [vesselId, period.start, period.end],
-  );
+  // 5. Period totals
+  const lineItemsInPeriod = await db.collection('audit_line_items').find({
+    vessel_id: vesselId,
+    created_at: { $gte: period.start, $lte: period.end },
+    po_number: { $nin: [null, ''] }
+  }).toArray();
+  const uniquePoNumbers = new Set(lineItemsInPeriod.map(item => item.po_number));
+  const posReceivedInQuarter = uniquePoNumbers.size;
+
+  const periodReqs = await db.collection('clarification_requests').find({
+    vessel_id: vesselId,
+    created_at: { $gte: period.start, $lte: period.end }
+  }).toArray();
+  const periodReqIds = periodReqs.map(r => r._id);
+
+  const docsRequested = await db.collection('clarification_items').countDocuments({
+    clarification_id: { $in: periodReqIds }
+  });
+
+  const vesselRequests = await db.collection('clarification_requests').find({ vessel_id: vesselId }, { projection: { _id: 1 } }).toArray();
+  const vesselReqIds = vesselRequests.map(r => r._id);
+  const docsReceived = await db.collection('clarification_items').countDocuments({
+    clarification_id: { $in: vesselReqIds },
+    $or: [
+      { mds_received_at: { $gte: period.start, $lte: period.end } },
+      { sdoc_received_at: { $gte: period.start, $lte: period.end } }
+    ]
+  });
+
   const totals = {
-    posReceivedInQuarter: Number((posRes.rows[0] as { c: number }).c),
-    docsRequested: Number((docsReqRes.rows[0] as { c: number }).c),
-    docsReceived: Number((docsRcvRes.rows[0] as { c: number }).c),
+    posReceivedInQuarter,
+    docsRequested,
+    docsReceived,
   };
 
-  // 6. PO appendices — three lists, all sourced from audit_line_items.
-  const appendixRows = (sql: string): Promise<PoAppendixRow[]> =>
-    query(sql, [vesselId, period.start, period.end]).then((res) =>
-      (res.rows as Array<Record<string, unknown>>).map((r) => ({
-        poNumber: String(r.po_number ?? ''),
-        receivedDate: fmtDate(r.created_at),
-      })),
-    );
+  // 6. PO Grouping in memory
+  const poGroups = new Map<string, { poNumber: string; created_at: Date; items: any[] }>();
+  for (const item of lineItemsInPeriod) {
+    const poNum = item.po_number;
+    if (!poNum) continue;
+    const existing = poGroups.get(poNum);
+    if (!existing) {
+      poGroups.set(poNum, {
+        poNumber: poNum,
+        created_at: new Date(item.created_at),
+        items: [item]
+      });
+    } else {
+      existing.items.push(item);
+      if (new Date(item.created_at) < existing.created_at) {
+        existing.created_at = new Date(item.created_at);
+      }
+    }
+  }
 
-  const [posWithHazmat, posAllHazmatFree, posAwaitingDeclaration] = await Promise.all([
-    // POs that have at least one suspected-hazmat line item.
-    appendixRows(
-      `SELECT po_number, MIN(created_at) AS created_at
-         FROM audit_line_items
-        WHERE vessel_id = $1 AND created_at BETWEEN $2 AND $3
-          AND po_number IS NOT NULL AND po_number <> ''
-        GROUP BY po_number
-       HAVING SUM(CASE WHEN LOWER(is_suspected) = 'yes' THEN 1 ELSE 0 END) > 0
-        ORDER BY MIN(created_at) DESC`,
-    ),
-    // POs whose every line item is non-suspected (hazmat-free).
-    appendixRows(
-      `SELECT po_number, MIN(created_at) AS created_at
-         FROM audit_line_items
-        WHERE vessel_id = $1 AND created_at BETWEEN $2 AND $3
-          AND po_number IS NOT NULL AND po_number <> ''
-        GROUP BY po_number
-       HAVING SUM(CASE WHEN LOWER(is_suspected) = 'yes' THEN 1 ELSE 0 END) = 0
-        ORDER BY MIN(created_at) DESC`,
-    ),
-    // POs awaiting declaration — joined to clarification_items at the
-    // vessel level (clarifications aren't keyed by po_number in this
-    // schema, so the link is vessel-wide). Empty when no pending
-    // MD/SDoC clarifications exist for the vessel.
-    appendixRows(
-      `SELECT DISTINCT ali.po_number, MIN(ali.created_at) AS created_at
-         FROM audit_line_items ali
-        WHERE ali.vessel_id = $1 AND ali.created_at BETWEEN $2 AND $3
-          AND ali.po_number IS NOT NULL AND ali.po_number <> ''
-          AND EXISTS (
-            SELECT 1 FROM clarification_items ci
-              JOIN clarification_requests cr ON ci.clarification_id = cr.id
-             WHERE cr.vessel_id = $1
-               AND (ci.mds_status = 'pending' OR ci.sdoc_status = 'pending')
-          )
-        GROUP BY ali.po_number
-        ORDER BY MIN(ali.created_at) DESC`,
-    ),
-  ]);
+  const poList = Array.from(poGroups.values()).sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
 
-  // 6b. Full PO listing with details + suspected-hazmat counts.
-  // Aggregates audit_line_items rows by po_number into one row per PO.
-  // MAX(vendor_name) and MIN(po_sent_date) are safe — every line of a
-  // single PO carries the same supplier and PO date in practice.
-  const poDetailsRes = await query(
-    `SELECT po_number,
-            MAX(vendor_name)              AS supplier,
-            MIN(po_sent_date)             AS po_date,
-            MIN(created_at)               AS received_at,
-            COUNT(*)::int                 AS total_items,
-            SUM(CASE WHEN LOWER(is_suspected) = 'yes' THEN 1 ELSE 0 END)::int AS suspected_count,
-            (ARRAY_AGG(item_description ORDER BY row_index))[1] AS sample_item
-       FROM audit_line_items
-      WHERE vessel_id = $1 AND created_at BETWEEN $2 AND $3
-        AND po_number IS NOT NULL AND po_number <> ''
-      GROUP BY po_number
-      ORDER BY MIN(created_at) DESC`,
-    [vesselId, period.start, period.end],
-  );
-  const purchaseOrders: PoDetailRow[] = (poDetailsRes.rows as Array<Record<string, unknown>>).map((r) => {
-    const sample = String(r.sample_item ?? '').trim();
+  // posWithHazmat: POs that have at least one suspected-hazmat line item.
+  const posWithHazmat = poList
+    .filter(po => po.items.some(item => String(item.is_suspected).toLowerCase() === 'yes'))
+    .map(po => ({ poNumber: po.poNumber, receivedDate: fmtDate(po.created_at) }));
+
+  // posAllHazmatFree: POs whose every line item is non-suspected.
+  const posAllHazmatFree = poList
+    .filter(po => po.items.every(item => String(item.is_suspected).toLowerCase() !== 'yes'))
+    .map(po => ({ poNumber: po.poNumber, receivedDate: fmtDate(po.created_at) }));
+
+  // posAwaitingDeclaration: POs awaiting declaration (joined to clarification_items at the vessel level showing pending status)
+  const awaitingClar = await db.collection('clarification_items').countDocuments({
+    clarification_id: { $in: vesselReqIds },
+    $or: [
+      { mds_status: 'pending' },
+      { sdoc_status: 'pending' }
+    ]
+  });
+
+  const posAwaitingDeclaration = awaitingClar > 0
+    ? poList.map(po => ({ poNumber: po.poNumber, receivedDate: fmtDate(po.created_at) }))
+    : [];
+
+  // PO Details list
+  const purchaseOrders = poList.map(po => {
+    po.items.sort((a, b) => (a.row_index ?? 0) - (b.row_index ?? 0));
+    const sample = String(po.items[0]?.item_description ?? '').trim();
+    const supplier = po.items.map(item => item.vendor_name).filter(Boolean)[0] || 'Unknown Supplier';
+    const poDates = po.items.map(item => item.po_sent_date).filter(Boolean);
+    const poDate = poDates.length > 0 ? poDates[0] : null;
+
     return {
-      poNumber: String(r.po_number ?? ''),
-      supplier: String(r.supplier ?? ''),
-      poDate: r.po_date ? fmtDate(r.po_date) : '—',
-      receivedOn: fmtDate(r.received_at),
-      totalItems: Number(r.total_items ?? 0),
-      suspectedCount: Number(r.suspected_count ?? 0),
+      poNumber: po.poNumber,
+      supplier,
+      poDate: poDate ? fmtDate(poDate) : '—',
+      receivedOn: fmtDate(po.created_at),
+      totalItems: po.items.length,
+      suspectedCount: po.items.filter(item => String(item.is_suspected).toLowerCase() === 'yes').length,
       sampleItem: sample.length > 60 ? sample.slice(0, 60) + '…' : sample,
     };
   });
 
-  // 6c. Suspected-hazmat line items — one row per audit_line_items
-  //     entry where is_suspected = Yes. Sorted by supplier so the
-  //     renderer can group them under per-supplier sub-headings.
-  const suspectedRes = await query(
-    `SELECT po_number, vendor_name, po_sent_date, created_at,
-            item_description, equipment_name, maker, part_number,
-            quantity, unit, vendor_remark
-       FROM audit_line_items
-      WHERE vessel_id = $1 AND created_at BETWEEN $2 AND $3
-        AND LOWER(is_suspected) = 'yes'
-      ORDER BY vendor_name ASC, po_number ASC, row_index ASC`,
-    [vesselId, period.start, period.end],
-  );
-  const suspectedItems: SuspectedItemRow[] = (suspectedRes.rows as Array<Record<string, unknown>>).map((r) => ({
+  // Suspected items
+  const suspectedRes = await db.collection('audit_line_items').find({
+    vessel_id: vesselId,
+    created_at: { $gte: period.start, $lte: period.end },
+    is_suspected: { $regex: /^yes$/i }
+  }).sort({ vendor_name: 1, po_number: 1, row_index: 1 }).toArray();
+
+  const suspectedItems = suspectedRes.map(r => ({
     supplier: String(r.vendor_name ?? '').trim() || 'Unknown supplier',
     poNumber: String(r.po_number ?? ''),
     poDate: r.po_sent_date ? fmtDate(r.po_sent_date) : '—',
@@ -574,129 +547,104 @@ export async function buildQuarterlyComplianceData(
     vendorRemark: String(r.vendor_remark ?? '').trim(),
   }));
 
-  // 6d. MD/SDoC tracking — vendor outreach status, reminders sent,
-  //     and items received vs pending. Sourced from
-  //     clarification_requests + clarification_items. Period filter
-  //     uses cr.created_at so the report covers requests opened
-  //     during the period.
-  // Reminders are stored per clarification_item (each item carries its
-  // own reminder_count), but reminders are sent per *request* email. We
-  // take MAX(reminder_count) per request so a 4-item request that was
-  // reminded once is counted as 1 reminder, not 4.
-  const totalsRes = await query(
-    `WITH per_req AS (
-       SELECT cr.id, cr.status, cr.recipient_emails, cr.created_at,
-              COALESCE(MAX(ci.reminder_count), 0) AS req_reminders
-         FROM clarification_requests cr
-         LEFT JOIN clarification_items ci ON ci.clarification_id = cr.id
-        WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
-        GROUP BY cr.id, cr.status, cr.recipient_emails, cr.created_at
-     )
-     SELECT
-        COUNT(*)::int                                             AS total_requests,
-        COUNT(DISTINCT recipient_emails)::int                     AS distinct_vendors,
-        COUNT(*) FILTER (WHERE status = 'submitted')::int         AS submitted_requests,
-        COUNT(*) FILTER (WHERE status = 'sent')::int              AS pending_requests,
-        COALESCE(SUM(req_reminders), 0)::int                      AS total_reminders,
-        (SELECT COUNT(*)::int FROM clarification_items ci
-           JOIN clarification_requests cr ON ci.clarification_id = cr.id
-          WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3) AS total_items,
-        (SELECT COUNT(*)::int FROM clarification_items ci
-           JOIN clarification_requests cr ON ci.clarification_id = cr.id
-          WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
-            AND ci.mds_status  = 'pending') AS mds_pending,
-        (SELECT COUNT(*)::int FROM clarification_items ci
-           JOIN clarification_requests cr ON ci.clarification_id = cr.id
-          WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
-            AND ci.mds_received_at IS NOT NULL) AS mds_received,
-        (SELECT COUNT(*)::int FROM clarification_items ci
-           JOIN clarification_requests cr ON ci.clarification_id = cr.id
-          WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
-            AND ci.sdoc_status = 'pending') AS sdoc_pending,
-        (SELECT COUNT(*)::int FROM clarification_items ci
-           JOIN clarification_requests cr ON ci.clarification_id = cr.id
-          WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
-            AND ci.sdoc_received_at IS NOT NULL) AS sdoc_received
-       FROM per_req`,
-    [vesselId, period.start, period.end],
-  );
-  const totalsRow = (totalsRes.rows[0] ?? {}) as Record<string, number>;
+  // MD/SDoC tracking stats & byVendor
+  const periodItems = await db.collection('clarification_items').find({
+    clarification_id: { $in: periodReqIds }
+  }).toArray();
 
-  // Group by recipient_emails so each unique vendor appears once,
-  // even when only some of their requests have supplier_company filled
-  // in (it's NULL on 'sent' requests until the supplier submits the
-  // portal form). The displayed vendor name picks any non-empty
-  // supplier_company seen for that email; otherwise falls back to the
-  // email itself.
-  const byVendorRes = await query(
-    `WITH per_req AS (
-       SELECT cr.id, cr.status, cr.recipient_emails, cr.supplier_company, cr.created_at,
-              COALESCE(MAX(ci.reminder_count), 0) AS req_reminders
-         FROM clarification_requests cr
-         LEFT JOIN clarification_items ci ON ci.clarification_id = cr.id
-        WHERE cr.vessel_id = $1 AND cr.created_at BETWEEN $2 AND $3
-        GROUP BY cr.id, cr.status, cr.recipient_emails, cr.supplier_company, cr.created_at
-     )
-     SELECT
-        COALESCE(MAX(NULLIF(pr.supplier_company, '')), pr.recipient_emails) AS vendor,
-        pr.recipient_emails                                                  AS email,
-        COUNT(*)::int                                                        AS total_requests,
-        COUNT(*) FILTER (WHERE pr.status = 'submitted')::int                 AS submitted,
-        COUNT(*) FILTER (WHERE pr.status = 'sent')::int                      AS pending,
-        COALESCE(SUM(pr.req_reminders), 0)::int                              AS reminders,
-        (SELECT COUNT(*)::int FROM clarification_items ci
-           JOIN clarification_requests cr2 ON ci.clarification_id = cr2.id
-          WHERE cr2.vessel_id = $1 AND cr2.created_at BETWEEN $2 AND $3
-            AND cr2.recipient_emails = pr.recipient_emails) AS mds_requested,
-        (SELECT COUNT(*)::int FROM clarification_items ci
-           JOIN clarification_requests cr2 ON ci.clarification_id = cr2.id
-          WHERE cr2.vessel_id = $1 AND cr2.created_at BETWEEN $2 AND $3
-            AND cr2.recipient_emails = pr.recipient_emails
-            AND ci.mds_received_at IS NOT NULL) AS mds_received,
-        (SELECT COUNT(*)::int FROM clarification_items ci
-           JOIN clarification_requests cr2 ON ci.clarification_id = cr2.id
-          WHERE cr2.vessel_id = $1 AND cr2.created_at BETWEEN $2 AND $3
-            AND cr2.recipient_emails = pr.recipient_emails) AS sdocs_requested,
-        (SELECT COUNT(*)::int FROM clarification_items ci
-           JOIN clarification_requests cr2 ON ci.clarification_id = cr2.id
-          WHERE cr2.vessel_id = $1 AND cr2.created_at BETWEEN $2 AND $3
-            AND cr2.recipient_emails = pr.recipient_emails
-            AND ci.sdoc_received_at IS NOT NULL) AS sdocs_received,
-        MAX(pr.created_at)                                                   AS last_sent_at
-       FROM per_req pr
-      GROUP BY pr.recipient_emails
-      ORDER BY MAX(pr.created_at) DESC`,
-    [vesselId, period.start, period.end],
-  );
-  const mdSdoc: MdSdocStats = {
-    totals: {
-      totalRequests:     Number(totalsRow.total_requests     ?? 0),
-      distinctVendors:   Number(totalsRow.distinct_vendors   ?? 0),
-      submittedRequests: Number(totalsRow.submitted_requests ?? 0),
-      pendingRequests:   Number(totalsRow.pending_requests   ?? 0),
-      totalReminders:    Number(totalsRow.total_reminders    ?? 0),
-      totalItems:        Number(totalsRow.total_items        ?? 0),
-      mdsPending:        Number(totalsRow.mds_pending        ?? 0),
-      mdsReceived:       Number(totalsRow.mds_received       ?? 0),
-      sdocsPending:      Number(totalsRow.sdoc_pending       ?? 0),
-      sdocsReceived:     Number(totalsRow.sdoc_received      ?? 0),
-    },
-    byVendor: (byVendorRes.rows as Array<Record<string, unknown>>).map((r) => ({
-      vendor:          String(r.vendor ?? '').trim() || 'Unknown vendor',
-      email:           String(r.email ?? '').trim(),
-      totalRequests:   Number(r.total_requests   ?? 0),
-      submitted:       Number(r.submitted        ?? 0),
-      pending:         Number(r.pending          ?? 0),
-      reminders:       Number(r.reminders        ?? 0),
-      mdsRequested:    Number(r.mds_requested    ?? 0),
-      mdsReceived:     Number(r.mds_received     ?? 0),
-      sdocsRequested:  Number(r.sdocs_requested  ?? 0),
-      sdocsReceived:   Number(r.sdocs_received   ?? 0),
-      lastSentAt:      fmtDate(r.last_sent_at),
-    })),
+  const itemsByReqId = new Map<string, any[]>();
+  for (const item of periodItems) {
+    const clarId = item.clarification_id;
+    if (!itemsByReqId.has(clarId)) {
+      itemsByReqId.set(clarId, []);
+    }
+    itemsByReqId.get(clarId)!.push(item);
+  }
+
+  const perReq = periodReqs.map(cr => {
+    const items = itemsByReqId.get(cr._id) || [];
+    const req_reminders = items.length > 0 ? Math.max(...items.map(item => item.reminder_count || 0)) : 0;
+    return {
+      id: cr._id,
+      status: cr.status,
+      recipient_emails: cr.recipient_emails || '',
+      supplier_company: cr.supplier_company || '',
+      created_at: new Date(cr.created_at),
+      req_reminders
+    };
+  });
+
+  const totalsRow = {
+    total_requests: perReq.length,
+    distinct_vendors: new Set(perReq.map(pr => pr.recipient_emails)).size,
+    submitted_requests: perReq.filter(pr => pr.status === 'submitted').length,
+    pending_requests: perReq.filter(pr => pr.status === 'sent' || pr.status === 'queued').length,
+    total_reminders: perReq.reduce((sum, pr) => sum + pr.req_reminders, 0),
+    total_items: periodItems.length,
+    mds_pending: periodItems.filter(item => item.mds_status === 'pending').length,
+    mds_received: periodItems.filter(item => item.mds_received_at != null).length,
+    sdoc_pending: periodItems.filter(item => item.sdoc_status === 'pending').length,
+    sdoc_received: periodItems.filter(item => item.sdoc_received_at != null).length
   };
 
-  // 7. Doc number — yyyymmdd-IMO-AD for ad-hoc, plain Q-style otherwise.
+  const reqsByVendor = new Map<string, typeof perReq>();
+  for (const pr of perReq) {
+    if (!reqsByVendor.has(pr.recipient_emails)) {
+      reqsByVendor.set(pr.recipient_emails, []);
+    }
+    reqsByVendor.get(pr.recipient_emails)!.push(pr);
+  }
+
+  const byVendorList = [];
+  for (const [email, prs] of reqsByVendor.entries()) {
+    const supplierCompany = prs.map(pr => pr.supplier_company).filter(Boolean)[0] || email;
+    const totalRequests = prs.length;
+    const submitted = prs.filter(pr => pr.status === 'submitted').length;
+    const pending = prs.filter(pr => pr.status === 'sent' || pr.status === 'queued').length;
+    const reminders = prs.reduce((sum, pr) => sum + pr.req_reminders, 0);
+
+    const vReqIds = prs.map(pr => pr.id);
+    const vItems = periodItems.filter(item => vReqIds.includes(item.clarification_id));
+    const mdsRequested = vItems.length;
+    const mdsReceived = vItems.filter(item => item.mds_received_at != null).length;
+    const sdocsRequested = vItems.length;
+    const sdocsReceived = vItems.filter(item => item.sdoc_received_at != null).length;
+
+    const lastSentAt = new Date(Math.max(...prs.map(pr => pr.created_at.getTime())));
+
+    byVendorList.push({
+      vendor: supplierCompany.trim() || 'Unknown vendor',
+      email: email.trim(),
+      totalRequests,
+      submitted,
+      pending,
+      reminders,
+      mdsRequested,
+      mdsReceived,
+      sdocsRequested,
+      sdocsReceived,
+      lastSentAt: fmtDate(lastSentAt),
+    });
+  }
+
+  byVendorList.sort((a, b) => b.totalRequests - a.totalRequests);
+
+  const mdSdoc: MdSdocStats = {
+    totals: {
+      totalRequests:     totalsRow.total_requests,
+      distinctVendors:   totalsRow.distinct_vendors,
+      submittedRequests: totalsRow.submitted_requests,
+      pendingRequests:   totalsRow.pending_requests,
+      totalReminders:    totalsRow.total_reminders,
+      totalItems:        totalsRow.total_items,
+      mdsPending:        totalsRow.mds_pending,
+      mdsReceived:       totalsRow.mds_received,
+      sdocsPending:      totalsRow.sdoc_pending,
+      sdocsReceived:     totalsRow.sdoc_received,
+    },
+    byVendor: byVendorList,
+  };
+
   const yyyymmdd = `${period.end.getUTCFullYear()}${String(period.end.getUTCMonth() + 1).padStart(2, '0')}${String(period.end.getUTCDate()).padStart(2, '0')}`;
   const docNumber = `EG | ${vessel.imoNumber} | ${yyyymmdd} | ${period.label.replace(/\s+/g, '')}`;
 

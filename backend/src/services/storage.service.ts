@@ -130,7 +130,7 @@ export async function getInlinePreviewUrl(
     Key: key,
     ResponseContentDisposition: 'inline',
   });
-  return getSignedUrl(getClient(), cmd, { expiresIn: expiresInSeconds });
+  return getSignedUrl(getClient() as any, cmd, { expiresIn: expiresInSeconds });
 }
 
 /**

@@ -1,5 +1,5 @@
-// -- Menu Items Service -------------------------------------
-import { query } from '../config/database.js';
+import crypto from 'crypto';
+import { getDb } from '../config/database.js';
 
 const FIELD_MAP: Record<string, string> = {
   title: 'title',
@@ -16,81 +16,97 @@ REVERSE['id'] = 'id';
 REVERSE['created_at'] = 'createdAt';
 REVERSE['updated_at'] = 'updatedAt';
 
-function toApi(row: Record<string, unknown>) {
+function toApi(row: any) {
+  if (!row) return null;
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) out[REVERSE[k] || k] = v;
+  for (const [k, v] of Object.entries(row)) {
+    if (k === '_id') {
+      out['id'] = v;
+    } else {
+      out[REVERSE[k] || k] = v;
+    }
+  }
   return out;
 }
 
 function extract(data: Record<string, unknown>) {
-  const cols: string[] = [];
-  const vals: unknown[] = [];
+  const fields: Record<string, unknown> = {};
   for (const [c, s] of Object.entries(FIELD_MAP)) {
     if (c in data && data[c] !== undefined) {
-      cols.push(s);
-      vals.push(data[c]);
+      fields[s] = data[c];
     }
   }
-  return { cols, vals };
+  return fields;
 }
 
 export const MenuService = {
   async list(archived = false) {
-    const r = await query(
-      `SELECT * FROM menu_items WHERE archived = $1 ORDER BY sort_order ASC, title ASC`,
-      [archived],
-    );
-    return r.rows.map((row: Record<string, unknown>) => toApi(row));
+    const db = getDb();
+    const rows = await db.collection('menu_items')
+      .find({ archived })
+      .sort({ sort_order: 1, title: 1 })
+      .toArray();
+    return rows.map(toApi);
   },
 
   async getById(id: string) {
-    const r = await query('SELECT * FROM menu_items WHERE id = $1', [id]);
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const db = getDb();
+    const doc = await db.collection('menu_items').findOne({ _id: id });
+    return doc ? toApi(doc) : null;
   },
 
   async create(data: Record<string, unknown>) {
     if (!data.title || !data.path) throw new Error('title and path are required');
-    const { cols, vals } = extract(data);
-    const ph = vals.map((_, i) => `$${i + 1}`).join(', ');
-    const r = await query(
-      `INSERT INTO menu_items (${cols.join(', ')}) VALUES (${ph}) RETURNING *`,
-      vals,
-    );
-    return toApi(r.rows[0] as Record<string, unknown>);
+    const db = getDb();
+    const fields = extract(data);
+    fields['created_at'] = new Date();
+    fields['updated_at'] = new Date();
+    const _id = crypto.randomUUID();
+
+    await db.collection('menu_items').insertOne({
+      _id,
+      ...fields
+    });
+    const created = await db.collection('menu_items').findOne({ _id });
+    return toApi(created);
   },
 
   async update(id: string, data: Record<string, unknown>) {
-    const { cols, vals } = extract(data);
-    if (cols.length === 0) return null;
+    const db = getDb();
+    const fields = extract(data);
+    if (Object.keys(fields).length === 0) return null;
 
-    const setClauses = cols.map((c, i) => `${c} = $${i + 1}`);
-    setClauses.push('updated_at = NOW()');
-    vals.push(id);
-
-    const r = await query(
-      `UPDATE menu_items SET ${setClauses.join(', ')} WHERE id = $${vals.length} RETURNING *`,
-      vals,
+    fields['updated_at'] = new Date();
+    await db.collection('menu_items').updateOne(
+      { _id: id },
+      { $set: fields }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('menu_items').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   async archive(id: string) {
-    const r = await query(
-      `UPDATE menu_items SET archived = true, updated_at = NOW() WHERE id = $1 RETURNING *`,
-      [id],
+    const db = getDb();
+    await db.collection('menu_items').updateOne(
+      { _id: id },
+      { $set: { archived: true, updated_at: new Date() } }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('menu_items').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   async restore(id: string) {
-    const r = await query(
-      `UPDATE menu_items SET archived = false, updated_at = NOW() WHERE id = $1 RETURNING *`,
-      [id],
+    const db = getDb();
+    await db.collection('menu_items').updateOne(
+      { _id: id },
+      { $set: { archived: false, updated_at: new Date() } }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('menu_items').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   async delete(id: string) {
-    await query('DELETE FROM menu_items WHERE id = $1', [id]);
+    const db = getDb();
+    await db.collection('menu_items').deleteOne({ _id: id });
   },
 };

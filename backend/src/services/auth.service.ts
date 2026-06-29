@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { query } from '../config/database.js';
+import { getDb } from '../config/database.js';
 import { env } from '../config/env.js';
 
 interface UserRow {
@@ -17,21 +17,35 @@ interface UserRow {
   updated_at: Date;
 }
 
+// Convert MongoDB document to UserRow structure expected by Auth routes
+function toUserRow(doc: any): UserRow | null {
+  if (!doc) return null;
+  return {
+    id: doc._id,
+    email: doc.email,
+    name: doc.name,
+    phone: doc.phone ?? null,
+    country: doc.country ?? null,
+    status: doc.status,
+    category: doc.category,
+    password: doc.password,
+    last_activity: doc.last_activity ? new Date(doc.last_activity) : null,
+    created_at: new Date(doc.created_at),
+    updated_at: new Date(doc.updated_at),
+  };
+}
+
 export const AuthService = {
   async findUserByEmail(email: string) {
-    const result = await query<UserRow>(
-      'SELECT * FROM users WHERE email = $1',
-      [email],
-    );
-    return result.rows[0] || null;
+    const db = getDb();
+    const doc = await db.collection('users').findOne({ email });
+    return toUserRow(doc);
   },
 
   async findUserById(id: string) {
-    const result = await query<UserRow>(
-      'SELECT * FROM users WHERE id = $1',
-      [id],
-    );
-    return result.rows[0] || null;
+    const db = getDb();
+    const doc = await db.collection('users').findOne({ _id: id });
+    return toUserRow(doc);
   },
 
   async verifyPassword(plain: string, hash: string): Promise<boolean> {
@@ -49,9 +63,10 @@ export const AuthService = {
   },
 
   async updateLastActivity(userId: string) {
-    await query(
-      'UPDATE users SET last_activity = NOW(), updated_at = NOW() WHERE id = $1',
-      [userId],
+    const db = getDb();
+    await db.collection('users').updateOne(
+      { _id: userId },
+      { $set: { last_activity: new Date(), updated_at: new Date() } }
     );
   },
 };

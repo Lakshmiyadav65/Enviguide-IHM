@@ -1,7 +1,6 @@
-// -- User Admin Service -------------------------------------
-// CRUD + role assignment + profile update. Distinct from AuthService (login).
 import bcrypt from 'bcryptjs';
-import { query } from '../config/database.js';
+import crypto from 'crypto';
+import { getDb } from '../config/database.js';
 import { logger } from '../utils/logger.js';
 
 const log = logger.child('user');
@@ -29,118 +28,135 @@ REVERSE['last_activity'] = 'lastActivity';
 REVERSE['created_at'] = 'createdAt';
 REVERSE['updated_at'] = 'updatedAt';
 
-function toApi(row: Record<string, unknown>) {
+function toApi(row: any) {
+  if (!row) return null;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(row)) {
     if (k === 'password') continue;
-    out[REVERSE[k] || k] = v;
+    if (k === '_id') {
+      out['id'] = v;
+    } else {
+      out[REVERSE[k] || k] = v;
+    }
   }
   return out;
 }
 
 function extract(data: Record<string, unknown>) {
-  const cols: string[] = [];
-  const vals: unknown[] = [];
+  const fields: Record<string, unknown> = {};
   for (const [c, s] of Object.entries(FIELD_MAP)) {
     if (c in data && data[c] !== undefined) {
-      cols.push(s);
-      vals.push(data[c]);
+      fields[s] = data[c];
     }
   }
-  return { cols, vals };
+  return fields;
 }
 
 export const UserService = {
   async list(filters?: { status?: string; category?: string; search?: string }) {
-    let sql = `SELECT * FROM users WHERE 1=1`;
-    const params: unknown[] = [];
-    let i = 1;
+    const db = getDb();
+    const query: Record<string, any> = {};
 
     if (filters?.status) {
-      sql += ` AND status = $${i++}`;
-      params.push(filters.status);
+      query.status = filters.status;
     }
     if (filters?.category) {
-      sql += ` AND category = $${i++}`;
-      params.push(filters.category);
+      query.category = filters.category;
     }
     if (filters?.search) {
-      sql += ` AND (name ILIKE $${i} OR email ILIKE $${i} OR category ILIKE $${i})`;
-      params.push(`%${filters.search}%`);
-      i++;
+      const regex = { $regex: filters.search, $options: 'i' };
+      query.$or = [
+        { name: regex },
+        { email: regex },
+        { category: regex }
+      ];
     }
 
-    sql += ' ORDER BY created_at DESC';
-    const r = await query(sql, params);
-    return r.rows.map((row: Record<string, unknown>) => toApi(row));
+    const cursor = db.collection('users').find(query).sort({ created_at: -1 });
+    const rows = await cursor.toArray();
+    return rows.map(toApi);
   },
 
   async getById(id: string) {
-    const r = await query('SELECT * FROM users WHERE id = $1', [id]);
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const db = getDb();
+    const doc = await db.collection('users').findOne({ _id: id });
+    return doc ? toApi(doc) : null;
   },
 
   async create(data: Record<string, unknown>) {
     if (!data.email || !data.name || !data.password) {
       throw new Error('email, name and password are required');
     }
-    const existing = await query('SELECT id FROM users WHERE email = $1', [data.email]);
-    if (existing.rows[0]) throw new Error('Email already registered');
+    const db = getDb();
+    const existing = await db.collection('users').findOne({ email: data.email });
+    if (existing) throw new Error('Email already registered');
 
     const hashed = await bcrypt.hash(data.password as string, 10);
-    const { cols, vals } = extract(data);
-    cols.push('password');
-    vals.push(hashed);
+    const fields = extract(data);
+    fields['password'] = hashed;
+    fields['created_at'] = new Date();
+    fields['updated_at'] = new Date();
 
-    const ph = vals.map((_, i) => `$${i + 1}`).join(', ');
-    const r = await query(
-      `INSERT INTO users (${cols.join(', ')}) VALUES (${ph}) RETURNING *`,
-      vals,
-    );
-    const created = toApi(r.rows[0] as Record<string, unknown>) as { id: string; name: string; email: string; category?: string; roleName?: string };
-    log.info(`✓ created user=${created.name} email=${created.email} category=${created.category ?? '-'} role=${created.roleName ?? '-'}`);
-    return created;
+    const _id = crypto.randomUUID();
+    await db.collection('users').insertOne({
+      _id,
+      ...fields
+    });
+
+    const created = await db.collection('users').findOne({ _id });
+    const apiUser = toApi(created) as any;
+    log.info(`✓ created user=${apiUser.name} email=${apiUser.email} category=${apiUser.category ?? '-'} role=${apiUser.roleName ?? '-'}`);
+    return apiUser;
   },
 
   async update(id: string, data: Record<string, unknown>) {
-    const { cols, vals } = extract(data);
+    const db = getDb();
+    const fields = extract(data);
 
     if (data.password) {
-      cols.push('password');
-      vals.push(await bcrypt.hash(data.password as string, 10));
+      fields['password'] = await bcrypt.hash(data.password as string, 10);
     }
 
-    if (cols.length === 0) return null;
+    if (Object.keys(fields).length === 0) return null;
 
-    const setClauses = cols.map((c, i) => `${c} = $${i + 1}`);
-    setClauses.push('updated_at = NOW()');
-    vals.push(id);
-
-    const r = await query(
-      `UPDATE users SET ${setClauses.join(', ')} WHERE id = $${vals.length} RETURNING *`,
-      vals,
+    fields['updated_at'] = new Date();
+    await db.collection('users').updateOne(
+      { _id: id },
+      { $set: fields }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('users').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   async delete(id: string) {
-    await query('DELETE FROM users WHERE id = $1', [id]);
+    const db = getDb();
+    await db.collection('users').deleteOne({ _id: id });
   },
 
   async setAvatar(id: string, avatarPath: string) {
-    const r = await query(
-      `UPDATE users SET avatar = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
-      [avatarPath, id],
+    const db = getDb();
+    await db.collection('users').updateOne(
+      { _id: id },
+      { $set: { avatar: avatarPath, updated_at: new Date() } }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('users').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   async assignRole(userId: string, roleName: string, category?: string) {
-    const r = await query(
-      `UPDATE users SET role_name = $1, category = COALESCE($2, category), updated_at = NOW()
-       WHERE id = $3 RETURNING *`,
-      [roleName, category || null, userId],
+    const db = getDb();
+    const updateFields: Record<string, any> = {
+      role_name: roleName,
+      updated_at: new Date()
+    };
+    if (category) {
+      updateFields.category = category;
+    }
+    await db.collection('users').updateOne(
+      { _id: userId },
+      { $set: updateFields }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('users').findOne({ _id: userId });
+    return updated ? toApi(updated) : null;
   },
 };

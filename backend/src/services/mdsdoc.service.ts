@@ -1,4 +1,5 @@
-import { query } from '../config/database.js';
+import crypto from 'crypto';
+import { getDb } from '../config/database.js';
 
 const FIELD_MAP: Record<string, string> = {
   poId: 'po_id',
@@ -22,128 +23,174 @@ REVERSE['vessel_id'] = 'vesselId';
 REVERSE['created_at'] = 'createdAt';
 REVERSE['updated_at'] = 'updatedAt';
 
-function toApi(row: Record<string, unknown>) {
+function toApi(row: any) {
+  if (!row) return null;
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) out[REVERSE[k] || k] = v;
+  for (const [k, v] of Object.entries(row)) {
+    if (k === '_id') {
+      out['id'] = v;
+    } else {
+      out[REVERSE[k] || k] = v;
+    }
+  }
   return out;
 }
 
 function extract(data: Record<string, unknown>) {
-  const cols: string[] = [];
-  const vals: unknown[] = [];
+  const fields: Record<string, unknown> = {};
   for (const [c, s] of Object.entries(FIELD_MAP)) {
     if (c in data && data[c] !== undefined) {
-      cols.push(s);
-      vals.push(data[c]);
+      fields[s] = data[c];
     }
   }
-  return { cols, vals };
+  return fields;
 }
 
 export const MdSDocService = {
   /** List requests grouped by status (Pending, Received, Reminder, etc.) */
   async listForVessel(vesselId: string, status?: string) {
-    let sql = 'SELECT * FROM md_sdoc_requests WHERE vessel_id = $1';
-    const params: unknown[] = [vesselId];
+    const db = getDb();
+    const query: any = { vessel_id: vesselId };
     if (status) {
-      sql += ' AND status = $2';
-      params.push(status);
+      query.status = status;
     }
-    sql += ' ORDER BY supplier_name, created_at DESC';
-    const r = await query(sql, params);
-    return r.rows.map((row: Record<string, unknown>) => toApi(row));
+    const rows = await db.collection('md_sdoc_requests')
+      .find(query)
+      .sort({ supplier_name: 1, created_at: -1 })
+      .toArray();
+    return rows.map(toApi);
   },
 
   /** Get all requests grouped by supplier (for the Request Pending UI) */
   async getGroupedBySupplier(vesselId: string, status?: string) {
-    let sql = `SELECT supplier_name, supplier_code,
-                      json_agg(json_build_object(
-                        'id', id, 'itemName', item_name, 'ihmPart', ihm_part,
-                        'hazardType', hazard_type, 'status', status, 'reminderCount', reminder_count
-                      )) AS items,
-                      COUNT(*)::int AS total_items
-               FROM md_sdoc_requests
-               WHERE vessel_id = $1`;
-    const params: unknown[] = [vesselId];
+    const db = getDb();
+    const match: any = { vessel_id: vesselId };
     if (status) {
-      sql += ' AND status = $2';
-      params.push(status);
+      match.status = status;
     }
-    sql += ' GROUP BY supplier_name, supplier_code ORDER BY supplier_name';
-    const r = await query(sql, params);
-    return r.rows;
+
+    const rows = await db.collection('md_sdoc_requests').aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: { supplier_name: '$supplier_name', supplier_code: '$supplier_code' },
+          items: {
+            $push: {
+              id: '$_id',
+              itemName: '$item_name',
+              ihmPart: '$ihm_part',
+              hazardType: '$hazard_type',
+              status: '$status',
+              reminderCount: '$reminder_count'
+            }
+          },
+          total_items: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          supplier_name: '$_id.supplier_name',
+          supplier_code: '$_id.supplier_code',
+          items: 1,
+          total_items: 1
+        }
+      },
+      { $sort: { supplier_name: 1 } }
+    ]).toArray();
+    return rows;
   },
 
   async getById(id: string, vesselId: string) {
-    const r = await query(
-      'SELECT * FROM md_sdoc_requests WHERE id = $1 AND vessel_id = $2',
-      [id, vesselId],
-    );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const db = getDb();
+    const doc = await db.collection('md_sdoc_requests').findOne({ _id: id, vessel_id: vesselId });
+    return doc ? toApi(doc) : null;
   },
 
   async create(data: Record<string, unknown>, vesselId: string) {
-    const { cols, vals } = extract(data);
-    cols.push('vessel_id');
-    vals.push(vesselId);
-    const ph = vals.map((_, i) => `$${i + 1}`).join(', ');
-    const r = await query(
-      `INSERT INTO md_sdoc_requests (${cols.join(', ')}) VALUES (${ph}) RETURNING *`,
-      vals,
-    );
-    return toApi(r.rows[0] as Record<string, unknown>);
+    const db = getDb();
+    const fields = extract(data);
+    fields['vessel_id'] = vesselId;
+    fields['created_at'] = new Date();
+    fields['updated_at'] = new Date();
+    const _id = crypto.randomUUID();
+
+    await db.collection('md_sdoc_requests').insertOne({
+      _id,
+      ...fields
+    });
+    const created = await db.collection('md_sdoc_requests').findOne({ _id });
+    return toApi(created);
   },
 
   async update(id: string, data: Record<string, unknown>) {
-    const { cols, vals } = extract(data);
-    if (cols.length === 0) return null;
-    const setClauses = cols.map((c, i) => `${c} = $${i + 1}`);
-    setClauses.push('updated_at = NOW()');
-    vals.push(id);
-    const r = await query(
-      `UPDATE md_sdoc_requests SET ${setClauses.join(', ')} WHERE id = $${vals.length} RETURNING *`,
-      vals,
+    const db = getDb();
+    const fields = extract(data);
+    if (Object.keys(fields).length === 0) return null;
+
+    fields['updated_at'] = new Date();
+    await db.collection('md_sdoc_requests').updateOne(
+      { _id: id },
+      { $set: fields }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('md_sdoc_requests').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   async sendReminder(id: string) {
-    const r = await query(
-      `UPDATE md_sdoc_requests
-       SET reminder_count = reminder_count + 1,
-           last_reminder_at = NOW(),
-           updated_at = NOW()
-       WHERE id = $1 RETURNING *`,
-      [id],
+    const db = getDb();
+    await db.collection('md_sdoc_requests').updateOne(
+      { _id: id },
+      {
+        $inc: { reminder_count: 1 },
+        $set: { last_reminder_at: new Date(), updated_at: new Date() }
+      }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('md_sdoc_requests').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   async markReceived(id: string) {
-    const r = await query(
-      `UPDATE md_sdoc_requests
-       SET status = 'Received', received_at = NOW(), updated_at = NOW()
-       WHERE id = $1 RETURNING *`,
-      [id],
+    const db = getDb();
+    await db.collection('md_sdoc_requests').updateOne(
+      { _id: id },
+      {
+        $set: { status: 'Received', received_at: new Date(), updated_at: new Date() }
+      }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('md_sdoc_requests').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   /** Auto-generate requests from suspected hazardous materials (category=hazard, no MD yet) */
   async generateFromHazardousMaterials(vesselId: string) {
-    const r = await query(
-      `INSERT INTO md_sdoc_requests (vessel_id, material_id, item_name, ihm_part, hazard_type, supplier_name, status)
-       SELECT m.vessel_id, m.id, m.name, m.ihm_part, m.hazard_type,
-              COALESCE(m.manufacturer, 'Unknown Supplier'), 'Pending'
-       FROM materials m
-       WHERE m.vessel_id = $1
-         AND m.category = 'hazard'
-         AND NOT EXISTS (
-           SELECT 1 FROM md_sdoc_requests r WHERE r.material_id = m.id
-         )
-       RETURNING *`,
-      [vesselId],
-    );
-    return { generated: r.rowCount || 0, requests: r.rows.map((row: Record<string, unknown>) => toApi(row)) };
+    const db = getDb();
+    const materials = await db.collection('materials').find({ vessel_id: vesselId, category: 'hazard' }).toArray();
+    const existingRequests = await db.collection('md_sdoc_requests').find({ vessel_id: vesselId, material_id: { $ne: null } }, { projection: { material_id: 1 } }).toArray();
+    const existingMaterialIds = new Set(existingRequests.map((r) => r.material_id));
+
+    const toInsert = [];
+    for (const m of materials) {
+      if (!existingMaterialIds.has(m._id)) {
+        toInsert.push({
+          _id: crypto.randomUUID(),
+          vessel_id: vesselId,
+          material_id: m._id,
+          item_name: m.name,
+          ihm_part: m.ihm_part,
+          hazard_type: m.hazard_type,
+          supplier_name: m.manufacturer || 'Unknown Supplier',
+          status: 'Pending',
+          reminder_count: 0,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+      }
+    }
+
+    if (toInsert.length > 0) {
+      await db.collection('md_sdoc_requests').insertMany(toInsert);
+    }
+    return { generated: toInsert.length, requests: toInsert.map(toApi) };
   },
 };

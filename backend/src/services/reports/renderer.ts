@@ -45,7 +45,7 @@ export async function renderPdf(html: string, opts: RenderOptions = {}): Promise
   const browser = await getBrowser();
   const page = await browser.newPage();
   try {
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    await page.setContent(html, { waitUntil: 'networkidle0' as any });
 
     // Belt-and-braces: ensure every <img> on the page has actually
     // decoded before we ask Puppeteer to render the PDF. networkidle0

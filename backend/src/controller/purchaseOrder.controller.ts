@@ -1,9 +1,10 @@
 // -- Purchase Order Controller -----------------------------
 import type { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { PurchaseOrderService } from '../services/purchaseOrder.service.js';
 import { VesselService } from '../services/vessel.service.js';
 import { AuditService } from '../services/audit.service.js';
-import { query } from '../config/database.js';
+import { getDb } from '../config/database.js';
 import { createError } from '../middleware/errorHandler.js';
 
 const VALID_STATUS = ['responsive', 'non-responsive', 'pending'];
@@ -144,14 +145,6 @@ export async function getPurchaseOrdersBySupplier(req: Request, res: Response, n
 
 /**
  * POST /api/v1/purchase-orders/upload-bulk — bulk PO upload from Excel/PDF/CSV.
- *
- * Expects multipart/form-data with:
- *   - file:      the raw uploaded file (kept for audit trail)
- *   - vesselId:  vessel the upload belongs to
- *   - stats:     JSON string { totalPO, totalItems, duplicatePO, duplicateSupplierCode, duplicateProduct }
- *   - lineItems: JSON string — array of arrays (rows) using the standard 20-column order from the frontend
- *
- * Creates one audit_summary row, then bulk-inserts all lineItems into audit_line_items.
  */
 export async function uploadPurchaseOrderBulk(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -180,54 +173,47 @@ export async function uploadPurchaseOrderBulk(req: Request, res: Response, next:
     const v = vessel as Record<string, unknown>;
     const filePath = `/uploads/po/${req.file.filename}`;
 
-    // 1. Upsert the audit summary. Any active audit for this vessel — whether
-     //    'In Progress', 'Pending Review', or 'Awaiting Clarification' — is
-     //    replaced by this upload. Completed audits are preserved (they are
-     //    historical records). If there are multiple active rows (legacy
-     //    duplicates), we keep the newest, reset it, and delete the rest.
-    const existingActive = await query(
-      `SELECT id FROM audit_summaries
-         WHERE vessel_id = $1
-           AND status IN ('In Progress', 'Pending', 'Pending Review', 'Awaiting Clarification')
-         ORDER BY created_at DESC`,
-      [vesselId],
-    );
+    const db = getDb();
+
+    // 1. Upsert the audit summary. Any active audit for this vessel is replaced.
+    const existingActive = await db.collection('audit_summaries')
+      .find({
+        vessel_id: vesselId,
+        status: { $in: ['In Progress', 'Pending', 'Pending Review', 'Awaiting Clarification'] }
+      })
+      .sort({ created_at: -1 })
+      .toArray();
 
     let auditId: string;
-    if (existingActive.rows.length > 0) {
-      const all = existingActive.rows as Array<Record<string, unknown>>;
-      auditId = String(all[0]!.id);
-      // Drop any older duplicates — we collapse all active audits for this
-      // vessel into the newest one.
+    if (existingActive.length > 0) {
+      const all = existingActive;
+      auditId = String(all[0]._id);
       if (all.length > 1) {
-        const extraIds = all.slice(1).map((r) => String(r.id));
-        await query(
-          `DELETE FROM audit_summaries WHERE id = ANY($1::uuid[])`,
-          [extraIds],
-        );
+        const extraIds = all.slice(1).map((r) => r._id);
+        await db.collection('audit_summaries').deleteMany({ _id: { $in: extraIds } });
       }
-      await query(
-        `UPDATE audit_summaries
-            SET total_po = $1, total_items = $2,
-                duplicate_po = $3, duplicate_supplier_code = $4, duplicate_product = $5,
-                uploaded_file_path = $6, uploaded_file_name = $7,
-                status = 'In Progress',
-                review_assigned_to = NULL, reviewed_by = NULL, reviewed_at = NULL,
-                last_activity = NOW(), updated_at = NOW()
-          WHERE id = $8`,
-        [
-          Number(stats.totalPO ?? 0),
-          Number(stats.totalItems ?? lineItems.length),
-          Number(stats.duplicatePO ?? 0),
-          Number(stats.duplicateSupplierCode ?? 0),
-          Number(stats.duplicateProduct ?? 0),
-          filePath,
-          req.file.originalname,
-          auditId,
-        ],
+      await db.collection('audit_summaries').updateOne(
+        { _id: auditId },
+        {
+          $set: {
+            total_po: Number(stats.totalPO ?? 0),
+            total_items: Number(stats.totalItems ?? lineItems.length),
+            duplicate_po: Number(stats.duplicatePO ?? 0),
+            duplicate_supplier_code: Number(stats.duplicateSupplierCode ?? 0),
+            duplicate_product: Number(stats.duplicateProduct ?? 0),
+            uploaded_file_path: filePath,
+            uploaded_file_name: req.file.originalname,
+            status: 'In Progress',
+            review_assigned_to: null,
+            reviewed_by: null,
+            reviewed_at: null,
+            last_activity: new Date(),
+            updated_at: new Date()
+          }
+        }
       );
-      // Wipe the previous line items — they're being replaced by the new upload.
-      await query('DELETE FROM audit_line_items WHERE audit_id = $1', [auditId]);
+      // Wipe the previous line items
+      await db.collection('audit_line_items').deleteMany({ audit_id: auditId });
     } else {
       const audit = await AuditService.createAudit({
         imoNumber: v.imoNumber,
@@ -241,76 +227,61 @@ export async function uploadPurchaseOrderBulk(req: Request, res: Response, next:
       }, vesselId);
 
       auditId = String((audit as Record<string, unknown>).id);
-      await query(
-        `UPDATE audit_summaries
-           SET uploaded_file_path = $1, uploaded_file_name = $2
-         WHERE id = $3`,
-        [filePath, req.file.originalname, auditId],
+      await db.collection('audit_summaries').updateOne(
+        { _id: auditId },
+        {
+          $set: {
+            uploaded_file_path: filePath,
+            uploaded_file_name: req.file.originalname
+          }
+        }
       );
     }
 
-    // 2. Bulk-insert line items in chunks (Postgres parameter limit is 65,535).
-    //    With 24 columns/row, 2000 rows = 48,000 params — safe.
+    // 2. Bulk-insert line items in chunks
     const CHUNK = 1000;
     let inserted = 0;
     for (let offset = 0; offset < lineItems.length; offset += CHUNK) {
       const batch = lineItems.slice(offset, offset + CHUNK);
-      const vals: unknown[] = [];
-      const placeholders: string[] = [];
+      if (batch.length === 0) continue;
 
-      batch.forEach((row, i) => {
+      const docs = batch.map((row, i) => {
         const rowIndex = offset + i;
         const r = Array.isArray(row) ? row : [];
-        // Standard 20-column layout; anything beyond goes into extra_data.
         const extra = r.slice(20);
-        const base = [
-          auditId,
-          vesselId,
-          rowIndex,
-          r[0] ?? null,                 // name
-          r[1] ?? null,                 // vessel_name
-          r[2] ?? null,                 // po_number
-          r[3] ?? null,                 // imo_number
-          r[4] ?? null,                 // po_sent_date
-          r[5] ?? null,                 // md_requested_date
-          r[6] ?? null,                 // item_description
-          (r[7] === 'Yes' ? 'Yes' : 'No'), // is_suspected
-          r[8] ?? null,                 // impa_code
-          r[9] ?? null,                 // issa_code
-          r[10] ?? null,                // equipment_code
-          r[11] ?? null,                // equipment_name
-          r[12] ?? null,                // maker
-          r[13] ?? null,                // model
-          r[14] ?? null,                // part_number
-          r[15] ?? null,                // unit
-          r[16] ?? null,                // quantity
-          r[17] ?? null,                // vendor_remark
-          r[18] ?? null,                // vendor_email
-          r[19] ?? null,                // vendor_name
-          JSON.stringify(extra),        // extra_data
-        ];
-        const start = vals.length;
-        const phs = base.map((_, j) => `$${start + j + 1}`);
-        // extra_data is the last one and must cast to jsonb
-        phs[phs.length - 1] = `${phs[phs.length - 1]}::jsonb`;
-        placeholders.push(`(${phs.join(', ')})`);
-        vals.push(...base);
+        return {
+          _id: crypto.randomUUID(),
+          audit_id: auditId,
+          vessel_id: vesselId,
+          row_index: rowIndex,
+          name: r[0] ?? null,
+          vessel_name: r[1] ?? null,
+          po_number: r[2] ?? null,
+          imo_number: r[3] ?? null,
+          po_sent_date: r[4] ?? null,
+          md_requested_date: r[5] ?? null,
+          item_description: r[6] ?? null,
+          is_suspected: r[7] === 'Yes' ? 'Yes' : 'No',
+          impa_code: r[8] ?? null,
+          issa_code: r[9] ?? null,
+          equipment_code: r[10] ?? null,
+          equipment_name: r[11] ?? null,
+          maker: r[12] ?? null,
+          model: r[13] ?? null,
+          part_number: r[14] ?? null,
+          unit: r[15] ?? null,
+          quantity: r[16] ?? null,
+          vendor_remark: r[17] ?? null,
+          vendor_email: r[18] ?? null,
+          vendor_name: r[19] ?? null,
+          extra_data: extra,
+          created_at: new Date(),
+          updated_at: new Date()
+        };
       });
 
-      if (placeholders.length === 0) continue;
-
-      await query(
-        `INSERT INTO audit_line_items (
-           audit_id, vessel_id, row_index,
-           name, vessel_name, po_number, imo_number,
-           po_sent_date, md_requested_date, item_description, is_suspected,
-           impa_code, issa_code, equipment_code, equipment_name,
-           maker, model, part_number, unit, quantity,
-           vendor_remark, vendor_email, vendor_name, extra_data
-         ) VALUES ${placeholders.join(', ')}`,
-        vals,
-      );
-      inserted += placeholders.length;
+      await db.collection('audit_line_items').insertMany(docs);
+      inserted += docs.length;
     }
 
     res.status(201).json({

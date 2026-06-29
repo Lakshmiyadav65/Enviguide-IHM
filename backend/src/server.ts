@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // IHM EnviGuide - Backend Entry Point
 // ============================================================
 
@@ -54,8 +54,8 @@ app.use('/uploads', express.static(path.resolve(__dirname, '..', 'uploads')));
 // keeps both the Render dyno and the Supabase pooler warm.
 app.get('/health', async (_req, res) => {
   try {
-    const { query } = await import('./config/database.js');
-    await query('SELECT 1');
+    const { getDb } = await import('./config/database.js');
+    await getDb().command({ ping: 1 });
     res.json({ status: 'ok', db: 'reachable', timestamp: new Date().toISOString() });
   } catch (err) {
     res.status(503).json({

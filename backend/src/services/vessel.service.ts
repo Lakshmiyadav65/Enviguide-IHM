@@ -1,4 +1,5 @@
-import { query } from '../config/database.js';
+import crypto from 'crypto';
+import { getCollection } from '../config/database.js';
 import { isUserAdmin } from './access.js';
 
 // Column mapping: camelCase (API) -> snake_case (DB)
@@ -28,105 +29,86 @@ REVERSE_MAP['created_by_id'] = 'createdById';
 REVERSE_MAP['created_at'] = 'createdAt';
 REVERSE_MAP['updated_at'] = 'updatedAt';
 
-/** Convert a DB row (snake_case) to API object (camelCase) */
-function toApi(row: Record<string, unknown>): Record<string, unknown> {
+/** Convert a DB document to API object (camelCase) */
+function toApi(row: any): Record<string, unknown> {
+  if (!row) return {};
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(row)) {
-    const camel = REVERSE_MAP[key] || key;
-    result[camel] = value;
+    if (key === '_id') {
+      result['id'] = value;
+    } else {
+      const camel = REVERSE_MAP[key] || key;
+      result[camel] = value;
+    }
   }
   return result;
 }
 
 /** Extract known fields from request body and convert to snake_case */
-function extractFields(data: Record<string, unknown>): { columns: string[]; values: unknown[] } {
-  const columns: string[] = [];
-  const values: unknown[] = [];
+function extractFields(data: Record<string, unknown>): Record<string, unknown> {
+  const fields: Record<string, unknown> = {};
   for (const [camel, snake] of Object.entries(FIELD_MAP)) {
     if (camel in data && data[camel] !== undefined) {
-      columns.push(snake);
-      values.push(data[camel]);
+      fields[snake] = data[camel];
     }
   }
-  return { columns, values };
+  return fields;
 }
 
 export const VesselService = {
-  /** Get all vessels visible to the caller. Admins see the whole
-   *  fleet; non-admin roles see only the vessels they themselves
-   *  onboarded (vessels.created_by_id match). */
   async getVesselsByUser(userId: string) {
-    if (await isUserAdmin(userId)) {
-      const result = await query(
-        'SELECT * FROM vessels ORDER BY created_at DESC',
-      );
-      return result.rows.map(toApi);
-    }
-    const result = await query(
-      'SELECT * FROM vessels WHERE created_by_id = $1 ORDER BY created_at DESC',
-      [userId],
-    );
-    return result.rows.map(toApi);
+    const coll = getCollection('vessels');
+    const query = (await isUserAdmin(userId)) ? {} : { created_by_id: userId };
+    const cursor = coll.find(query).sort({ created_at: -1 });
+    const rows = await cursor.toArray();
+    return rows.map(toApi);
   },
 
-  /** Get a single vessel by id. Admins can fetch any vessel; non-admin
-   *  roles get the row only when they own it (created_by_id match). */
   async getVesselByIdForUser(id: string, userId: string) {
-    if (await isUserAdmin(userId)) {
-      const result = await query(
-        'SELECT * FROM vessels WHERE id = $1',
-        [id],
-      );
-      return result.rows[0] ? toApi(result.rows[0]) : null;
-    }
-    const result = await query(
-      'SELECT * FROM vessels WHERE id = $1 AND created_by_id = $2',
-      [id, userId],
-    );
-    return result.rows[0] ? toApi(result.rows[0]) : null;
+    const coll = getCollection('vessels');
+    const query: any = (await isUserAdmin(userId)) ? { _id: id } : { _id: id, created_by_id: userId };
+    const row = await coll.findOne(query);
+    return row ? toApi(row) : null;
   },
 
-  /** Check if IMO already exists (globally unique) */
   async getVesselByImo(imoNumber: string) {
-    const result = await query(
-      'SELECT id FROM vessels WHERE imo_number = $1',
-      [imoNumber],
-    );
-    return result.rows[0] || null;
+    const coll = getCollection('vessels');
+    const row = await coll.findOne({ imo_number: imoNumber });
+    return row ? toApi(row) : null;
   },
 
-  /** Create a vessel owned by the user */
   async createVessel(data: Record<string, unknown>, userId: string) {
-    const { columns, values } = extractFields(data);
-    columns.push('created_by_id');
-    values.push(userId);
-
-    const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
-    const result = await query(
-      `INSERT INTO vessels (${columns.join(', ')}) VALUES (${placeholders}) RETURNING *`,
-      values,
-    );
-    return toApi(result.rows[0]);
+    const coll = getCollection('vessels');
+    const fields = extractFields(data);
+    fields['created_by_id'] = userId;
+    fields['created_at'] = new Date();
+    fields['updated_at'] = new Date();
+    const _id = crypto.randomUUID();
+    
+    await coll.insertOne({
+      _id,
+      ...fields
+    });
+    const created = await coll.findOne({ _id });
+    return toApi(created);
   },
 
-  /** Update a vessel */
   async updateVessel(id: string, data: Record<string, unknown>) {
-    const { columns, values } = extractFields(data);
-    if (columns.length === 0) return this.getVesselByIdForUser(id, '');
+    const coll = getCollection('vessels');
+    const fields = extractFields(data);
+    if (Object.keys(fields).length === 0) return this.getVesselByIdForUser(id, '');
 
-    const setClauses = columns.map((col, i) => `${col} = $${i + 1}`);
-    setClauses.push(`updated_at = NOW()`);
-    values.push(id);
-
-    const result = await query(
-      `UPDATE vessels SET ${setClauses.join(', ')} WHERE id = $${values.length} RETURNING *`,
-      values,
+    fields['updated_at'] = new Date();
+    await coll.updateOne(
+      { _id: id },
+      { $set: fields }
     );
-    return result.rows[0] ? toApi(result.rows[0]) : null;
+    const updated = await coll.findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
-  /** Delete a vessel */
   async deleteVessel(id: string) {
-    await query('DELETE FROM vessels WHERE id = $1', [id]);
+    const coll = getCollection('vessels');
+    await coll.deleteOne({ _id: id });
   },
 };

@@ -1,4 +1,5 @@
-import { query } from '../config/database.js';
+import crypto from 'crypto';
+import { getDb } from '../config/database.js';
 import { SuspectedKeywordService } from './suspectedKeyword.service.js';
 
 const SEVERITY_TO_CATEGORY: Record<string, string> = {
@@ -71,56 +72,109 @@ REVERSE_MAP['deck_area_id'] = 'deckAreaId';
 REVERSE_MAP['created_at'] = 'createdAt';
 REVERSE_MAP['updated_at'] = 'updatedAt';
 
-function toApi(row: Record<string, unknown>) {
+function toApi(row: any) {
+  if (!row) return null;
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(row)) {
-    const camel = REVERSE_MAP[key] || key;
-    result[camel] = value;
+    if (key === '_id') {
+      result['id'] = value;
+    } else {
+      const camel = REVERSE_MAP[key] || key;
+      result[camel] = value;
+    }
   }
   // Construct pin object for frontend convenience
   if (result.pinX !== null && result.pinX !== undefined && result.pinY !== null && result.pinY !== undefined) {
-    result.pin = { x: result.pinX, y: result.pinY };
+    result.pin = { x: Number(result.pinX), y: Number(result.pinY) };
   } else {
     result.pin = null;
   }
   return result;
 }
 
-function extractFields(data: Record<string, unknown>): { columns: string[]; values: unknown[] } {
-  const columns: string[] = [];
-  const values: unknown[] = [];
+function extractFields(data: Record<string, unknown>): Record<string, unknown> {
+  const fields: Record<string, unknown> = {};
   for (const [camel, snake] of Object.entries(FIELD_MAP)) {
     if (camel in data && data[camel] !== undefined) {
-      columns.push(snake);
-      values.push(data[camel]);
+      fields[snake] = data[camel];
     }
   }
-  return { columns, values };
+  return fields;
 }
 
 export const MaterialService = {
   /** List all materials for a vessel, optionally filtered by deck or deck area */
   async getMaterialsForVessel(vesselId: string, deckId?: string, deckAreaId?: string) {
-    let sql = `SELECT m.*, d.name AS deck_name, da.name AS deck_area_name
-               FROM materials m
-               LEFT JOIN decks d ON m.deck_id = d.id
-               LEFT JOIN deck_areas da ON m.deck_area_id = da.id
-               WHERE m.vessel_id = $1`;
-    const params: unknown[] = [vesselId];
-
+    const db = getDb();
+    const match: any = { vessel_id: vesselId };
     if (deckId) {
-      params.push(deckId);
-      sql += ` AND m.deck_id = $${params.length}`;
+      match.deck_id = deckId;
     }
     if (deckAreaId) {
-      params.push(deckAreaId);
-      sql += ` AND m.deck_area_id = $${params.length}`;
+      match.deck_area_id = deckAreaId;
     }
 
-    sql += ' ORDER BY m.created_at DESC';
+    const pipeline: any[] = [
+      { $match: match },
+      {
+        $lookup: {
+          from: 'decks',
+          localField: 'deck_id',
+          foreignField: '_id',
+          as: 'deck'
+        }
+      },
+      { $unwind: { path: '$deck', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'deck_areas',
+          localField: 'deck_area_id',
+          foreignField: '_id',
+          as: 'deck_area'
+        }
+      },
+      { $unwind: { path: '$deck_area', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          vessel_id: 1,
+          deck_id: 1,
+          deck_area_id: 1,
+          name: 1,
+          ihm_part: 1,
+          category: 1,
+          hazard_type: 1,
+          equipment_class: 1,
+          hm_status: 1,
+          quantity: 1,
+          unit: 1,
+          no_of_pieces: 1,
+          total_quantity: 1,
+          compartment: 1,
+          equipment: 1,
+          position: 1,
+          component: 1,
+          material_name: 1,
+          ship_po: 1,
+          movement_type: 1,
+          manufacturer: 1,
+          ihm_part_number: 1,
+          description: 1,
+          remarks: 1,
+          avoid_updation: 1,
+          pin_x: 1,
+          pin_y: 1,
+          created_at: 1,
+          updated_at: 1,
+          deck_name: '$deck.name',
+          deck_area_name: '$deck_area.name'
+        }
+      },
+      { $sort: { created_at: -1 } }
+    ];
 
-    const result = await query(sql, params);
-    return result.rows.map((row: Record<string, unknown>) => ({
+    const rows = await db.collection('materials').aggregate(pipeline).toArray();
+    return rows.map((row) => ({
       ...toApi(row),
       deckName: row.deck_name || null,
       deckAreaName: row.deck_area_name || null,
@@ -129,19 +183,70 @@ export const MaterialService = {
 
   /** Get materials grouped by deck for mapping view */
   async getMaterialMapping(vesselId: string) {
-    const result = await query(
-      `SELECT m.*, d.name AS deck_name, da.thumbnail AS deck_thumbnail
-       FROM materials m
-       LEFT JOIN decks d ON m.deck_id = d.id
-       LEFT JOIN deck_areas da ON m.deck_area_id = da.id
-       WHERE m.vessel_id = $1
-       ORDER BY d.name ASC, m.created_at ASC`,
-      [vesselId],
-    );
+    const db = getDb();
+    const pipeline: any[] = [
+      { $match: { vessel_id: vesselId } },
+      {
+        $lookup: {
+          from: 'decks',
+          localField: 'deck_id',
+          foreignField: '_id',
+          as: 'deck'
+        }
+      },
+      { $unwind: { path: '$deck', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'deck_areas',
+          localField: 'deck_area_id',
+          foreignField: '_id',
+          as: 'deck_area'
+        }
+      },
+      { $unwind: { path: '$deck_area', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          vessel_id: 1,
+          deck_id: 1,
+          deck_area_id: 1,
+          name: 1,
+          ihm_part: 1,
+          category: 1,
+          hazard_type: 1,
+          equipment_class: 1,
+          hm_status: 1,
+          quantity: 1,
+          unit: 1,
+          no_of_pieces: 1,
+          total_quantity: 1,
+          compartment: 1,
+          equipment: 1,
+          position: 1,
+          component: 1,
+          material_name: 1,
+          ship_po: 1,
+          movement_type: 1,
+          manufacturer: 1,
+          ihm_part_number: 1,
+          description: 1,
+          remarks: 1,
+          avoid_updation: 1,
+          pin_x: 1,
+          pin_y: 1,
+          created_at: 1,
+          updated_at: 1,
+          deck_name: '$deck.name',
+          deck_thumbnail: '$deck_area.thumbnail'
+        }
+      },
+      { $sort: { deck_name: 1, created_at: 1 } }
+    ];
 
-    // Group by deck
+    const rows = await db.collection('materials').aggregate(pipeline).toArray();
+
     const mapping: Record<string, { deckId: string; deckName: string; deckThumbnail: string | null; materials: unknown[] }> = {};
-    for (const row of result.rows as Record<string, unknown>[]) {
+    for (const row of rows) {
       const dId = (row.deck_id as string) || 'unassigned';
       if (!mapping[dId]) {
         mapping[dId] = {
@@ -159,16 +264,68 @@ export const MaterialService = {
 
   /** Get a single material by ID */
   async getMaterialById(id: string, vesselId: string) {
-    const result = await query(
-      `SELECT m.*, d.name AS deck_name, da.name AS deck_area_name
-       FROM materials m
-       LEFT JOIN decks d ON m.deck_id = d.id
-       LEFT JOIN deck_areas da ON m.deck_area_id = da.id
-       WHERE m.id = $1 AND m.vessel_id = $2`,
-      [id, vesselId],
-    );
-    if (!result.rows[0]) return null;
-    const row = result.rows[0] as Record<string, unknown>;
+    const db = getDb();
+    const pipeline: any[] = [
+      { $match: { _id: id, vessel_id: vesselId } },
+      {
+        $lookup: {
+          from: 'decks',
+          localField: 'deck_id',
+          foreignField: '_id',
+          as: 'deck'
+        }
+      },
+      { $unwind: { path: '$deck', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'deck_areas',
+          localField: 'deck_area_id',
+          foreignField: '_id',
+          as: 'deck_area'
+        }
+      },
+      { $unwind: { path: '$deck_area', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          vessel_id: 1,
+          deck_id: 1,
+          deck_area_id: 1,
+          name: 1,
+          ihm_part: 1,
+          category: 1,
+          hazard_type: 1,
+          equipment_class: 1,
+          hm_status: 1,
+          quantity: 1,
+          unit: 1,
+          no_of_pieces: 1,
+          total_quantity: 1,
+          compartment: 1,
+          equipment: 1,
+          position: 1,
+          component: 1,
+          material_name: 1,
+          ship_po: 1,
+          movement_type: 1,
+          manufacturer: 1,
+          ihm_part_number: 1,
+          description: 1,
+          remarks: 1,
+          avoid_updation: 1,
+          pin_x: 1,
+          pin_y: 1,
+          created_at: 1,
+          updated_at: 1,
+          deck_name: '$deck.name',
+          deck_area_name: '$deck_area.name'
+        }
+      }
+    ];
+
+    const rows = await db.collection('materials').aggregate(pipeline).toArray();
+    if (!rows[0]) return null;
+    const row = rows[0];
     return {
       ...toApi(row),
       deckName: row.deck_name || null,
@@ -178,115 +335,115 @@ export const MaterialService = {
 
   /** Create a material entry */
   async createMaterial(data: Record<string, unknown>, vesselId: string, deckId?: string, deckAreaId?: string) {
+    const db = getDb();
     await applyKeywordAutoFlag(data);
-    const { columns, values } = extractFields(data);
-    columns.push('vessel_id');
-    values.push(vesselId);
+    const fields = extractFields(data);
+    fields['vessel_id'] = vesselId;
+    fields['deck_id'] = deckId || null;
+    fields['deck_area_id'] = deckAreaId || null;
+    fields['created_at'] = new Date();
+    fields['updated_at'] = new Date();
 
-    if (deckId) {
-      columns.push('deck_id');
-      values.push(deckId);
-    }
-    if (deckAreaId) {
-      columns.push('deck_area_id');
-      values.push(deckAreaId);
-    }
-
-    const placeholders = values.map((_, i) => `$${i + 1}`).join(', ');
-    const result = await query(
-      `INSERT INTO materials (${columns.join(', ')}) VALUES (${placeholders}) RETURNING *`,
-      values,
-    );
-    return toApi(result.rows[0] as Record<string, unknown>);
+    const _id = crypto.randomUUID();
+    await db.collection('materials').insertOne({
+      _id,
+      ...fields
+    });
+    const created = await db.collection('materials').findOne({ _id });
+    return toApi(created);
   },
 
   /** Update a material entry */
   async updateMaterial(id: string, data: Record<string, unknown>) {
+    const db = getDb();
     await applyKeywordAutoFlag(data);
-    const { columns, values } = extractFields(data);
+    const fields = extractFields(data);
 
-    // Handle deck transfer
     if ('deckId' in data) {
-      columns.push('deck_id');
-      values.push(data.deckId || null);
+      fields['deck_id'] = data.deckId || null;
     }
     if ('deckAreaId' in data) {
-      columns.push('deck_area_id');
-      values.push(data.deckAreaId || null);
+      fields['deck_area_id'] = data.deckAreaId || null;
     }
 
-    if (columns.length === 0) return null;
+    if (Object.keys(fields).length === 0) return null;
 
-    const setClauses = columns.map((col, i) => `${col} = $${i + 1}`);
-    setClauses.push('updated_at = NOW()');
-    values.push(id);
-
-    const result = await query(
-      `UPDATE materials SET ${setClauses.join(', ')} WHERE id = $${values.length} RETURNING *`,
-      values,
+    fields['updated_at'] = new Date();
+    await db.collection('materials').updateOne(
+      { _id: id },
+      { $set: fields }
     );
-    return result.rows[0] ? toApi(result.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('materials').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   /** Delete a material entry */
   async deleteMaterial(id: string) {
-    await query('DELETE FROM materials WHERE id = $1', [id]);
+    const db = getDb();
+    await db.collection('materials').deleteOne({ _id: id });
   },
 
   /** Transfer a material to a different deck (clears pin — needs re-mapping) */
   async transferMaterial(id: string, newDeckId: string) {
-    const result = await query(
-      `UPDATE materials SET deck_id = $1, pin_x = NULL, pin_y = NULL, updated_at = NOW()
-       WHERE id = $2 RETURNING *`,
-      [newDeckId, id],
+    const db = getDb();
+    await db.collection('materials').updateOne(
+      { _id: id },
+      { $set: { deck_id: newDeckId, pin_x: null, pin_y: null, updated_at: new Date() } }
     );
-    return result.rows[0] ? toApi(result.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('materials').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   /** Complete a re-mapping after transfer: set new pin + update fields */
   async remapMaterial(id: string, data: Record<string, unknown>) {
-    const { columns, values } = extractFields(data);
+    const db = getDb();
+    const fields = extractFields(data);
 
     if ('deckId' in data) {
-      columns.push('deck_id');
-      values.push(data.deckId || null);
+      fields['deck_id'] = data.deckId || null;
     }
     if ('deckAreaId' in data) {
-      columns.push('deck_area_id');
-      values.push(data.deckAreaId || null);
+      fields['deck_area_id'] = data.deckAreaId || null;
     }
 
-    if (columns.length === 0) return null;
+    if (Object.keys(fields).length === 0) return null;
 
-    const setClauses = columns.map((col, i) => `${col} = $${i + 1}`);
-    setClauses.push('updated_at = NOW()');
-    values.push(id);
-
-    const result = await query(
-      `UPDATE materials SET ${setClauses.join(', ')} WHERE id = $${values.length} RETURNING *`,
-      values,
+    fields['updated_at'] = new Date();
+    await db.collection('materials').updateOne(
+      { _id: id },
+      { $set: fields }
     );
-    return result.rows[0] ? toApi(result.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('materials').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   /** Get material count per vessel (for dashboard) */
   async getMaterialCount(vesselId: string) {
-    const result = await query(
-      'SELECT COUNT(*)::int AS total FROM materials WHERE vessel_id = $1',
-      [vesselId],
-    );
-    return result.rows[0].total as number;
+    const db = getDb();
+    return db.collection('materials').countDocuments({ vessel_id: vesselId });
   },
 
   /** Get material summary by IHM Part for a vessel */
   async getMaterialSummary(vesselId: string) {
-    const result = await query(
-      `SELECT ihm_part, category, COUNT(*)::int AS count
-       FROM materials WHERE vessel_id = $1
-       GROUP BY ihm_part, category
-       ORDER BY ihm_part, category`,
-      [vesselId],
-    );
-    return result.rows;
+    const db = getDb();
+    const rows = await db.collection('materials').aggregate([
+      { $match: { vessel_id: vesselId } },
+      {
+        $group: {
+          _id: { ihm_part: '$ihm_part', category: '$category' },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          ihm_part: '$_id.ihm_part',
+          category: '$_id.category',
+          count: 1
+        }
+      },
+      { $sort: { ihm_part: 1, category: 1 } }
+    ]).toArray();
+    return rows;
   },
 };

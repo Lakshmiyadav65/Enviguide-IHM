@@ -66,15 +66,11 @@ function meToAuthUser(d: MeResponse['data'], token: string): AuthUser {
 // every permission check passes and the whole app is browsable.
 const MOCK_TOKEN = 'mock-token';
 
-// The only credential accepted in mock mode (no backend).
-const MOCK_EMAIL = 'sivaprasad@enviguide.com';
-const MOCK_PASSWORD = 'Envi123';
-
 function makeMockUser(email: string): AuthUser {
   return {
     id: 'mock-admin',
     name: email.split('@')[0] || 'Admin',
-    email: email || MOCK_EMAIL,
+    email: email || 'admin@enviguide.com',
     role: 'admin',
     isAdmin: true,
     permissions: [],
@@ -133,13 +129,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Mock mode: no backend — only the fixed demo credential is accepted.
+      // Mock mode: no backend — allow any valid email/password
       if (API_CONFIG.USE_MOCK) {
-        const emailOk = email.trim().toLowerCase() === MOCK_EMAIL.toLowerCase();
-        if (!emailOk || password !== MOCK_PASSWORD) {
+        if (!email.includes('@') || !password) {
           throw new Error('Invalid email or password');
         }
-        const u = makeMockUser(MOCK_EMAIL);
+        const u = makeMockUser(email);
         localStorage.setItem('ihm_token', u.token);
         localStorage.setItem('ihm_user', JSON.stringify(u));
         setUser(u);

@@ -1,9 +1,11 @@
-import { query } from '../config/database.js';
+import crypto from 'crypto';
+import { getDb } from '../config/database.js';
 import fs from 'fs/promises';
 
-function toApi(row: Record<string, unknown>): Record<string, unknown> {
+function toApi(row: any): Record<string, unknown> {
+  if (!row) return {};
   return {
-    id: row.id,
+    id: row._id,
     vesselId: row.vessel_id,
     name: row.name,
     fileName: row.file_name,
@@ -18,16 +20,35 @@ function toApi(row: Record<string, unknown>): Record<string, unknown> {
 export const GAPlanService = {
   /** List all GA Plans for a vessel */
   async getPlansForVessel(vesselId: string) {
-    const result = await query(
-      `SELECT gp.*, COUNT(da.id)::int AS deck_area_count
-       FROM ga_plans gp
-       LEFT JOIN deck_areas da ON da.ga_plan_id = gp.id
-       WHERE gp.vessel_id = $1
-       GROUP BY gp.id
-       ORDER BY gp.created_at DESC`,
-      [vesselId],
-    );
-    return result.rows.map((row) => ({
+    const db = getDb();
+    const rows = await db.collection('ga_plans').aggregate([
+      { $match: { vessel_id: vesselId } },
+      {
+        $lookup: {
+          from: 'deck_areas',
+          localField: '_id',
+          foreignField: 'ga_plan_id',
+          as: 'deck_areas'
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          vessel_id: 1,
+          name: 1,
+          file_name: 1,
+          file_path: 1,
+          file_size: 1,
+          mime_type: 1,
+          created_at: 1,
+          updated_at: 1,
+          deck_area_count: { $size: '$deck_areas' }
+        }
+      },
+      { $sort: { created_at: -1 } }
+    ]).toArray();
+
+    return rows.map((row) => ({
       ...toApi(row),
       _count: { deckAreas: row.deck_area_count },
     }));
@@ -35,21 +56,16 @@ export const GAPlanService = {
 
   /** Get a single GA Plan with all its deck areas */
   async getPlanById(id: string, vesselId: string) {
-    const planResult = await query(
-      'SELECT * FROM ga_plans WHERE id = $1 AND vessel_id = $2',
-      [id, vesselId],
-    );
-    if (!planResult.rows[0]) return null;
+    const db = getDb();
+    const plan = await db.collection('ga_plans').findOne({ _id: id, vessel_id: vesselId });
+    if (!plan) return null;
 
-    const areasResult = await query(
-      'SELECT * FROM deck_areas WHERE ga_plan_id = $1 ORDER BY sort_order ASC',
-      [id],
-    );
+    const areas = await db.collection('deck_areas').find({ ga_plan_id: id }).sort({ sort_order: 1 }).toArray();
 
     return {
-      ...toApi(planResult.rows[0]),
-      deckAreas: areasResult.rows.map((r) => ({
-        id: r.id, gaPlanId: r.ga_plan_id, name: r.name,
+      ...toApi(plan),
+      deckAreas: areas.map((r) => ({
+        id: r._id, gaPlanId: r.ga_plan_id, name: r.name,
         x: r.x, y: r.y, width: r.width, height: r.height,
         thumbnail: r.thumbnail, sortOrder: r.sort_order,
         createdAt: r.created_at, updatedAt: r.updated_at,
@@ -62,38 +78,53 @@ export const GAPlanService = {
     vesselId: string; name: string; fileName: string;
     filePath: string; fileSize: number; mimeType: string;
   }) {
-    const result = await query(
-      `INSERT INTO ga_plans (vessel_id, name, file_name, file_path, file_size, mime_type)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [data.vesselId, data.name, data.fileName, data.filePath, data.fileSize, data.mimeType],
-    );
-    return { ...toApi(result.rows[0]), _count: { deckAreas: 0 } };
+    const db = getDb();
+    const _id = crypto.randomUUID();
+    const fields = {
+      _id,
+      vessel_id: data.vesselId,
+      name: data.name,
+      file_name: data.fileName,
+      file_path: data.filePath,
+      file_size: data.fileSize,
+      mime_type: data.mimeType,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+
+    await db.collection('ga_plans').insertOne(fields);
+    const created = await db.collection('ga_plans').findOne({ _id });
+    return { ...toApi(created), _count: { deckAreas: 0 } };
   },
 
   /** Update GA Plan name */
   async updatePlan(id: string, name: string) {
-    const result = await query(
-      'UPDATE ga_plans SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-      [name, id],
+    const db = getDb();
+    await db.collection('ga_plans').updateOne(
+      { _id: id },
+      { $set: { name, updated_at: new Date() } }
     );
-    return result.rows[0] ? toApi(result.rows[0]) : null;
+    const updated = await db.collection('ga_plans').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   /** Delete a GA Plan and its file from disk */
   async deletePlan(id: string) {
-    const planResult = await query('SELECT * FROM ga_plans WHERE id = $1', [id]);
-    if (!planResult.rows[0]) return null;
+    const db = getDb();
+    const plan = await db.collection('ga_plans').findOne({ _id: id });
+    if (!plan) return null;
 
-    // Delete from database (deck_areas cascade)
-    await query('DELETE FROM ga_plans WHERE id = $1', [id]);
+    // Delete GA plan and its deck areas
+    await db.collection('ga_plans').deleteOne({ _id: id });
+    await db.collection('deck_areas').deleteMany({ ga_plan_id: id });
 
     // Delete file from disk (best-effort)
     try {
-      await fs.unlink(planResult.rows[0].file_path);
+      await fs.unlink(plan.file_path);
     } catch {
       // File may already be missing
     }
 
-    return toApi(planResult.rows[0]);
+    return toApi(plan);
   },
 };

@@ -1,8 +1,10 @@
-import { query } from '../config/database.js';
+import crypto from 'crypto';
+import { getDb } from '../config/database.js';
 
-function toApi(row: Record<string, unknown>) {
+function toApi(row: any) {
+  if (!row) return null;
   return {
-    id: row.id,
+    id: row._id,
     vesselId: row.vessel_id,
     gaPlanId: row.ga_plan_id,
     deckAreaId: row.deck_area_id,
@@ -19,22 +21,53 @@ function toApi(row: Record<string, unknown>) {
 export const DeckService = {
   /** List all decks for a vessel — includes mapped material count per deck */
   async getDecksForVessel(vesselId: string) {
-    const result = await query(
-      `SELECT d.*, da.x, da.y, da.width, da.height,
-              COALESCE(mc.material_count, 0)::int AS material_count
-       FROM decks d
-       LEFT JOIN deck_areas da ON d.deck_area_id = da.id
-       LEFT JOIN (
-         SELECT deck_id, COUNT(*) AS material_count
-         FROM materials
-         WHERE deck_id IS NOT NULL
-         GROUP BY deck_id
-       ) mc ON mc.deck_id = d.id
-       WHERE d.vessel_id = $1
-       ORDER BY d.level ASC, d.created_at ASC`,
-      [vesselId],
-    );
-    return result.rows.map((row: Record<string, unknown>) => ({
+    const db = getDb();
+    const pipeline = [
+      { $match: { vessel_id: vesselId } },
+      // Lookup deck area
+      {
+        $lookup: {
+          from: 'deck_areas',
+          localField: 'deck_area_id',
+          foreignField: '_id',
+          as: 'deck_area'
+        }
+      },
+      { $unwind: { path: '$deck_area', preserveNullAndEmptyArrays: true } },
+      // Lookup materials count
+      {
+        $lookup: {
+          from: 'materials',
+          localField: '_id',
+          foreignField: 'deck_id',
+          as: 'materials'
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          vessel_id: 1,
+          ga_plan_id: 1,
+          deck_area_id: 1,
+          name: 1,
+          level: 1,
+          ga_plan_url: 1,
+          thumbnail: 1,
+          status: 1,
+          created_at: 1,
+          updated_at: 1,
+          x: '$deck_area.x',
+          y: '$deck_area.y',
+          width: '$deck_area.width',
+          height: '$deck_area.height',
+          material_count: { $size: '$materials' }
+        }
+      },
+      { $sort: { level: 1, created_at: 1 } }
+    ];
+
+    const rows = await db.collection('decks').aggregate(pipeline).toArray();
+    return rows.map((row) => ({
       ...toApi(row),
       mappedItemsCount: row.material_count,
       cropCoordinates: row.deck_area_id
@@ -45,15 +78,43 @@ export const DeckService = {
 
   /** Get a single deck */
   async getDeckById(id: string, vesselId: string) {
-    const result = await query(
-      `SELECT d.*, da.x, da.y, da.width, da.height
-       FROM decks d
-       LEFT JOIN deck_areas da ON d.deck_area_id = da.id
-       WHERE d.id = $1 AND d.vessel_id = $2`,
-      [id, vesselId],
-    );
-    if (!result.rows[0]) return null;
-    const row = result.rows[0] as Record<string, unknown>;
+    const db = getDb();
+    const pipeline = [
+      { $match: { _id: id, vessel_id: vesselId } },
+      // Lookup deck area
+      {
+        $lookup: {
+          from: 'deck_areas',
+          localField: 'deck_area_id',
+          foreignField: '_id',
+          as: 'deck_area'
+        }
+      },
+      { $unwind: { path: '$deck_area', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          vessel_id: 1,
+          ga_plan_id: 1,
+          deck_area_id: 1,
+          name: 1,
+          level: 1,
+          ga_plan_url: 1,
+          thumbnail: 1,
+          status: 1,
+          created_at: 1,
+          updated_at: 1,
+          x: '$deck_area.x',
+          y: '$deck_area.y',
+          width: '$deck_area.width',
+          height: '$deck_area.height'
+        }
+      }
+    ];
+
+    const rows = await db.collection('decks').aggregate(pipeline).toArray();
+    if (!rows[0]) return null;
+    const row = rows[0];
     return {
       ...toApi(row),
       cropCoordinates: row.deck_area_id
@@ -72,34 +133,37 @@ export const DeckService = {
     gaPlanUrl?: string;
     thumbnail?: string;
   }) {
-    // Auto-assign level = MAX(level) + 1 if not provided
+    const db = getDb();
     let level = data.level;
     if (level === undefined) {
-      const maxResult = await query(
-        'SELECT COALESCE(MAX(level), -1) AS max_level FROM decks WHERE vessel_id = $1',
-        [data.vesselId],
-      );
-      level = (maxResult.rows[0].max_level as number) + 1;
+      const cursor = db.collection('decks').find({ vessel_id: data.vesselId }).sort({ level: -1 }).limit(1);
+      const rows = await cursor.toArray();
+      level = rows[0] ? (rows[0].level as number) + 1 : 0;
     }
 
-    const result = await query(
-      `INSERT INTO decks (vessel_id, ga_plan_id, deck_area_id, name, level, ga_plan_url, thumbnail)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [
-        data.vesselId,
-        data.gaPlanId || null,
-        data.deckAreaId || null,
-        data.name,
-        level,
-        data.gaPlanUrl || null,
-        data.thumbnail || null,
-      ],
-    );
-    return toApi(result.rows[0]);
+    const _id = crypto.randomUUID();
+    const fields = {
+      _id,
+      vessel_id: data.vesselId,
+      ga_plan_id: data.gaPlanId || null,
+      deck_area_id: data.deckAreaId || null,
+      name: data.name,
+      level,
+      ga_plan_url: data.gaPlanUrl || null,
+      thumbnail: data.thumbnail || null,
+      status: 'active',
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+
+    await db.collection('decks').insertOne(fields);
+    const created = await db.collection('decks').findOne({ _id });
+    return toApi(created);
   },
 
   /** Update a deck */
   async updateDeck(id: string, data: Record<string, unknown>) {
+    const db = getDb();
     const fieldMap: Record<string, string> = {
       name: 'name',
       level: 'level',
@@ -108,55 +172,47 @@ export const DeckService = {
       status: 'status',
     };
 
-    const setClauses: string[] = [];
-    const values: unknown[] = [];
-    let idx = 1;
-
+    const updateFields: Record<string, any> = {};
     for (const [key, col] of Object.entries(fieldMap)) {
       if (key in data && data[key] !== undefined) {
-        setClauses.push(`${col} = $${idx}`);
-        values.push(data[key]);
-        idx++;
+        updateFields[col] = data[key];
       }
     }
 
-    if (setClauses.length === 0) return null;
+    if (Object.keys(updateFields).length === 0) return null;
 
-    setClauses.push('updated_at = NOW()');
-    values.push(id);
-
-    const result = await query(
-      `UPDATE decks SET ${setClauses.join(', ')} WHERE id = $${idx} RETURNING *`,
-      values,
+    updateFields['updated_at'] = new Date();
+    await db.collection('decks').updateOne(
+      { _id: id },
+      { $set: updateFields }
     );
-    return result.rows[0] ? toApi(result.rows[0]) : null;
+    const updated = await db.collection('decks').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   /** Delete a deck */
   async deleteDeck(id: string) {
-    await query('DELETE FROM decks WHERE id = $1', [id]);
+    const db = getDb();
+    await db.collection('decks').deleteOne({ _id: id });
   },
 
   /** Check if a deck name already exists for this vessel */
   async nameExists(vesselId: string, name: string, excludeId?: string) {
-    const result = excludeId
-      ? await query(
-          'SELECT id FROM decks WHERE vessel_id = $1 AND LOWER(name) = LOWER($2) AND id != $3',
-          [vesselId, name, excludeId],
-        )
-      : await query(
-          'SELECT id FROM decks WHERE vessel_id = $1 AND LOWER(name) = LOWER($2)',
-          [vesselId, name],
-        );
-    return result.rows.length > 0;
+    const db = getDb();
+    const query: any = {
+      vessel_id: vesselId,
+      name: { $regex: new RegExp(`^${name}$`, 'i') }
+    };
+    if (excludeId) {
+      query._id = { $ne: excludeId };
+    }
+    const count = await db.collection('decks').countDocuments(query);
+    return count > 0;
   },
 
   /** Get deck count for a vessel */
   async getDeckCount(vesselId: string) {
-    const result = await query(
-      'SELECT COUNT(*)::int AS count FROM decks WHERE vessel_id = $1',
-      [vesselId],
-    );
-    return result.rows[0].count as number;
+    const db = getDb();
+    return db.collection('decks').countDocuments({ vessel_id: vesselId });
   },
 };

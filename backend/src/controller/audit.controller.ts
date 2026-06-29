@@ -6,7 +6,7 @@ import { DocumentService } from '../services/document.service.js';
 import { sendMail } from '../services/email.service.js';
 import jwt from 'jsonwebtoken';
 import { persistUploadedFile, getStoredFileStream } from '../services/storage.service.js';
-import { query } from '../config/database.js';
+import { getDb } from '../config/database.js';
 import { env } from '../config/env.js';
 import { createError } from '../middleware/errorHandler.js';
 
@@ -201,6 +201,7 @@ function rewriteSuspectedBlock(body: string, rows: unknown[][]): string {
  */
 export async function sendClarificationEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const db = getDb();
     const {
       imo,
       vesselName,
@@ -329,39 +330,50 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
       if (cc && cc.length) ccAndBcc.push(...cc);
       if (batch.bcc && batch.bcc.length) ccAndBcc.push(...batch.bcc);
 
-      const inserted = await query(
-        `INSERT INTO clarification_requests
-           (vessel_id, imo_number, vessel_name, recipient_emails, cc_emails,
-            subject, body, suspected_items, status, error_message, sent_by,
-            public_token, public_token_expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13)
-         RETURNING id, status, created_at`,
-        [
-          vesselId, imo, vesselName || null,
-          batch.to.join(', '),
-          ccAndBcc.length > 0 ? ccAndBcc.join(', ') : null,
-          subject, bodyWithLink, JSON.stringify(batch.rows),
-          'queued', null, req.user!.userId,
-          publicToken, expiresAt,
-        ],
-      );
-      const clarificationId = String((inserted.rows[0] as Record<string, unknown>).id);
+      const db = getDb();
+      const clarId = crypto.randomUUID();
+      await db.collection('clarification_requests').insertOne({
+        _id: clarId,
+        vessel_id: vesselId,
+        imo_number: imo,
+        vessel_name: vesselName || null,
+        recipient_emails: batch.to.join(', '),
+        cc_emails: ccAndBcc.length > 0 ? ccAndBcc.join(', ') : null,
+        subject,
+        body: bodyWithLink,
+        suspected_items: batch.rows,
+        status: 'queued',
+        error_message: null,
+        sent_by: req.user!.userId,
+        public_token: publicToken,
+        public_token_expires_at: expiresAt,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+      const clarificationId = clarId;
 
       const itemCount = batch.rows.length;
       if (itemCount > 0) {
-        const placeholders: string[] = [];
-        const vals: unknown[] = [];
+        const docs = [];
         for (let i = 0; i < itemCount; i++) {
-          const start = vals.length;
-          placeholders.push(`($${start + 1}, $${start + 2})`);
-          vals.push(clarificationId, i);
+          docs.push({
+            _id: crypto.randomUUID(),
+            clarification_id: clarificationId,
+            item_index: i,
+            mds_status: 'pending',
+            sdoc_status: 'pending',
+            reminder_count: 0,
+            created_at: new Date(),
+            updated_at: new Date()
+          });
         }
-        await query(
-          `INSERT INTO clarification_items (clarification_id, item_index)
-           VALUES ${placeholders.join(', ')}
-           ON CONFLICT (clarification_id, item_index) DO NOTHING`,
-          vals,
-        );
+        try {
+          await db.collection('clarification_items').insertMany(docs, { ordered: false });
+        } catch (err: any) {
+          if (!err.message.includes('E11000')) {
+            throw err;
+          }
+        }
       }
 
       persisted.push({
@@ -375,19 +387,20 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
       });
     }
 
-    // Move the audit into 'Awaiting Clarification' immediately — clarifications
-    // are queued, they'll be dispatched in the background.
+    // Move the audit into 'Awaiting Clarification' immediately
     if (audit) {
       const auditRow = audit as Record<string, unknown>;
       const currentStatus = String(auditRow.status ?? '');
       if (currentStatus === 'Pending Review' || currentStatus === 'In Progress' || currentStatus === 'Pending') {
-        await query(
-          `UPDATE audit_summaries
-              SET status = 'Awaiting Clarification',
-                  last_activity = NOW(),
-                  updated_at = NOW()
-            WHERE id = $1`,
-          [auditRow.id],
+        await db.collection('audit_summaries').updateOne(
+          { _id: auditRow.id },
+          {
+            $set: {
+              status: 'Awaiting Clarification',
+              last_activity: new Date(),
+              updated_at: new Date()
+            }
+          }
         );
       }
     }
@@ -431,18 +444,18 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
           console.log(
             `${label}: OK (${elapsed}ms) messageId=${(result as { messageId?: string })?.messageId ?? '?'}`,
           );
-          await query(
-            `UPDATE clarification_requests SET status = 'sent', error_message = NULL WHERE id = $1`,
-            [p.clarificationId],
+          await db.collection('clarification_requests').updateOne(
+            { _id: p.clarificationId },
+            { $set: { status: 'sent', error_message: null, updated_at: new Date() } }
           );
         } catch (mailErr) {
           const errorMessage = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
           const elapsed = Date.now() - t0;
           console.error(`${label}: FAILED after ${elapsed}ms — ${errorMessage}`);
-          await query(
-            `UPDATE clarification_requests SET status = 'failed', error_message = $2 WHERE id = $1`,
-            [p.clarificationId, errorMessage],
-          ).catch((dbErr) => {
+          await db.collection('clarification_requests').updateOne(
+            { _id: p.clarificationId },
+            { $set: { status: 'failed', error_message: errorMessage, updated_at: new Date() } }
+          ).catch((dbErr: any) => {
             console.error(`${label}: also failed to record failure:`, dbErr);
           });
         }
@@ -521,9 +534,16 @@ export async function replaceAuditLineItems(req: Request, res: Response, next: N
     const vesselId = auditRow.vesselId ? String(auditRow.vesselId) : null;
 
     await AuditService.replaceLineItems(auditId, vesselId, rows);
-    await query(
-      `UPDATE audit_summaries SET total_items = $1, last_activity = NOW(), updated_at = NOW() WHERE id = $2`,
-      [rows.length, auditId],
+    const db = getDb();
+    await db.collection('audit_summaries').updateOne(
+      { _id: auditId },
+      {
+        $set: {
+          total_items: rows.length,
+          last_activity: new Date(),
+          updated_at: new Date()
+        }
+      }
     );
 
     res.json({ success: true, data: { auditId, rowsWritten: rows.length } });
@@ -546,9 +566,16 @@ export async function replaceAuditLineItemsById(req: Request, res: Response, nex
     const vesselId = a.vesselId ? String(a.vesselId) : null;
 
     await AuditService.replaceLineItems(auditId, vesselId, rows);
-    await query(
-      `UPDATE audit_summaries SET total_items = $1, last_activity = NOW(), updated_at = NOW() WHERE id = $2`,
-      [rows.length, auditId],
+    const db = getDb();
+    await db.collection('audit_summaries').updateOne(
+      { _id: auditId },
+      {
+        $set: {
+          total_items: rows.length,
+          last_activity: new Date(),
+          updated_at: new Date()
+        }
+      }
     );
 
     res.json({ success: true, data: { auditId, rowsWritten: rows.length } });

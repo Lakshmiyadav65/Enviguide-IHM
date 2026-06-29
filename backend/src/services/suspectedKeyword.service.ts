@@ -1,6 +1,5 @@
-// -- Suspected Keywords Service ------------------------------
-// Keywords auto-flag materials whose name/description matches.
-import { query } from '../config/database.js';
+import crypto from 'crypto';
+import { getDb } from '../config/database.js';
 
 const FIELD_MAP: Record<string, string> = {
   keyword: 'keyword',
@@ -16,22 +15,27 @@ REVERSE['id'] = 'id';
 REVERSE['created_at'] = 'createdAt';
 REVERSE['updated_at'] = 'updatedAt';
 
-function toApi(row: Record<string, unknown>) {
+function toApi(row: any) {
+  if (!row) return null;
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) out[REVERSE[k] || k] = v;
+  for (const [k, v] of Object.entries(row)) {
+    if (k === '_id') {
+      out['id'] = v;
+    } else {
+      out[REVERSE[k] || k] = v;
+    }
+  }
   return out;
 }
 
 function extract(data: Record<string, unknown>) {
-  const cols: string[] = [];
-  const vals: unknown[] = [];
+  const fields: Record<string, unknown> = {};
   for (const [c, s] of Object.entries(FIELD_MAP)) {
     if (c in data && data[c] !== undefined) {
-      cols.push(s);
-      vals.push(data[c]);
+      fields[s] = data[c];
     }
   }
-  return { cols, vals };
+  return fields;
 }
 
 export interface KeywordMatch {
@@ -40,7 +44,6 @@ export interface KeywordMatch {
   severity: string;
 }
 
-// Simple in-memory cache; refreshed on mutations.
 let cache: KeywordMatch[] | null = null;
 
 export const SuspectedKeywordService = {
@@ -49,70 +52,79 @@ export const SuspectedKeywordService = {
   },
 
   async list(filters?: { status?: string; hazardType?: string; search?: string }) {
-    let sql = `SELECT * FROM suspected_keywords WHERE 1=1`;
-    const params: unknown[] = [];
-    let i = 1;
+    const db = getDb();
+    const query: any = {};
 
-    if (filters?.status) { sql += ` AND status = $${i++}`; params.push(filters.status); }
-    if (filters?.hazardType) { sql += ` AND hazard_type = $${i++}`; params.push(filters.hazardType); }
+    if (filters?.status) {
+      query.status = filters.status;
+    }
+    if (filters?.hazardType) {
+      query.hazard_type = filters.hazardType;
+    }
     if (filters?.search) {
-      sql += ` AND (keyword ILIKE $${i} OR hazard_type ILIKE $${i})`;
-      params.push(`%${filters.search}%`);
-      i++;
+      const regex = { $regex: filters.search, $options: 'i' };
+      query.$or = [
+        { keyword: regex },
+        { hazard_type: regex }
+      ];
     }
 
-    sql += ' ORDER BY keyword ASC';
-    const r = await query(sql, params);
-    return r.rows.map((row: Record<string, unknown>) => toApi(row));
+    const rows = await db.collection('suspected_keywords').find(query).sort({ keyword: 1 }).toArray();
+    return rows.map(toApi);
   },
 
   async getById(id: string) {
-    const r = await query('SELECT * FROM suspected_keywords WHERE id = $1', [id]);
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const db = getDb();
+    const doc = await db.collection('suspected_keywords').findOne({ _id: id });
+    return doc ? toApi(doc) : null;
   },
 
   async create(data: Record<string, unknown>) {
     if (!data.keyword) throw new Error('keyword is required');
-    const existing = await query('SELECT id FROM suspected_keywords WHERE keyword = $1', [data.keyword]);
-    if (existing.rows[0]) throw new Error('Keyword already registered');
+    const db = getDb();
+    const existing = await db.collection('suspected_keywords').findOne({ keyword: data.keyword });
+    if (existing) throw new Error('Keyword already registered');
 
-    const { cols, vals } = extract(data);
-    const ph = vals.map((_, i) => `$${i + 1}`).join(', ');
-    const r = await query(
-      `INSERT INTO suspected_keywords (${cols.join(', ')}) VALUES (${ph}) RETURNING *`,
-      vals,
-    );
+    const fields = extract(data);
+    fields['created_at'] = new Date();
+    fields['updated_at'] = new Date();
+    const _id = crypto.randomUUID();
+
+    await db.collection('suspected_keywords').insertOne({
+      _id,
+      ...fields
+    });
     this.invalidateCache();
-    return toApi(r.rows[0] as Record<string, unknown>);
+    const created = await db.collection('suspected_keywords').findOne({ _id });
+    return toApi(created);
   },
 
   async update(id: string, data: Record<string, unknown>) {
-    const { cols, vals } = extract(data);
-    if (cols.length === 0) return null;
+    const db = getDb();
+    const fields = extract(data);
+    if (Object.keys(fields).length === 0) return null;
 
-    const setClauses = cols.map((c, i) => `${c} = $${i + 1}`);
-    setClauses.push('updated_at = NOW()');
-    vals.push(id);
-
-    const r = await query(
-      `UPDATE suspected_keywords SET ${setClauses.join(', ')} WHERE id = $${vals.length} RETURNING *`,
-      vals,
+    fields['updated_at'] = new Date();
+    await db.collection('suspected_keywords').updateOne(
+      { _id: id },
+      { $set: fields }
     );
     this.invalidateCache();
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('suspected_keywords').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   async delete(id: string) {
-    await query('DELETE FROM suspected_keywords WHERE id = $1', [id]);
+    const db = getDb();
+    await db.collection('suspected_keywords').deleteOne({ _id: id });
     this.invalidateCache();
   },
 
   async getActiveKeywords(): Promise<KeywordMatch[]> {
     if (cache) return cache;
-    const r = await query(
-      `SELECT keyword, hazard_type, severity FROM suspected_keywords WHERE status = 'Active'`,
-    );
-    cache = r.rows.map((row: Record<string, unknown>) => ({
+    const db = getDb();
+    const rows = await db.collection('suspected_keywords').find({ status: 'Active' }).toArray();
+    cache = rows.map((row: any) => ({
       keyword: (row.keyword as string).toUpperCase(),
       hazardType: (row.hazard_type as string) || null,
       severity: (row.severity as string) || 'Medium',

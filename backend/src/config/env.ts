@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Backend Environment Config - Validates & Exports .env
 // ============================================================
 // Crashes at startup if a required variable is missing,
@@ -23,7 +23,7 @@ const optional = (key: string, fallback: string): string =>
 export const env = {
   PORT:         Number(optional('PORT', '8000')),
   NODE_ENV:     optional('NODE_ENV', 'development') as 'development' | 'production' | 'test',
-  DATABASE_URL: required('DATABASE_URL'),
+  MONGODB_URI:  required('MONGODB_URI'),
   JWT_SECRET:   required('JWT_SECRET'),
   JWT_EXPIRES_IN: optional('JWT_EXPIRES_IN', '7d'),
   CORS_ORIGIN:  optional('CORS_ORIGIN', 'http://localhost:5173'),

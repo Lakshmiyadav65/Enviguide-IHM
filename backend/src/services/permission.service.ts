@@ -1,6 +1,4 @@
-// -- Permissions / Rights Service ---------------------------
-// Manages the permission-node tree and per-user / per-role grants.
-import { query } from '../config/database.js';
+import { getDb, getClient } from '../config/database.js';
 
 interface NodeRow {
   id: string;
@@ -29,7 +27,6 @@ function buildTree(rows: NodeRow[]): PermissionNode[] {
     if (parent) parent.children!.push(node);
     else roots.push(node);
   }
-  // Strip empty children arrays + parent_id helpers before returning.
   const strip = (nodes: InternalNode[]) => {
     for (const n of nodes) {
       delete (n as { parent_id?: string | null }).parent_id;
@@ -44,92 +41,118 @@ function buildTree(rows: NodeRow[]): PermissionNode[] {
 export const PermissionService = {
   /** List all nodes as a hierarchical tree */
   async listNodes(): Promise<PermissionNode[]> {
-    const r = await query(
-      `SELECT id, label, parent_id, sort_order FROM permission_nodes
-       ORDER BY sort_order ASC, label ASC`,
-    );
-    return buildTree(r.rows as NodeRow[]);
+    const db = getDb();
+    const rows = await db.collection('permission_nodes')
+      .find({})
+      .sort({ sort_order: 1, label: 1 })
+      .toArray();
+
+    const nodeRows = rows.map((r) => ({
+      id: r._id as string,
+      label: r.label as string,
+      parent_id: r.parent_id as string | null,
+      sort_order: r.sort_order as number,
+    }));
+
+    return buildTree(nodeRows);
   },
 
   /** Upsert a permission node (id stable — e.g. 'ship_view') */
   async upsertNode(id: string, label: string, parentId: string | null = null, sortOrder = 0) {
-    await query(
-      `INSERT INTO permission_nodes (id, label, parent_id, sort_order)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label,
-         parent_id = EXCLUDED.parent_id, sort_order = EXCLUDED.sort_order`,
-      [id, label, parentId, sortOrder],
+    const db = getDb();
+    await db.collection('permission_nodes').updateOne(
+      { _id: id },
+      { $set: { label, parent_id: parentId, sort_order: sortOrder } },
+      { upsert: true }
     );
   },
 
   async deleteNode(id: string) {
-    await query('DELETE FROM permission_nodes WHERE id = $1', [id]);
+    const db = getDb();
+    await db.collection('permission_nodes').deleteOne({ _id: id });
   },
 
   /** Get flat list of node ids granted to a user */
   async getUserPermissions(userId: string): Promise<string[]> {
-    const r = await query(
-      `SELECT node_id FROM user_permissions WHERE user_id = $1`,
-      [userId],
-    );
-    return (r.rows as Array<{ node_id: string }>).map((x) => x.node_id);
+    const db = getDb();
+    const cursor = db.collection('user_permissions').find({ user_id: userId });
+    const rows = await cursor.toArray();
+    return rows.map((x) => x.node_id as string);
   },
 
   /** Replace a user's permission set with the given list (atomic) */
   async setUserPermissions(userId: string, nodeIds: string[]) {
-    await query('BEGIN');
+    const client = getClient();
+    const session = client.startSession();
     try {
-      await query('DELETE FROM user_permissions WHERE user_id = $1', [userId]);
+      session.startTransaction();
+      const db = getDb();
+      await db.collection('user_permissions').deleteMany({ user_id: userId }, { session });
       if (nodeIds.length > 0) {
-        const values = nodeIds.map((_, i) => `($1, $${i + 2})`).join(', ');
-        await query(
-          `INSERT INTO user_permissions (user_id, node_id) VALUES ${values}
-           ON CONFLICT DO NOTHING`,
-          [userId, ...nodeIds],
-        );
+        const docs = nodeIds.map((nodeId) => ({ user_id: userId, node_id: nodeId }));
+        // Insert with ignore duplicates if any node_id matches
+        try {
+          await db.collection('user_permissions').insertMany(docs, { session, ordered: false });
+        } catch (err: any) {
+          // ignore duplicate key error
+          if (!err.message.includes('E11000')) {
+            throw err;
+          }
+        }
       }
-      await query('COMMIT');
+      await session.commitTransaction();
     } catch (err) {
-      await query('ROLLBACK');
+      await session.abortTransaction();
       throw err;
+    } finally {
+      await session.endSession();
     }
   },
 
   /** Get flat list of node ids granted to a role */
   async getRolePermissions(roleName: string): Promise<string[]> {
-    const r = await query(
-      `SELECT node_id FROM role_permissions WHERE role_name = $1`,
-      [roleName],
-    );
-    return (r.rows as Array<{ node_id: string }>).map((x) => x.node_id);
+    const db = getDb();
+    const cursor = db.collection('role_permissions').find({ role_name: roleName });
+    const rows = await cursor.toArray();
+    return rows.map((x) => x.node_id as string);
   },
 
   /** Replace a role's permission set with the given list (atomic) */
   async setRolePermissions(roleName: string, nodeIds: string[]) {
-    await query('BEGIN');
+    const client = getClient();
+    const session = client.startSession();
     try {
-      await query('DELETE FROM role_permissions WHERE role_name = $1', [roleName]);
+      session.startTransaction();
+      const db = getDb();
+      await db.collection('role_permissions').deleteMany({ role_name: roleName }, { session });
       if (nodeIds.length > 0) {
-        const values = nodeIds.map((_, i) => `($1, $${i + 2})`).join(', ');
-        await query(
-          `INSERT INTO role_permissions (role_name, node_id) VALUES ${values}
-           ON CONFLICT DO NOTHING`,
-          [roleName, ...nodeIds],
-        );
+        const docs = nodeIds.map((nodeId) => ({ role_name: roleName, node_id: nodeId }));
+        try {
+          await db.collection('role_permissions').insertMany(docs, { session, ordered: false });
+        } catch (err: any) {
+          if (!err.message.includes('E11000')) {
+            throw err;
+          }
+        }
       }
-      await query('COMMIT');
+      await session.commitTransaction();
     } catch (err) {
-      await query('ROLLBACK');
+      await session.abortTransaction();
       throw err;
+    } finally {
+      await session.endSession();
     }
   },
 
   async listRoles(): Promise<string[]> {
-    const r = await query(
-      `SELECT DISTINCT role_name FROM role_permissions
-       UNION SELECT DISTINCT role_name FROM users WHERE role_name IS NOT NULL
-       ORDER BY 1 ASC`,
-    );
-    return (r.rows as Array<{ role_name: string }>).map((x) => x.role_name);
+    const db = getDb();
+    
+    // Distinct from role_permissions
+    const rolePerms = await db.collection('role_permissions').distinct('role_name');
+    // Distinct from users
+    const usersRoles = await db.collection('users').distinct('role_name', { role_name: { $ne: null } });
+
+    const rolesSet = new Set<string>([...rolePerms, ...usersRoles]);
+    return Array.from(rolesSet).sort();
   },
 };

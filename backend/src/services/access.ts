@@ -12,7 +12,7 @@
 // We cache the lookup for 60 seconds per user so we don't hit the
 // users table on every request inside a hot endpoint.
 
-import { query } from '../config/database.js';
+import { getDb } from '../config/database.js';
 
 const TTL_MS = 60_000;
 type CacheEntry = { isAdmin: boolean; expires: number };
@@ -25,11 +25,12 @@ export async function isUserAdmin(userId: string | undefined | null): Promise<bo
   const hit = cache.get(userId);
   if (hit && hit.expires > now) return hit.isAdmin;
 
-  const r = await query(
-    `SELECT category FROM users WHERE id = $1 LIMIT 1`,
-    [userId],
-  );
-  const row = r.rows[0] as { category?: string } | undefined;
+  const db = getDb();
+  const row = await db.collection('users').findOne(
+    { _id: userId },
+    { projection: { category: 1 } }
+  ) as { category?: string } | null;
+
   const isAdmin = !!row && String(row.category ?? '').toLowerCase() === 'admin';
   cache.set(userId, { isAdmin, expires: now + TTL_MS });
   return isAdmin;

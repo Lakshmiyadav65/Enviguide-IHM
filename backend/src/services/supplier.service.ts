@@ -1,5 +1,5 @@
-// -- Suppliers Service --------------------------------------
-import { query } from '../config/database.js';
+import crypto from 'crypto';
+import { getDb } from '../config/database.js';
 
 const FIELD_MAP: Record<string, string> = {
   name: 'name',
@@ -18,75 +18,91 @@ REVERSE['id'] = 'id';
 REVERSE['created_at'] = 'createdAt';
 REVERSE['updated_at'] = 'updatedAt';
 
-function toApi(row: Record<string, unknown>) {
+function toApi(row: any) {
+  if (!row) return null;
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) out[REVERSE[k] || k] = v;
+  for (const [k, v] of Object.entries(row)) {
+    if (k === '_id') {
+      out['id'] = v;
+    } else {
+      out[REVERSE[k] || k] = v;
+    }
+  }
   return out;
 }
 
 function extract(data: Record<string, unknown>) {
-  const cols: string[] = [];
-  const vals: unknown[] = [];
+  const fields: Record<string, unknown> = {};
   for (const [c, s] of Object.entries(FIELD_MAP)) {
     if (c in data && data[c] !== undefined) {
-      cols.push(s);
-      vals.push(data[c]);
+      fields[s] = data[c];
     }
   }
-  return { cols, vals };
+  return fields;
 }
 
 export const SupplierService = {
   async list(filters?: { category?: string; location?: string; search?: string }) {
-    let sql = `SELECT * FROM suppliers WHERE 1=1`;
-    const params: unknown[] = [];
-    let i = 1;
+    const db = getDb();
+    const query: any = {};
 
-    if (filters?.category) { sql += ` AND category = $${i++}`; params.push(filters.category); }
-    if (filters?.location) { sql += ` AND location = $${i++}`; params.push(filters.location); }
+    if (filters?.category) {
+      query.category = filters.category;
+    }
+    if (filters?.location) {
+      query.location = filters.location;
+    }
     if (filters?.search) {
-      sql += ` AND (name ILIKE $${i} OR category ILIKE $${i} OR location ILIKE $${i})`;
-      params.push(`%${filters.search}%`);
-      i++;
+      const regex = { $regex: filters.search, $options: 'i' };
+      query.$or = [
+        { name: regex },
+        { category: regex },
+        { location: regex }
+      ];
     }
 
-    sql += ' ORDER BY name ASC';
-    const r = await query(sql, params);
-    return r.rows.map((row: Record<string, unknown>) => toApi(row));
+    const rows = await db.collection('suppliers').find(query).sort({ name: 1 }).toArray();
+    return rows.map(toApi);
   },
 
   async getById(id: string) {
-    const r = await query('SELECT * FROM suppliers WHERE id = $1', [id]);
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const db = getDb();
+    const doc = await db.collection('suppliers').findOne({ _id: id });
+    return doc ? toApi(doc) : null;
   },
 
   async create(data: Record<string, unknown>) {
     if (!data.name) throw new Error('name is required');
-    const { cols, vals } = extract(data);
-    const ph = vals.map((_, i) => `$${i + 1}`).join(', ');
-    const r = await query(
-      `INSERT INTO suppliers (${cols.join(', ')}) VALUES (${ph}) RETURNING *`,
-      vals,
-    );
-    return toApi(r.rows[0] as Record<string, unknown>);
+    const db = getDb();
+    const fields = extract(data);
+    fields['created_at'] = new Date();
+    fields['updated_at'] = new Date();
+    const _id = crypto.randomUUID();
+
+    await db.collection('suppliers').insertOne({
+      _id,
+      ...fields
+    });
+    const created = await db.collection('suppliers').findOne({ _id });
+    return toApi(created);
   },
 
   async update(id: string, data: Record<string, unknown>) {
-    const { cols, vals } = extract(data);
-    if (cols.length === 0) return null;
+    const db = getDb();
+    const fields = extract(data);
+    if (Object.keys(fields).length === 0) return null;
 
-    const setClauses = cols.map((c, i) => `${c} = $${i + 1}`);
-    setClauses.push('updated_at = NOW()');
-    vals.push(id);
-
-    const r = await query(
-      `UPDATE suppliers SET ${setClauses.join(', ')} WHERE id = $${vals.length} RETURNING *`,
-      vals,
+    fields['updated_at'] = new Date();
+    await db.collection('suppliers').updateOne(
+      { _id: id },
+      { $set: fields }
     );
-    return r.rows[0] ? toApi(r.rows[0] as Record<string, unknown>) : null;
+    const updated = await db.collection('suppliers').findOne({ _id: id });
+    return updated ? toApi(updated) : null;
   },
 
   async delete(id: string) {
-    await query('DELETE FROM suppliers WHERE id = $1', [id]);
+    const db = getDb();
+    await db.collection('suppliers').deleteOne({ _id: id });
   },
 };
