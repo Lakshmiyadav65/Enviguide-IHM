@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
     Search, Plus, Check, ShieldCheck, BarChart2, ShoppingCart, Layers,
@@ -364,7 +364,7 @@ export default function Vessels() {
         if (!vId) { setQuarterlyTimeline([]); return; }
         let cancelled = false;
         setQuarterlyLoading(true);
-        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+        const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
         const token = localStorage.getItem('ihm_token') || '';
         fetch(`${base}/vessels/${vId}/reports/quarterly/timeline`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -390,7 +390,7 @@ export default function Vessels() {
         // first so the post-generate row is included.
         if (generatingStandard !== null) return;
         let cancelled = false;
-        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+        const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
         const token = localStorage.getItem('ihm_token') || '';
         fetch(`${base}/vessels/${vId}/reports`, {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -1074,7 +1074,7 @@ export default function Vessels() {
                     const type = backendType(catId, itemId);
                     setGeneratingStandard(itemId);
                     try {
-                        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+                        const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
                         const url = `${base}/vessels/${vId}/reports/${type}/download`;
                         const token = localStorage.getItem('ihm_token') || '';
                         const res = await fetch(url, {
@@ -1113,7 +1113,7 @@ export default function Vessels() {
                     if (!vId) return;
                     setGeneratingQuarter(entry.period.label);
                     try {
-                        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+                        const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
                         const params = new URLSearchParams({
                             periodLabel: entry.period.label,
                             periodStart: entry.period.start.slice(0, 10),
@@ -1152,7 +1152,7 @@ export default function Vessels() {
                     const vId = activeVesselData?.id;
                     if (!vId) return;
                     try {
-                        const base = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/+$/, '');
+                        const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
                         const url = `${base}/vessels/${vId}/reports/file/${reportId}`;
                         const token = localStorage.getItem('ihm_token') || '';
                         const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
