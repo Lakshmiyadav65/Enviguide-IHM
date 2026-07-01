@@ -76,6 +76,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
     const [showAllMaterials, setShowAllMaterials] = useState(false);
     const [hoveredMaterial, setHoveredMaterial] = useState<{ id: string, pin: { x: number, y: number }, deckId: string } | null>(null);
     const [planToDeleteId, setPlanToDeleteId] = useState<string | null>(null);
+    const [deckToDelete, setDeckToDelete] = useState<{ id: string; planId: string } | null>(null);
 
     const [mappedSections, setMappedSections] = useState<MappedSection[]>(() => {
         const saved = localStorage.getItem(`vessel_sections_${vesselName}`);
@@ -685,8 +686,13 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
         setPlanToDeleteId(null);
     };
 
-    const removeDeck = async (deckId: string, planId: string) => {
-        if (!window.confirm("Are you sure you want to delete this deck? This will delete all material logs associated with this deck.")) return;
+    const removeDeck = (deckId: string, planId: string) => {
+        setDeckToDelete({ id: deckId, planId });
+    };
+
+    const confirmRemoveDeck = async () => {
+        if (!deckToDelete) return;
+        const { id: deckId, planId } = deckToDelete;
         if (vesselId && planId) {
             try {
                 await api.delete(ENDPOINTS.DECK_AREAS.DETAIL(vesselId, planId, deckId));
@@ -697,6 +703,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
         const newSections = mappedSections.filter(s => s.id !== deckId);
         localStorage.setItem(`vessel_sections_${vesselName}`, JSON.stringify(newSections));
         setMappedSections(newSections);
+        setDeckToDelete(null);
     };
 
     const toggleExpand = (id: string) => {
@@ -1231,6 +1238,27 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                 CANCEL
                             </button>
                             <button className="custom-confirm-btn delete" onClick={() => confirmRemovePlan(planToDeleteId)}>
+                                DELETE
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {deckToDelete && (
+                <div className="custom-confirm-overlay">
+                    <div className="custom-confirm-card">
+                        <div className="custom-confirm-icon delete">
+                            <Trash2 size={32} />
+                        </div>
+                        <h3 className="custom-confirm-title">Delete Active Deck</h3>
+                        <p className="custom-confirm-message">
+                            Are you sure you want to delete this deck? This will delete all material logs associated with this deck.
+                        </p>
+                        <div className="custom-confirm-actions">
+                            <button className="custom-confirm-btn cancel" onClick={() => setDeckToDelete(null)}>
+                                CANCEL
+                            </button>
+                            <button className="custom-confirm-btn delete" onClick={confirmRemoveDeck}>
                                 DELETE
                             </button>
                         </div>
