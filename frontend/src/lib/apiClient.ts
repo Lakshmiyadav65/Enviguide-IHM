@@ -62,6 +62,13 @@ export async function httpClient<T>(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      if (response.status === 401 && !path.includes('/auth/login')) {
+        localStorage.removeItem('ihm_token');
+        localStorage.removeItem('ihm_user');
+        window.location.href = '/';
+        throw new ApiError(401, 'Session expired. Redirecting to login...');
+      }
+
       const body = await response.json().catch(() => ({ message: response.statusText })) as Record<string, unknown>;
       const message = (body.error as Record<string, unknown>)?.message as string
         || body.message as string

@@ -92,7 +92,7 @@ export default function Users() {
             })
             .catch((err) => {
                 console.error('Failed to load users:', err);
-                setError('Failed to retrieve users. Please verify your connection.');
+                setError(err.message || 'Failed to retrieve users. Please verify your connection.');
             })
             .finally(() => setLoading(false));
     };
