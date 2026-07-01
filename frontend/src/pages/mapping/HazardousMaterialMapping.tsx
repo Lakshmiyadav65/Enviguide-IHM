@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
     LayoutGrid,
@@ -247,6 +247,7 @@ export default function HazardousMaterialMapping() {
 
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [viewingMaterial, setViewingMaterial] = useState<MaterialEntry | null>(null);
+    const [validationError, setValidationError] = useState<string | null>(null);
 
     // Initial mode check and focus on crop
     useEffect(() => {
@@ -397,6 +398,7 @@ export default function HazardousMaterialMapping() {
 
 
     const resetFormAfterCreate = () => {
+        setValidationError(null);
         setTempPin(null);
         setFormData({
             avoidUpdation: false,
@@ -428,12 +430,12 @@ export default function HazardousMaterialMapping() {
 
     const handleAddMaterial = async () => {
         if (!tempPin) {
-            alert("Please drop a pin on the deck plan first.");
+            setValidationError("Please drop a pin on the deck plan first.");
             return;
         }
 
         if (!formData.name || !formData.ihmPart || formData.hazMaterials.length === 0) {
-            alert("Please fill in all required fields (Name, IHM Part, and Hazardous Materials).");
+            setValidationError("Please fill in all required fields (Name, IHM Part, and Hazardous Materials).");
             return;
         }
 
@@ -453,7 +455,7 @@ export default function HazardousMaterialMapping() {
                 resetFormAfterCreate();
             } catch (err) {
                 console.error('Failed to create material:', err);
-                alert('Could not save the material. Please try again.');
+                setValidationError('Could not save the material. Please try again.');
             }
             return;
         }
@@ -728,7 +730,7 @@ export default function HazardousMaterialMapping() {
                             <div className="material-detail-panel-v5" style={{ padding: '0', background: '#F8FAFC' }}>
                                 <div style={{ padding: '16px 16px 0 16px' }}>
                                     <button
-                                        onClick={() => { setViewingMaterial(null); setViewMode('list'); }}
+                                        onClick={() => { setViewingMaterial(null); setViewMode('list'); setValidationError(null); }}
                                         className="back-btn-v5"
                                         style={{ width: 'auto', padding: '6px 12px', fontSize: '12px', height: '32px' }}
                                     >
@@ -736,6 +738,15 @@ export default function HazardousMaterialMapping() {
                                     </button>
                                 </div>
                                 <div className="detail-card-premium">
+                                    {validationError && (
+                                        <div className="form-validation-error-card" style={{ marginBottom: '16px' }}>
+                                            <span className="error-card-icon">⚠️</span>
+                                            <div className="error-card-content">
+                                                <p>{validationError}</p>
+                                            </div>
+                                            <button className="error-card-close" onClick={() => setValidationError(null)}>×</button>
+                                        </div>
+                                    )}
                                     <div className="detail-header-row">
                                         <div className="dh-left">
                                             <div className="dh-icon-box">
@@ -758,13 +769,14 @@ export default function HazardousMaterialMapping() {
                                                 key={`ihm-${viewingMaterial.id}`}
                                                 type="text"
                                                 className="df-input"
-                                                defaultValue={viewingMaterial.ihmPartNumber || ''}
+                                                value={viewingMaterial.ihmPartNumber || ''}
+                                                onChange={e => setViewingMaterial({ ...viewingMaterial, ihmPartNumber: e.target.value })}
                                                 placeholder="e.g. IHM-CAD-P4022"
                                             />
                                         </div>
                                         <div className="df-group">
                                             <label>LOCATION ON SHIP</label>
-                                            <div className="custom-select-v2 deck-selector-field" onClick={() => setDeckSelectorOpen(!deckSelectorOpen)} style={{ background: '#F8FAFC', padding: '8px 12px', height: 'auto', minHeight: '38px', position: 'relative' }}>
+                                            <div className="df-input deck-selector-field" onClick={() => setDeckSelectorOpen(!deckSelectorOpen)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '38px', position: 'relative', border: '1px solid #E2E8F0', borderRadius: '6px', background: '#F8FAFC', padding: '8px 12px', boxSizing: 'border-box' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                                                     {/* Show target deck if selected, else current */}
                                                     <span>{targetDeckForTransfer || viewingMaterial.deckPlan || sectionName}</span>
@@ -794,7 +806,8 @@ export default function HazardousMaterialMapping() {
                                         <textarea
                                             key={`mfr-${viewingMaterial.id}`}
                                             className="df-textarea"
-                                            defaultValue={viewingMaterial.manufacturer || ''}
+                                            value={viewingMaterial.manufacturer || ''}
+                                            onChange={e => setViewingMaterial({ ...viewingMaterial, manufacturer: e.target.value })}
                                             placeholder="e.g. Maritime Component Solutions Ltd."
                                         />
                                     </div>
@@ -859,7 +872,7 @@ export default function HazardousMaterialMapping() {
                                     </div>
 
                                     <div className="detail-actions-footer">
-                                        <button className="hm-mapping-btn cancel" onClick={() => { setViewingMaterial(null); setViewMode('list'); }}>CANCEL</button>
+                                        <button className="hm-mapping-btn cancel" onClick={() => { setViewingMaterial(null); setViewMode('list'); setValidationError(null); }}>CANCEL</button>
                                         <button className="hm-mapping-btn save" onClick={async () => {
                                             if (targetDeckForTransfer) {
                                                 const deck = availableDecks.find(d => (d.title || d.sectionName) === targetDeckForTransfer);
@@ -899,7 +912,7 @@ export default function HazardousMaterialMapping() {
                                                     );
                                                 } catch (err) {
                                                     console.error('Failed to update material:', err);
-                                                    alert('Could not save changes. Please try again.');
+                                                    setValidationError('Could not save changes. Please try again.');
                                                     return;
                                                 }
                                             }
@@ -916,6 +929,16 @@ export default function HazardousMaterialMapping() {
                                 </div>
 
                                 <div className="form-content-v5">
+                                    {validationError && (
+                                        <div className="form-validation-error-card">
+                                            <span className="error-card-icon">⚠️</span>
+                                            <div className="error-card-content">
+                                                <p>{validationError}</p>
+                                            </div>
+                                            <button className="error-card-close" onClick={() => setValidationError(null)}>×</button>
+                                        </div>
+                                    )}
+
                                     {activeTool === 'pin' && !tempPin && (
                                         <div className="drop-pin-alert">
                                             <MapPin size={16} />

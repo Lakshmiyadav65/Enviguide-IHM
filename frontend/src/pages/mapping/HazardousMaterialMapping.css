@@ -1211,6 +1211,9 @@
     color: #64748B;
     letter-spacing: 0.5px;
     text-transform: uppercase;
+    min-height: 28px;
+    display: flex;
+    align-items: flex-end;
 }
 
 .req {
@@ -2429,4 +2432,49 @@
 
 .date-icon-abs {
     transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Custom Form Validation Error Card */
+.form-validation-error-card {
+    background: #FEF3F2;
+    border: 1px solid #FDA29B;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.error-card-icon {
+    font-size: 16px;
+}
+
+.error-card-content {
+    flex: 1;
+}
+
+.error-card-content p {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #B42318;
+    text-transform: none; /* Do not capitalize the error message! */
+}
+
+.error-card-close {
+    background: transparent;
+    border: none;
+    font-size: 18px;
+    color: #FDA29B;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    transition: color 0.2s;
+}
+
+.error-card-close:hover {
+    color: #B42318;
 }
