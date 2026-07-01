@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Auth Middleware - JWT Verification
 // ============================================================
 
@@ -6,6 +6,8 @@ import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { createError } from './errorHandler.js';
+
+import { logger } from '../utils/logger.js';
 
 export interface AuthPayload {
   userId: string;
@@ -33,7 +35,8 @@ export function authenticate(req: Request, _res: Response, next: NextFunction): 
     const payload = jwt.verify(token, env.JWT_SECRET) as AuthPayload;
     req.user = payload;
     next();
-  } catch {
+  } catch (err: any) {
+    logger.error(`JWT verification failed: ${err.message}. Token: ${token ? token.substring(0, 15) : 'none'}...`);
     next(createError('Invalid or expired token', 401));
   }
 }
