@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
     Upload,
     Plus,
@@ -8,7 +8,6 @@ import {
     Compass,
     Layers,
     FileText,
-    Settings,
     ExternalLink,
     Pencil
 } from 'lucide-react';
@@ -682,6 +681,20 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
         setMappedSections(prev => prev.filter(section => section.planId !== id));
     };
 
+    const removeDeck = async (deckId: string, planId: string) => {
+        if (!window.confirm("Are you sure you want to delete this deck? This will delete all material logs associated with this deck.")) return;
+        if (vesselId && planId) {
+            try {
+                await api.delete(ENDPOINTS.DECK_AREAS.DETAIL(vesselId, planId, deckId));
+            } catch (err) {
+                console.error('Failed to delete deck from backend:', err);
+            }
+        }
+        const newSections = mappedSections.filter(s => s.id !== deckId);
+        localStorage.setItem(`vessel_sections_${vesselName}`, JSON.stringify(newSections));
+        setMappedSections(newSections);
+    };
+
     const toggleExpand = (id: string) => {
         setExpandedDeckId(expandedDeckId === id ? null : id);
         setShowAllMaterials(false);
@@ -788,20 +801,26 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                 fileUrl={activePlan.url}
                 onClose={() => {
                     setIsViewerOpen(false);
-                    // Reload sections from localStorage when viewer closes
-                    const savedSections = localStorage.getItem(`vessel_sections_${vesselName}`);
-                    if (savedSections) {
-                        try {
-                            const parsed = JSON.parse(savedSections);
-                            setMappedSections(parsed);
-                        } catch (e) {
-                            console.error('Failed to parse saved sections:', e);
+                    if (vesselId) {
+                        reloadFromBackend();
+                    } else {
+                        // Reload sections from localStorage when viewer closes
+                        const savedSections = localStorage.getItem(`vessel_sections_${vesselName}`);
+                        if (savedSections) {
+                            try {
+                                const parsed = JSON.parse(savedSections);
+                                setMappedSections(parsed);
+                            } catch (e) {
+                                console.error('Failed to parse saved sections:', e);
+                            }
                         }
                     }
                 }}
                 mappedSections={mappedSections}
                 onUpdateSections={setMappedSections as any}
                 vesselName={vesselName}
+                vesselId={vesselId}
+                gaPlanId={activePlanId || undefined}
             />
         );
     }
@@ -856,53 +875,56 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                 </div>
 
                 {(uploadedPlans.length > 0) && (
-                    <div className={`uploaded-plans-container ${uploadedPlans.length > 2 ? 'has-multiple' : ''}`}>
-                        {uploadedPlans.length > 2 && (
-                            <div className="plans-summary-badge">
-                                <FileText size={16} />
-                                <span>You have <strong>{uploadedPlans.length} plans</strong> uploaded</span>
-                                <ChevronDown size={16} className="summary-chevron" />
-                            </div>
-                        )}
-
+                    <div className="uploaded-plans-container">
                         <div className="uploaded-plans-list">
-                            {uploadedPlans.map(plan => (
-                                <div
-                                    key={plan.id}
-                                    className={`plan-item-row ${activePlanId === plan.id ? 'active' : ''}`}
-                                    onClick={() => setActivePlanId(plan.id)}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    <div className="plan-name-info">
-                                        <FileText size={16} className="plan-icon" />
-                                        <div className="plan-text-meta">
-                                            <span className="plan-filename">{plan.name}</span>
-                                            <span className="plan-date">Uploaded on {plan.date}</span>
+                            {uploadedPlans.map(plan => {
+                                const isPdfPlan = plan.url.toLowerCase().endsWith('.pdf') || plan.name.toLowerCase().endsWith('.pdf');
+                                return (
+                                    <div
+                                        key={plan.id}
+                                        className={`plan-preview-card ${activePlanId === plan.id ? 'active' : ''}`}
+                                        onClick={() => setActivePlanId(plan.id)}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <div className="plan-preview-thumbnail-box">
+                                            {isPdfPlan ? (
+                                                <div className="pdf-thumbnail-placeholder">
+                                                    <FileText size={32} color="#94A3B8" />
+                                                    <span className="pdf-label-txt">PDF Document</span>
+                                                </div>
+                                            ) : (
+                                                <img src={plan.url} alt={plan.name} className="plan-thumbnail-image" />
+                                            )}
+                                        </div>
+                                        <div className="plan-card-footer">
+                                            <div className="plan-card-meta">
+                                                <span className="plan-card-name" title={plan.name}>{plan.name}</span>
+                                                <span className="plan-card-date">Uploaded on {plan.date}</span>
+                                            </div>
+                                            <div className="plan-card-actions">
+                                                <button
+                                                    className="open-full-viewer-btn-premium"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
+                                                        window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false`, '_blank');
+                                                    }}
+                                                >
+                                                    <ExternalLink size={14} />
+                                                    <span>VIEW PLAN</span>
+                                                </button>
+                                                <button
+                                                    className="plan-action-btn-refined delete"
+                                                    onClick={(e) => { e.stopPropagation(); removePlan(plan.id); }}
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="plan-row-actions">
-                                        <button className="plan-action-btn-refined" title="Settings">
-                                            <Settings size={18} />
-                                        </button>
-                                        <button className="plan-action-btn-refined delete" onClick={(e) => { e.stopPropagation(); removePlan(plan.id); }} title="Delete">
-                                            <Trash2 size={18} />
-                                        </button>
-                                        <button
-                                            className="open-full-viewer-btn-premium"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                {
-    const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
-    window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false`, '_blank');
-}
-                                            }}
-                                        >
-                                            <ExternalLink size={14} />
-                                            VIEW PLAN
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -1075,7 +1097,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                                     <button className="deck-action-icn-btn" onClick={(e) => { e.stopPropagation(); openMapping(deck, 'edit'); }} title="Edit Mapping">
                                                         <Pencil size={16} />
                                                     </button>
-                                                    <button className="deck-action-icn-btn" onClick={(e) => { e.stopPropagation(); setMappedSections(prev => prev.filter(s => s.id !== deck.id)); }} title="Delete Deck">
+                                                    <button className="deck-action-icn-btn" onClick={(e) => { e.stopPropagation(); removeDeck(deck.id, deck.planId || activePlanId || ''); }} title="Delete Deck">
                                                         <Trash2 size={16} />
                                                     </button>
                                                     <div className="action-icon-btn" onClick={() => toggleExpand(deck.id)}>
