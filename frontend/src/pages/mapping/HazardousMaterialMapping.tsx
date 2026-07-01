@@ -208,9 +208,12 @@ export default function HazardousMaterialMapping() {
             // Clear navigation state to prevent re-triggering on refresh
             window.history.replaceState({}, document.title);
 
-            // Professional Guidance Alert
             setTimeout(() => {
-                alert(`RE-MAPPING INITIATED: ${transfer.name}\n\nTechnical details have been pre-filled. Please click on the plan to set the new location for this material on ${sectionName}.`);
+                setBannerMessage({
+                    title: `RE-MAPPING INITIATED: ${transfer.name}`,
+                    body: `Technical details have been pre-filled. Please click on the plan to set the new location for this material on ${sectionName}.`,
+                    type: 'info'
+                });
             }, 600);
         }
     }, [location.state, sectionName]);
@@ -248,6 +251,7 @@ export default function HazardousMaterialMapping() {
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
     const [viewingMaterial, setViewingMaterial] = useState<MaterialEntry | null>(null);
     const [validationError, setValidationError] = useState<string | null>(null);
+    const [bannerMessage, setBannerMessage] = useState<{ title: string; body: string; type: 'info' | 'error' } | null>(null);
 
     // Initial mode check and focus on crop
     useEffect(() => {
@@ -1375,6 +1379,20 @@ export default function HazardousMaterialMapping() {
                 </div>
 
             </footer>
+            {bannerMessage && (
+                <div className="custom-banner-overlay">
+                    <div className={`custom-banner-card ${bannerMessage.type}`}>
+                        <div className={`custom-banner-icon ${bannerMessage.type}`}>
+                            {bannerMessage.type === 'info' ? <Ship size={24} /> : <Flame size={24} />}
+                        </div>
+                        <div className="custom-banner-text">
+                            <h4 className="custom-banner-title">{bannerMessage.title}</h4>
+                            <p className="custom-banner-body">{bannerMessage.body}</p>
+                        </div>
+                        <button className="custom-banner-close" onClick={() => setBannerMessage(null)}>×</button>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }

@@ -80,6 +80,7 @@ export default function Vessels() {
     const [formData, setFormData] = useState<Vessel>(EMPTY_FORM);
     const [showModal, setShowModal] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
+    const [bannerMessage, setBannerMessage] = useState<{ title: string; body: string; type: 'info' | 'error' } | null>(null);
 
     const [selectedDoc, setSelectedDoc] = useState<any>(null);
     const [docToDelete, setDocToDelete] = useState<any>(null);
@@ -492,7 +493,11 @@ export default function Vessels() {
         e.preventDefault();
 
         if (!formData.name || !formData.shipOwner || !formData.imoNumber) {
-            alert('Please fill all required fields (marked with *) before saving.');
+            setBannerMessage({
+                title: 'Required Fields Missing',
+                body: 'Please fill all required fields (marked with *) before saving.',
+                type: 'error'
+            });
             return;
         }
 
@@ -540,7 +545,11 @@ export default function Vessels() {
             }
             setShowModal(true);
         } catch (err) {
-            alert((err as Error).message || 'Failed to save vessel');
+            setBannerMessage({
+                title: 'Error Saving Vessel',
+                body: (err as Error).message || 'Failed to save vessel',
+                type: 'error'
+            });
         }
     };
 
@@ -570,7 +579,11 @@ export default function Vessels() {
         }
 
         if (newDocType === 'Select Document Type') {
-            alert('Please select a document type first');
+            setBannerMessage({
+                title: 'Document Type Required',
+                body: 'Please select a document type first',
+                type: 'error'
+            });
             return;
         }
 
@@ -1067,7 +1080,11 @@ export default function Vessels() {
                 const startGenerate = async (catId: string, itemId: string) => {
                     const vId = activeVesselData?.id;
                     if (!vId) {
-                        alert('This vessel is not backed by the database yet — add it first to generate a report.');
+                        setBannerMessage({
+                            title: 'Database Sync Required',
+                            body: 'This vessel is not backed by the database yet — add it first to generate a report.',
+                            type: 'error'
+                        });
                         return;
                     }
                     if (generatingStandard) return; // already generating something — ignore double-click
@@ -1098,7 +1115,11 @@ export default function Vessels() {
                         setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
                     } catch (err) {
                         console.error('Report generation failed:', err);
-                        alert(`Could not generate the report.\n\n${(err as Error).message}`);
+                        setBannerMessage({
+                            title: 'Generation Failed',
+                            body: `Could not generate the report.\n\n${(err as Error).message}`,
+                            type: 'error'
+                        });
                     } finally {
                         setGeneratingStandard(null);
                     }
@@ -1140,7 +1161,11 @@ export default function Vessels() {
                         setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
                     } catch (err) {
                         console.error('Quarterly report generation failed:', err);
-                        alert(`Could not generate the quarterly report.\n\n${(err as Error).message}`);
+                        setBannerMessage({
+                            title: 'Generation Failed',
+                            body: `Could not generate the quarterly report.\n\n${(err as Error).message}`,
+                            type: 'error'
+                        });
                     } finally {
                         setGeneratingQuarter(null);
                     }
@@ -1168,7 +1193,11 @@ export default function Vessels() {
                         setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
                     } catch (err) {
                         console.error('Cached download failed:', err);
-                        alert(`Could not download the cached report.\n\n${(err as Error).message}`);
+                        setBannerMessage({
+                            title: 'Download Failed',
+                            body: `Could not download the cached report.\n\n${(err as Error).message}`,
+                            type: 'error'
+                        });
                     }
                 };
 
@@ -2034,6 +2063,20 @@ export default function Vessels() {
                         />
                     )
                 }
+                {bannerMessage && (
+                    <div className="custom-banner-overlay">
+                        <div className={`custom-banner-card ${bannerMessage.type}`}>
+                            <div className={`custom-banner-icon ${bannerMessage.type}`}>
+                                {bannerMessage.type === 'info' ? <ShipIcon size={24} /> : <AlertTriangle size={24} />}
+                            </div>
+                            <div className="custom-banner-text">
+                                <h4 className="custom-banner-title">{bannerMessage.title}</h4>
+                                <p className="custom-banner-body">{bannerMessage.body}</p>
+                            </div>
+                            <button className="custom-banner-close" onClick={() => setBannerMessage(null)}>×</button>
+                        </div>
+                    </div>
+                )}
             </main >
         </div >
     );

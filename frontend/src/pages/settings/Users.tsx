@@ -249,7 +249,7 @@ export default function Users() {
     // CSV Download Report generator
     const handleDownloadReport = () => {
         if (filteredUsers.length === 0) {
-            alert('No user records match current filters to export.');
+            setError('No user records match current filters to export.');
             return;
         }
 

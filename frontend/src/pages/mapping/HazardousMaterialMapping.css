@@ -157,6 +157,9 @@
     font-weight: 700;
     color: #64748B;
     text-transform: uppercase;
+    min-height: 28px;
+    display: flex;
+    align-items: flex-end;
 }
 
 .df-input,
@@ -2477,4 +2480,104 @@
 
 .error-card-close:hover {
     color: #B42318;
+}
+
+/* Custom Banner Notification Card */
+.custom-banner-overlay {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    width: 90%;
+    max-width: 500px;
+    animation: slideDownConfirm 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes slideDownConfirm {
+    from {
+        transform: translate(-50%, -20px);
+        opacity: 0;
+    }
+    to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+}
+
+.custom-banner-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.03);
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    position: relative;
+}
+
+.custom-banner-card.info {
+    border-left: 4px solid #00B0FA;
+}
+
+.custom-banner-card.error {
+    border-left: 4px solid #EF4444;
+}
+
+.custom-banner-icon.info {
+    color: #00B0FA;
+    background: #E0F2FE;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.custom-banner-icon.error {
+    color: #EF4444;
+    background: #FEE2E2;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.custom-banner-text {
+    flex: 1;
+}
+
+.custom-banner-title {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #1E293B;
+}
+
+.custom-banner-body {
+    margin: 0;
+    font-size: 13px;
+    color: #64748B;
+    line-height: 1.4;
+}
+
+.custom-banner-close {
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    color: #94A3B8;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+    transition: color 0.2s;
+}
+
+.custom-banner-close:hover {
+    color: #64748B;
 }
