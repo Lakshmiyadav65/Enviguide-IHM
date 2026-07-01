@@ -833,6 +833,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                 vesselId={vesselId}
                 gaPlanId={activePlanId || undefined}
                 allPlans={uploadedPlans}
+                showAllPlansMode={true}
             />
         );
     }

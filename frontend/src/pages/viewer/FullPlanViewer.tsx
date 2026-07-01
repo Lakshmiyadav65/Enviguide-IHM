@@ -69,6 +69,8 @@ export default function FullPlanViewer() {
         return savedPlans ? JSON.parse(savedPlans) : [];
     });
 
+    const showAll = query.get('showAll') === 'true';
+
     return (
         <div style={{ height: '100vh', width: '100vw', overflow: 'hidden' }}>
             <GAPlanViewer
@@ -83,6 +85,7 @@ export default function FullPlanViewer() {
                 gaPlanId={gaPlanId}
                 isIsolationMode={query.get('isolated') === 'true'}
                 allPlans={allPlans}
+                showAllPlansMode={showAll}
             />
         </div>
     );
