@@ -278,22 +278,22 @@ export default function GAPlanViewer({
             // Global Fit: Scale to show entire GA plan
             const viewport = wrapperRef.current.parentElement?.getBoundingClientRect();
             if (viewport) {
-                const imgWidth = 1000;
-                const imgHeight = 1000 / imgAspectRatio;
-                const padding = 1.02; // Minimal 2% padding
-                const scaleX = viewport.width / (imgWidth * padding);
-                const scaleY = viewport.height / (imgHeight * padding);
+                const sheetWidth = wrapperRef.current.offsetWidth || 1000;
+                const sheetHeight = wrapperRef.current.offsetHeight || 700;
+                const padding = 1.05; // 5% padding
+                const scaleX = viewport.width / (sheetWidth * padding);
+                const scaleY = viewport.height / (sheetHeight * padding);
 
                 // Aggressive fit: Fill as much as possible
                 const fitZoom = Math.min(scaleX, scaleY) * 100;
                 setZoom(fitZoom);
                 setOffset({
-                    x: (viewport.width - (imgWidth * fitZoom / 100)) / 2,
-                    y: (viewport.height - (imgHeight * fitZoom / 100)) / 2
+                    x: (viewport.width - (sheetWidth * fitZoom / 100)) / 2,
+                    y: (viewport.height - (sheetHeight * fitZoom / 100)) / 2
                 });
             }
         }
-    }, [localFocusedId, mappedSections.length, fileUrl, vesselName]);
+    }, [localFocusedId, mappedSections.length, fileUrl, vesselName, displayPlans.length]);
 
     // Pan handling
     const [isPanning, setIsPanning] = useState(false);
@@ -632,6 +632,7 @@ export default function GAPlanViewer({
                 >
                     <div
                         className="ga-plan-wrapper"
+                        ref={wrapperRef}
                         style={{
                             transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom / 100}) rotate(${rotation}deg)`,
                             transformOrigin: '0 0',

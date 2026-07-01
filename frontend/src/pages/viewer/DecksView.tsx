@@ -1211,12 +1211,22 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                         </div>
                                     ))}
 
-                                    <div className="add-plan-section-container">
-                                        <button className="add-plan-section-dashed-refined" onClick={() => setIsViewerOpen(true)}>
-                                            <Plus size={20} />
-                                            Add New Plan Section
-                                        </button>
-                                    </div>
+                                    {visibleDecks.length > 0 && (
+                                        <div className="add-plan-section-container">
+                                            <button
+                                                className="add-plan-section-dashed-refined"
+                                                onClick={() => {
+                                                    const plan = uploadedPlans.find(p => p.id === activePlanId) || uploadedPlans[0];
+                                                    if (!plan) return;
+                                                    const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
+                                                    window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false&showAll=true`, '_blank');
+                                                }}
+                                            >
+                                                <Plus size={20} />
+                                                Add New Plan Section
+                                            </button>
+                                        </div>
+                                    )}
                                 </>
                             )}
                         </div>

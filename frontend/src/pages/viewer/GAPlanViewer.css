@@ -68,6 +68,13 @@
     flex-shrink: 0;
 }
 
+.logo-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transform: translateY(2px);
+}
+
 .logo-text h2 {
     font-size: 16px;
     font-weight: 800;
