@@ -48,6 +48,8 @@ export async function httpClient<T>(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout ?? API_CONFIG.TIMEOUT);
 
+  const tokenSent = localStorage.getItem('ihm_token');
+
   try {
     const response = await fetch(buildUrl(path, params), {
       ...fetchOptions,
@@ -63,9 +65,12 @@ export async function httpClient<T>(
 
     if (!response.ok) {
       if (response.status === 401 && !path.includes('/auth/login')) {
-        localStorage.removeItem('ihm_token');
-        localStorage.removeItem('ihm_user');
-        window.location.href = '/';
+        const currentToken = localStorage.getItem('ihm_token');
+        if (currentToken === tokenSent) {
+          localStorage.removeItem('ihm_token');
+          localStorage.removeItem('ihm_user');
+          window.location.href = '/';
+        }
         throw new ApiError(401, 'Session expired. Redirecting to login...');
       }
 

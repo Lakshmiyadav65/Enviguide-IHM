@@ -116,14 +116,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('ihm_token');
     if (!token) return;
 
+    let active = true;
     setIsLoading(true);
     fetchMe(token)
       .catch(() => {
-        localStorage.removeItem('ihm_token');
-        localStorage.removeItem('ihm_user');
-        setUser(null);
+        if (!active) return;
+        const currentToken = localStorage.getItem('ihm_token');
+        if (currentToken === token) {
+          localStorage.removeItem('ihm_token');
+          localStorage.removeItem('ihm_user');
+          setUser(null);
+        }
       })
-      .finally(() => setIsLoading(false));
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [fetchMe]);
 
   const login = useCallback(async (email: string, password: string) => {
