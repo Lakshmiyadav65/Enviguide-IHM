@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import GAPlanViewer from './GAPlanViewer';
 
@@ -64,6 +64,11 @@ export default function FullPlanViewer() {
 
     const focusedId = query.get('focusedId');
 
+    const [allPlans] = useState<any[]>(() => {
+        const savedPlans = localStorage.getItem(`vessel_plans_${vesselName}`);
+        return savedPlans ? JSON.parse(savedPlans) : [];
+    });
+
     return (
         <div style={{ height: '100vh', width: '100vw', overflow: 'hidden' }}>
             <GAPlanViewer
@@ -77,6 +82,7 @@ export default function FullPlanViewer() {
                 vesselId={vesselId}
                 gaPlanId={gaPlanId}
                 isIsolationMode={query.get('isolated') === 'true'}
+                allPlans={allPlans}
             />
         </div>
     );

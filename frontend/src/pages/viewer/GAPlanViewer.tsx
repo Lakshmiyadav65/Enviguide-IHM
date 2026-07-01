@@ -21,9 +21,9 @@ import {
 } from 'lucide-react';
 
 import './GAPlanViewer.css';
-import { PLAN_GENERIC } from '../../assets/ship_plans';
+import { PLAN_GENERIC, PLAN_OCEAN_PIONEER, PLAN_ACOSTA, PLAN_AFIF, PLAN_PACIFIC_HORIZON } from '../../assets/ship_plans';
 import { api } from '../../lib/apiClient';
-import { ENDPOINTS } from '../../config/api.config';
+import { ENDPOINTS, API_CONFIG } from '../../config/api.config';
 
 interface Rect {
     x: number;
@@ -57,6 +57,7 @@ interface GAPlanViewerProps {
     vesselId?: string;
     gaPlanId?: string;
     isIsolationMode?: boolean;
+    allPlans?: any[];
 }
 
 
@@ -70,7 +71,8 @@ export default function GAPlanViewer({
     vesselName,
     vesselId,
     gaPlanId,
-    isIsolationMode = false
+    isIsolationMode = false,
+    allPlans
 }: GAPlanViewerProps) {
     // True when both UUIDs are present — i.e. we're allowed to hit the API.
     const persistEnabled = Boolean(vesselId && gaPlanId);
@@ -93,6 +95,70 @@ export default function GAPlanViewer({
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [activeTool, setActiveTool] = useState<'none' | 'hand' | 'crop'>('none');
     const [localFocusedId, setLocalFocusedId] = useState<string | null>(focusedSectionId || null);
+
+    const [croppingPlanId, setCroppingPlanId] = useState<string>('');
+    const [fetchedPlans, setFetchedPlans] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (allPlans && allPlans.length > 0) {
+            setFetchedPlans(allPlans);
+            return;
+        }
+        if (vesselId) {
+            api.get<{ success: boolean; data: any[] }>(ENDPOINTS.GA_PLANS.LIST(vesselId))
+                .then((res) => {
+                    const plans = (res.data || []).map((p) => {
+                        let filePathStr = String(p.filePath ?? '');
+                        const resolvedUrl = filePathStr ? (filePathStr.startsWith('http') || filePathStr.startsWith('/uploads') ? filePathStr : `${API_CONFIG.BASE_URL}/${filePathStr.replace(/^\/+/, '')}`) : '';
+                        return {
+                            id: String(p.id),
+                            name: String(p.name ?? p.fileName ?? 'GA Plan'),
+                            url: resolvedUrl,
+                            date: typeof p.createdAt === 'string'
+                                ? new Date(p.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                : '',
+                        };
+                    });
+                    setFetchedPlans(plans);
+                })
+                .catch((err) => console.error("Failed to load plans in viewer:", err));
+        } else {
+            // Read plans from localStorage for local/mock mode
+            const localPlansStr = localStorage.getItem(`vessel_plans_${vesselName}`);
+            if (localPlansStr) {
+                try {
+                    const parsed = JSON.parse(localPlansStr);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setFetchedPlans(parsed);
+                        return;
+                    }
+                } catch (e) {
+                    console.error('Failed to parse local plans:', e);
+                }
+            }
+            // Demo mode fallback if not in localStorage
+            const demoVesselsPreviews: Record<string, string> = {
+                'MV Ocean Pioneer': PLAN_OCEAN_PIONEER,
+                'ACOSTA': PLAN_ACOSTA,
+                'AFIF': PLAN_AFIF,
+                'PACIFIC HORIZON': PLAN_PACIFIC_HORIZON
+            };
+            if (vesselName && demoVesselsPreviews[vesselName]) {
+                setFetchedPlans([{
+                    id: 'static-demo-plan-id',
+                    name: 'General Arrangement Plan',
+                    url: demoVesselsPreviews[vesselName],
+                    date: 'Feb 09, 2026'
+                }]);
+            }
+        }
+    }, [vesselId, vesselName, allPlans]);
+
+    const displayPlans = fetchedPlans.length > 0 ? fetchedPlans : [{
+        id: gaPlanId || 'default-plan',
+        name: filename,
+        url: fileUrl,
+    }];
 
     // Sync prop to local state
     useEffect(() => {
@@ -171,7 +237,6 @@ export default function GAPlanViewer({
 
     const canvasRef = useRef<HTMLDivElement>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
-    const isPdf = filename.toLowerCase().endsWith('.pdf');
 
     // Toast state
     const [toast, setToast] = useState<{ title: string; subtitle: string; visible: boolean; type: 'success' | 'error' }>({
@@ -237,15 +302,21 @@ export default function GAPlanViewer({
         }
 
         if (activeTool === 'crop') {
-            const rect = wrapperRef.current?.getBoundingClientRect();
-            if (rect && rect.width > 0) {
-                const scaleFactor = 1000 / rect.width;
-                const x = (e.clientX - rect.left) * scaleFactor;
-                const y = (e.clientY - rect.top) * scaleFactor;
-                setStartPoint({ x, y });
-                setIsDrawing(true);
-                setCurrentSelection(null);
-                setNewSelectionTitle('');
+            const targetContainer = (e.target as HTMLElement).closest('.ga-drawing-coordinate-reference');
+            if (targetContainer) {
+                const planIdAttr = targetContainer.getAttribute('data-plan-id') || '';
+                setCroppingPlanId(planIdAttr);
+
+                const rect = targetContainer.getBoundingClientRect();
+                if (rect && rect.width > 0) {
+                    const scaleFactor = 1000 / rect.width;
+                    const x = (e.clientX - rect.left) * scaleFactor;
+                    const y = (e.clientY - rect.top) * scaleFactor;
+                    setStartPoint({ x, y });
+                    setIsDrawing(true);
+                    setCurrentSelection(null);
+                    setNewSelectionTitle('');
+                }
             }
         }
     };
@@ -259,19 +330,22 @@ export default function GAPlanViewer({
             return;
         }
 
-        if (isDrawing && activeTool === 'crop') {
-            const rect = wrapperRef.current?.getBoundingClientRect();
-            if (rect && rect.width > 0) {
-                const scaleFactor = 1000 / rect.width;
-                const currentX = (e.clientX - rect.left) * scaleFactor;
-                const currentY = (e.clientY - rect.top) * scaleFactor;
+        if (isDrawing && activeTool === 'crop' && croppingPlanId) {
+            const targetContainer = canvasRef.current?.querySelector(`[data-plan-id="${croppingPlanId}"]`);
+            if (targetContainer) {
+                const rect = targetContainer.getBoundingClientRect();
+                if (rect && rect.width > 0) {
+                    const scaleFactor = 1000 / rect.width;
+                    const currentX = (e.clientX - rect.left) * scaleFactor;
+                    const currentY = (e.clientY - rect.top) * scaleFactor;
 
-                setCurrentSelection({
-                    x: Math.min(startPoint.x, currentX),
-                    y: Math.min(startPoint.y, currentY),
-                    width: Math.max(1, Math.abs(currentX - startPoint.x)),
-                    height: Math.max(1, Math.abs(currentY - startPoint.y))
-                });
+                    setCurrentSelection({
+                        x: Math.min(startPoint.x, currentX),
+                        y: Math.min(startPoint.y, currentY),
+                        width: Math.max(1, Math.abs(currentX - startPoint.x)),
+                        height: Math.max(1, Math.abs(currentY - startPoint.y))
+                    });
+                }
             }
         }
     };
@@ -363,10 +437,11 @@ export default function GAPlanViewer({
 
         // Persist to backend when we have real IDs; fall back to a
         // client-generated id otherwise so the demo flow still works.
-        if (persistEnabled && vesselId && gaPlanId) {
+        const targetPlanId = croppingPlanId || gaPlanId || '';
+        if (vesselId && targetPlanId) {
             try {
                 const res = await api.post<{ success: boolean; data: Record<string, unknown> }>(
-                    ENDPOINTS.DECK_AREAS.LIST(vesselId, gaPlanId),
+                    ENDPOINTS.DECK_AREAS.LIST(vesselId, targetPlanId),
                     {
                         name: trimmedTitle,
                         x: currentSelection.x,
@@ -384,7 +459,7 @@ export default function GAPlanViewer({
                     rect: currentSelection,
                     itemsCount: 0,
                     isVisible: true,
-                    planId: gaPlanId || '',
+                    planId: targetPlanId,
                 };
                 executeUpdate([...mappedSections, newSection]);
                 showToast("Deck Saved", `${trimmedTitle} has been saved to the project.`);
@@ -403,7 +478,7 @@ export default function GAPlanViewer({
                 rect: currentSelection,
                 itemsCount: 0,
                 isVisible: true,
-                planId: gaPlanId || '',
+                planId: targetPlanId,
             };
             executeUpdate([...mappedSections, newSection]);
             showToast("Deck Saved Successfully", `${trimmedTitle} has been added to the vessel project`);
@@ -553,124 +628,180 @@ export default function GAPlanViewer({
                         className="ga-plan-wrapper"
                         style={{
                             transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom / 100}) rotate(${rotation}deg)`,
-                            transformOrigin: '0 0'
+                            transformOrigin: '0 0',
+                            display: 'flex',
+                            flexDirection: 'row',
+                            gap: '40px',
+                            padding: '20px',
+                            background: '#0B0F19',
+                            alignItems: 'center'
                         }}
                     >
-
-                        <div
-                            className="ga-drawing-coordinate-reference"
-                            ref={wrapperRef}
-                            style={{
-                                position: 'relative',
-                                width: '1000px',
-                                height: `${1000 / imgAspectRatio}px`,
-                                background: 'transparent'
-                            }}
-                        >
-                            {isPdf ? (
-                                <iframe
-                                    src={`${displayFileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                                    title="GA Plan PDF"
-                                    className="ga-plan-frame"
-                                    style={{ width: '1000px', height: `${1000 / imgAspectRatio}px`, border: 'none', display: 'block' }}
-                                />
-                            ) : (
-                                <img
-                                    src={displayFileUrl}
-                                    alt="GA Plan"
-                                    className="ga-plan-image"
-                                    style={{ width: '1000px', height: 'auto', display: 'block' }}
-                                    draggable={false}
-                                    onLoad={(e) => {
-                                        const { naturalWidth, naturalHeight } = e.currentTarget;
-                                        if (naturalWidth && naturalHeight) {
-                                            setImgAspectRatio(naturalWidth / naturalHeight);
-                                        }
-                                    }}
-                                />
-                            )}
-
-                            {mappedSections.map(section => (
-                                // Use isIsolationMode to hide other sections when enabled, 
-                                // otherwise show all mapped sections
-                                (!section.planId || !gaPlanId || section.planId === gaPlanId) &&
-                                ((isIsolationMode && localFocusedId) ? section.id === localFocusedId : section.isVisible) && (
-                                    <div
-                                        key={section.id}
-                                        className="drawn-selection"
-                                        style={{
-                                            left: section.rect.x,
-                                            top: section.rect.y,
-                                            width: section.rect.width,
-                                            height: section.rect.height,
-                                            background: (localFocusedId === section.id || (activeTool === 'none' && !localFocusedId)) ? 'rgba(0, 176, 250, 0.1)' : 'transparent',
-                                            border: (localFocusedId === section.id || (activeTool === 'none' && !localFocusedId)) ? '2px solid #00B0FA' : '1px dashed rgba(0,176,250,0.3)',
-                                            zIndex: localFocusedId === section.id ? 5 : 1
-                                        }}
-                                    >
-                                        {localFocusedId === section.id && (
-                                            <div
-                                                className="section-label-viewer"
-                                                style={{
-                                                    fontSize: Math.max(12, 14 * (100 / zoom)) + 'px'
-                                                }}
-                                            >
-                                                {section.title}
-                                            </div>
-                                        )}
-                                    </div>
-                                )
-                            ))}
-
-                            {currentSelection && (
+                        {displayPlans.map((plan) => {
+                            const isPdfPlan = plan.url.toLowerCase().endsWith('.pdf') || plan.name.toLowerCase().endsWith('.pdf');
+                            let displayUrl = plan.url;
+                            if (displayUrl.includes('ga_plan_illustration.png')) {
+                                displayUrl = '/ga_plan_minimal.png';
+                            }
+                            return (
                                 <div
-                                    className="ga-selection-box"
+                                    key={plan.id}
+                                    className="ga-drawing-coordinate-reference"
+                                    data-plan-id={plan.id}
                                     style={{
-                                        left: currentSelection.x,
-                                        top: currentSelection.y,
-                                        width: currentSelection.width,
-                                        height: currentSelection.height
+                                        position: 'relative',
+                                        width: '1000px',
+                                        height: `${1000 / imgAspectRatio}px`,
+                                        background: '#FFFFFF',
+                                        boxShadow: '0 12px 32px rgba(0,0,0,0.4)',
+                                        borderRadius: '8px',
+                                        overflow: 'hidden',
+                                        border: '3px solid #1E293B',
+                                        flexShrink: 0
                                     }}
                                 >
-                                    {!isDrawing && (
-                                        <div
-                                            className="selection-input-container"
-                                            style={{
-                                                transform: `scale(${100 / zoom})`,
-                                                transformOrigin: 'top left'
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '12px',
+                                        left: '12px',
+                                        zIndex: 10,
+                                        background: 'rgba(15, 23, 42, 0.85)',
+                                        color: '#38BDF8',
+                                        padding: '6px 12px',
+                                        borderRadius: '4px',
+                                        fontSize: '12px',
+                                        fontWeight: '700',
+                                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                                        backdropFilter: 'blur(4px)'
+                                    }}>
+                                        {plan.name}
+                                    </div>
+
+                                    {isPdfPlan ? (
+                                        <iframe
+                                            src={`${displayUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                                            title={plan.name}
+                                            className="ga-plan-frame"
+                                            style={{ width: '1000px', height: `${1000 / imgAspectRatio}px`, border: 'none', display: 'block' }}
+                                        />
+                                    ) : (
+                                        <img
+                                            src={displayUrl}
+                                            alt={plan.name}
+                                            className="ga-plan-image"
+                                            style={{ width: '1000px', height: 'auto', display: 'block' }}
+                                            draggable={false}
+                                            onLoad={(e) => {
+                                                const { naturalWidth, naturalHeight } = e.currentTarget;
+                                                if (naturalWidth && naturalHeight) {
+                                                    setImgAspectRatio(naturalWidth / naturalHeight);
+                                                }
                                             }}
-                                            // Stop mouse events from bubbling to the canvas. Without
-                                            // this, clicking inside the popup fires the canvas's
-                                            // onMouseDown (crop tool is still active), which clears
-                                            // currentSelection + title before the click handler can
-                                            // run — so Enter saved but clicking the disk did not.
-                                            onMouseDown={(e) => e.stopPropagation()}
-                                            onMouseMove={(e) => e.stopPropagation()}
-                                            onMouseUp={(e) => e.stopPropagation()}
-                                        >
-                                            <input
-                                                type="text"
-                                                placeholder="Enter Title..."
-                                                value={newSelectionTitle}
-                                                onChange={(e) => setNewSelectionTitle(e.target.value)}
-                                                className="selection-input"
-                                                autoFocus
-                                                onKeyDown={(e) => e.key === 'Enter' && addSelection()}
-                                            />
-                                            <button
-                                                type="button"
-                                                className="input-save-btn"
-                                                onMouseDown={(e) => e.stopPropagation()}
-                                                onClick={(e) => { e.stopPropagation(); addSelection(); }}
-                                                title="Save Deck Selection"
+                                        />
+                                    )}
+
+                                    {mappedSections.map(section => (
+                                        (!section.planId || section.planId === plan.id) &&
+                                        ((isIsolationMode && localFocusedId) ? section.id === localFocusedId : section.isVisible) && (
+                                            <div
+                                                key={section.id}
+                                                className="drawn-selection"
+                                                style={{
+                                                    position: 'absolute',
+                                                    left: section.rect.x,
+                                                    top: section.rect.y,
+                                                    width: section.rect.width,
+                                                    height: section.rect.height,
+                                                    background: (localFocusedId === section.id || (activeTool === 'none' && !localFocusedId)) ? 'rgba(0, 176, 250, 0.1)' : 'transparent',
+                                                    border: (localFocusedId === section.id || (activeTool === 'none' && !localFocusedId)) ? '2px solid #00B0FA' : '1px dashed rgba(0,176,250,0.3)',
+                                                    zIndex: localFocusedId === section.id ? 5 : 1,
+                                                    cursor: 'pointer'
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setLocalFocusedId(section.id);
+                                                    setIsSidebarOpen(true);
+                                                }}
                                             >
-                                                <Save size={14} />
-                                            </button>
+                                                {localFocusedId === section.id && (
+                                                    <div
+                                                        className="section-label-viewer"
+                                                        style={{
+                                                            fontSize: Math.max(12, 14 * (100 / zoom)) + 'px'
+                                                        }}
+                                                    >
+                                                        {section.title}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    ))}
+
+                                    {isDrawing && currentSelection && croppingPlanId === plan.id && (
+                                        <div
+                                            className="crop-selection-marquee"
+                                            style={{
+                                                position: 'absolute',
+                                                left: currentSelection.x,
+                                                top: currentSelection.y,
+                                                width: currentSelection.width,
+                                                height: currentSelection.height,
+                                                border: '2px dashed #00B0FA',
+                                                background: 'rgba(0, 176, 250, 0.15)',
+                                                zIndex: 10,
+                                                pointerEvents: 'none'
+                                            }}
+                                        />
+                                    )}
+
+                                    {!isDrawing && currentSelection && croppingPlanId === plan.id && (
+                                        <div
+                                            className="ga-selection-box"
+                                            style={{
+                                                position: 'absolute',
+                                                left: currentSelection.x,
+                                                top: currentSelection.y,
+                                                width: currentSelection.width,
+                                                height: currentSelection.height,
+                                                border: '2px solid #00B0FA',
+                                                background: 'rgba(0, 176, 250, 0.1)',
+                                                zIndex: 10
+                                            }}
+                                        >
+                                            <div
+                                                className="selection-input-container"
+                                                style={{
+                                                    transform: `scale(${100 / zoom})`,
+                                                    transformOrigin: 'top left'
+                                                }}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                onMouseMove={(e) => e.stopPropagation()}
+                                                onMouseUp={(e) => e.stopPropagation()}
+                                            >
+                                                <input
+                                                    type="text"
+                                                    placeholder="Enter Title..."
+                                                    value={newSelectionTitle}
+                                                    onChange={(e) => setNewSelectionTitle(e.target.value)}
+                                                    className="selection-input"
+                                                    autoFocus
+                                                    onKeyDown={(e) => e.key === 'Enter' && addSelection()}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    className="input-save-btn"
+                                                    onMouseDown={(e) => e.stopPropagation()}
+                                                    onClick={(e) => { e.stopPropagation(); addSelection(); }}
+                                                    title="Save Deck Selection"
+                                                >
+                                                    <Save size={14} />
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
-                            )}
-                        </div>
+                            );
+                        })}
                     </div>
 
 

@@ -8,7 +8,6 @@ import {
     Compass,
     Layers,
     FileText,
-    ExternalLink,
     Pencil
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -655,6 +654,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
     };
 
     const removePlan = (id: string) => {
+        if (!window.confirm("Should we delete the GA plan? If you delete this GA plan, the entire active deck that you have been marked will be deleted.")) return;
         // Best-effort backend delete; local state updates regardless so
         // the UI stays responsive even if the request fails.
         if (vesselId) {
@@ -821,6 +821,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                 vesselName={vesselName}
                 vesselId={vesselId}
                 gaPlanId={activePlanId || undefined}
+                allPlans={uploadedPlans}
             />
         );
     }
@@ -905,18 +906,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                                 <span className="plan-card-name" title={plan.name}>{plan.name}</span>
                                                 <span className="plan-card-date">Uploaded on {plan.date}</span>
                                             </div>
-                                            <div className="plan-card-actions">
-                                                <button
-                                                    className="open-full-viewer-btn-premium"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
-                                                        window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false`, '_blank');
-                                                    }}
-                                                >
-                                                    <ExternalLink size={14} />
-                                                    <span>VIEW PLAN</span>
-                                                </button>
+                                            <div className="plan-card-actions" style={{ justifyContent: 'flex-end' }}>
                                                 <button
                                                     className="plan-action-btn-refined delete"
                                                     onClick={(e) => { e.stopPropagation(); removePlan(plan.id); }}
@@ -945,12 +935,10 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                         className={`add-deck-btn ${(uploadedPlans.length === 0 || isUploading) ? 'disabled' : ''}`}
                         disabled={uploadedPlans.length === 0 || isUploading}
                         onClick={() => {
-                            if (!activePlanId) return;
                             const plan = uploadedPlans.find(p => p.id === activePlanId) || uploadedPlans[0];
-                            {
-    const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
-    window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false`, '_blank');
-}
+                            if (!plan) return;
+                            const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
+                            window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false`, '_blank');
                         }}
                     >
                         <Plus size={18} />
@@ -1073,17 +1061,20 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                          <div key={deck.id} className="deck-row-card">
                                             <div className="deck-row-header" onClick={() => toggleExpand(deck.id)}>
                                                 <div className="deck-row-icon-box" onClick={(e) => { e.stopPropagation(); openMapping(deck); }}>
-                                                    {activePlan ? (
-                                                        <DeckPreview
-                                                            rect={deck.rect}
-                                                            fileUrl={activePlan.url}
-                                                            highlightPin={hoveredMaterial?.deckId === deck.id ? hoveredMaterial.pin : null}
-                                                        />
-                                                    ) : (
-                                                        <div className="deck-row-icon-placeholder">
-                                                            {deck.title.toLowerCase().includes('tank') ? <Layers size={21} /> : <Compass size={21} />}
-                                                        </div>
-                                                    )}
+                                                    {(() => {
+                                                        const deckPlan = uploadedPlans.find(p => p.id === deck.planId) || activePlan || (uploadedPlans.length > 0 ? uploadedPlans[0] : null);
+                                                        return deckPlan ? (
+                                                            <DeckPreview
+                                                                rect={deck.rect}
+                                                                fileUrl={deckPlan.url}
+                                                                highlightPin={hoveredMaterial?.deckId === deck.id ? hoveredMaterial.pin : null}
+                                                            />
+                                                        ) : (
+                                                            <div className="deck-row-icon-placeholder">
+                                                                {deck.title.toLowerCase().includes('tank') ? <Layers size={21} /> : <Compass size={21} />}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                                 <div className="deck-info-primary">
                                                     <div className="deck-title-row">

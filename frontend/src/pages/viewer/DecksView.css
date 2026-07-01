@@ -277,8 +277,8 @@
 .plan-preview-thumbnail-box {
     width: 100%;
     height: 120px;
-    background: #F8FAFC;
-    border-bottom: 1px solid #F1F5F9;
+    background: #0B0F19;
+    border-bottom: 1px solid #1E293B;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -289,7 +289,7 @@
 .plan-thumbnail-image {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .pdf-thumbnail-placeholder {
