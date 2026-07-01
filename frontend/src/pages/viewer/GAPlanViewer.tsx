@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     Hand,
     Maximize,
@@ -470,27 +470,32 @@ export default function GAPlanViewer({
         // Logic: Contain the crop within the standard 16:10 box
         const scale = Math.min(boxSize.w / rect.width, boxSize.h / rect.height);
 
-        // Logical image width is 1000px
-        const imgScale = scale;
-        const left = (boxSize.w - rect.width * scale) / 2 - rect.x * scale;
-        const top = (boxSize.h - rect.height * scale) / 2 - rect.y * scale;
-
         return (
             <div className="section-thumbnail-box" ref={wrapperRef}>
-                <img
-                    src={displayFileUrl}
-                    alt="crop"
+                <div
                     style={{
-                        position: 'absolute',
-                        left: `${left}px`,
-                        top: `${top}px`,
-                        width: `${1000 * imgScale}px`,
-                        height: 'auto',
-                        maxWidth: 'none',
-                        pointerEvents: 'none',
-                        display: 'block'
+                        width: `${rect.width * scale}px`,
+                        height: `${rect.height * scale}px`,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        borderRadius: '4px'
                     }}
-                />
+                >
+                    <img
+                        src={displayFileUrl}
+                        alt="crop"
+                        style={{
+                            position: 'absolute',
+                            left: `${-rect.x * scale}px`,
+                            top: `${-rect.y * scale}px`,
+                            width: `${1000 * scale}px`,
+                            height: 'auto',
+                            maxWidth: 'none',
+                            pointerEvents: 'none',
+                            display: 'block'
+                        }}
+                    />
+                </div>
             </div>
         );
     };
@@ -545,7 +550,7 @@ export default function GAPlanViewer({
                         className="ga-plan-wrapper"
                         style={{
                             transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom / 100}) rotate(${rotation}deg)`,
-                            transformOrigin: 'center center'
+                            transformOrigin: '0 0'
                         }}
                     >
 
