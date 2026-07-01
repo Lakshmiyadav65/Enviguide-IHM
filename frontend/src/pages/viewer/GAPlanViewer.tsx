@@ -58,6 +58,7 @@ interface GAPlanViewerProps {
     gaPlanId?: string;
     isIsolationMode?: boolean;
     allPlans?: any[];
+    showAllPlansMode?: boolean;
 }
 
 
@@ -72,7 +73,8 @@ export default function GAPlanViewer({
     vesselId,
     gaPlanId,
     isIsolationMode = false,
-    allPlans
+    allPlans,
+    showAllPlansMode = false
 }: GAPlanViewerProps) {
     // True when both UUIDs are present — i.e. we're allowed to hit the API.
     const persistEnabled = Boolean(vesselId && gaPlanId);
@@ -154,11 +156,15 @@ export default function GAPlanViewer({
         }
     }, [vesselId, vesselName, allPlans]);
 
-    const displayPlans = fetchedPlans.length > 0 ? fetchedPlans : [{
-        id: gaPlanId || 'default-plan',
-        name: filename,
-        url: fileUrl,
-    }];
+    const displayPlans = (showAllPlansMode && fetchedPlans.length > 0)
+        ? fetchedPlans
+        : fetchedPlans.find(p => p.id === gaPlanId)
+            ? [fetchedPlans.find(p => p.id === gaPlanId)]
+            : [{
+                id: gaPlanId || 'default-plan',
+                name: filename,
+                url: fileUrl,
+            }];
 
     // Sync prop to local state
     useEffect(() => {

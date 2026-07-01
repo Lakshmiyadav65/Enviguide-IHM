@@ -8,6 +8,7 @@ import {
     Compass,
     Layers,
     FileText,
+    ExternalLink,
     Pencil
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -74,6 +75,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
     const [expandedDeckId, setExpandedDeckId] = useState<string | null>(null);
     const [showAllMaterials, setShowAllMaterials] = useState(false);
     const [hoveredMaterial, setHoveredMaterial] = useState<{ id: string, pin: { x: number, y: number }, deckId: string } | null>(null);
+    const [planToDeleteId, setPlanToDeleteId] = useState<string | null>(null);
 
     const [mappedSections, setMappedSections] = useState<MappedSection[]>(() => {
         const saved = localStorage.getItem(`vessel_sections_${vesselName}`);
@@ -654,9 +656,10 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
     };
 
     const removePlan = (id: string) => {
-        if (!window.confirm("Should we delete the GA plan? If you delete this GA plan, the entire active deck that you have been marked will be deleted.")) return;
-        // Best-effort backend delete; local state updates regardless so
-        // the UI stays responsive even if the request fails.
+        setPlanToDeleteId(id);
+    };
+
+    const confirmRemovePlan = (id: string) => {
         if (vesselId) {
             api.delete(ENDPOINTS.GA_PLANS.DETAIL(vesselId, id)).catch((err) => {
                 console.error('GA Plan delete failed:', err);
@@ -679,6 +682,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
 
         // Also remove all sections associated with this specific plan
         setMappedSections(prev => prev.filter(section => section.planId !== id));
+        setPlanToDeleteId(null);
     };
 
     const removeDeck = async (deckId: string, planId: string) => {
@@ -906,7 +910,18 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                                 <span className="plan-card-name" title={plan.name}>{plan.name}</span>
                                                 <span className="plan-card-date">Uploaded on {plan.date}</span>
                                             </div>
-                                            <div className="plan-card-actions" style={{ justifyContent: 'flex-end' }}>
+                                            <div className="plan-card-actions">
+                                                <button
+                                                    className="open-full-viewer-btn-premium"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
+                                                        window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false`, '_blank');
+                                                    }}
+                                                >
+                                                    <ExternalLink size={14} />
+                                                    <span>VIEW PLAN</span>
+                                                </button>
                                                 <button
                                                     className="plan-action-btn-refined delete"
                                                     onClick={(e) => { e.stopPropagation(); removePlan(plan.id); }}
@@ -938,7 +953,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                             const plan = uploadedPlans.find(p => p.id === activePlanId) || uploadedPlans[0];
                             if (!plan) return;
                             const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
-                            window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false`, '_blank');
+                            window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false&showAll=true`, '_blank');
                         }}
                     >
                         <Plus size={18} />
@@ -1201,6 +1216,27 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                     )}
                 </div>
             </div>
+            {planToDeleteId && (
+                <div className="custom-confirm-overlay">
+                    <div className="custom-confirm-card">
+                        <div className="custom-confirm-icon delete">
+                            <Trash2 size={32} />
+                        </div>
+                        <h3 className="custom-confirm-title">Delete GA Plan</h3>
+                        <p className="custom-confirm-message">
+                            Should we delete the GA plan? If you delete this GA plan, the entire active deck that you have been marked will be deleted.
+                        </p>
+                        <div className="custom-confirm-actions">
+                            <button className="custom-confirm-btn cancel" onClick={() => setPlanToDeleteId(null)}>
+                                CANCEL
+                            </button>
+                            <button className="custom-confirm-btn delete" onClick={() => confirmRemovePlan(planToDeleteId)}>
+                                DELETE
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

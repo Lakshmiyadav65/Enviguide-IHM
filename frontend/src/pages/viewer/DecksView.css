@@ -1486,3 +1486,109 @@
         opacity: 0;
     }
 }
+
+/* Custom Delete Confirmation Modal */
+.custom-confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.custom-confirm-card {
+    background: #FFFFFF;
+    border: 1px solid #EAECF0;
+    border-radius: 16px;
+    padding: 32px 24px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 20px 24px -4px rgba(16, 24, 40, 0.1), 0 8px 8px -4px rgba(16, 24, 40, 0.04);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    animation: scaleUpConfirm 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes scaleUpConfirm {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.custom-confirm-icon.delete {
+    width: 64px;
+    height: 64px;
+    background: #FEF3F2;
+    color: #D92D20;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    border: 8px solid #FEE4E2;
+}
+
+.custom-confirm-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #101828;
+    margin: 0 0 8px 0;
+}
+
+.custom-confirm-message {
+    font-size: 14px;
+    color: #475467;
+    line-height: 1.5;
+    margin: 0 0 24px 0;
+}
+
+.custom-confirm-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.custom-confirm-btn {
+    flex: 1;
+    height: 44px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid #D0D5DD;
+    background: #FFFFFF;
+    color: #344054;
+}
+
+.custom-confirm-btn.cancel:hover {
+    background: #F9FAFB;
+    color: #1D2939;
+    border-color: #D0D5DD;
+}
+
+.custom-confirm-btn.delete {
+    background: #D92D20;
+    color: #FFFFFF;
+    border-color: #D92D20;
+}
+
+.custom-confirm-btn.delete:hover {
+    background: #B42318;
+    border-color: #B42318;
+}
