@@ -1999,7 +1999,7 @@ export default function Vessels() {
                                     ).map((vessel) => (
                                         <div
                                             key={`${vessel.name}-${vessel.imoNumber}`}
-                                            className={`vessel-item light ${activeVesselImo === vessel.imoNumber ? 'active' : ''}`}
+                                            className={`vessel-item light ${activeVesselName === vessel.name ? 'active' : ''}`}
                                             onClick={() => handleVesselSelect(vessel)}
                                         >
                                             <div className="vessel-status-dot v-active"></div>
