@@ -846,6 +846,10 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
         window.open(`/mapping?${urlParams.toString()}`, '_blank');
     };
 
+    const visibleDecks = activePlanId
+        ? mappedSections.filter(deck => deck.planId === activePlanId)
+        : mappedSections;
+
     return (
         <div className={`decks-view-container ${uploadedPlans.length === 0 ? 'no-scroll' : ''}`}>
             {/* GA Plans Upload Section */}
@@ -883,7 +887,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                     <div
                                         key={plan.id}
                                         className={`plan-preview-card ${activePlanId === plan.id ? 'active' : ''}`}
-                                        onClick={() => setActivePlanId(plan.id)}
+                                        onClick={() => setActivePlanId(activePlanId === plan.id ? null : plan.id)}
                                         style={{ cursor: 'pointer' }}
                                     >
                                         <div className="plan-preview-thumbnail-box">
@@ -935,7 +939,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                 <div className="active-decks-header">
                     <div className="active-decks-title">
                         <h3>Active Decks</h3>
-                        <span className="deck-count-badge">{mappedSections.length}</span>
+                        <span className="deck-count-badge">{visibleDecks.length}</span>
                     </div>
                     <button
                         className={`add-deck-btn ${(uploadedPlans.length === 0 || isUploading) ? 'disabled' : ''}`}
@@ -961,7 +965,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                             2. If uploading AND no plans -> Show large uploading animation
                             3. Otherwise -> Show the list (which captures: has decks, or has plans, or uploading while having plans)
                         */}
-                    {!isUploading && mappedSections.length === 0 && uploadedPlans.length === 0 ? (
+                    {!isUploading && visibleDecks.length === 0 && uploadedPlans.length === 0 ? (
                         <div className="no-decks-centered-state">
                             <div className="deck-empty-visual-canvas">
                                 <div className="deck-blueprint-illustration-premium">
@@ -1051,8 +1055,8 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                 </div>
                             )}
 
-                            {mappedSections.length === 0 ? (
-                                <div className="no-decks-centered-state">
+                             {visibleDecks.length === 0 ? (
+                                 <div className="no-decks-centered-state">
                                     <div className="empty-compass-container">
                                         <div className="compass-icon-refined">
                                             <Compass size={32} />
@@ -1065,8 +1069,8 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                 </div>
                             ) : (
                                 <>
-                                    {mappedSections.map((deck) => (
-                                        <div key={deck.id} className="deck-row-card">
+                                     {visibleDecks.map((deck) => (
+                                         <div key={deck.id} className="deck-row-card">
                                             <div className="deck-row-header" onClick={() => toggleExpand(deck.id)}>
                                                 <div className="deck-row-icon-box" onClick={(e) => { e.stopPropagation(); openMapping(deck); }}>
                                                     {activePlan ? (

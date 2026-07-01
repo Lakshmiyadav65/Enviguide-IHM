@@ -39,6 +39,7 @@ interface MappedSection {
     rect: Rect;
     itemsCount: number;
     isVisible?: boolean;
+    planId?: string;
 }
 
 interface GAPlanViewerProps {
@@ -383,6 +384,7 @@ export default function GAPlanViewer({
                     rect: currentSelection,
                     itemsCount: 0,
                     isVisible: true,
+                    planId: gaPlanId || '',
                 };
                 executeUpdate([...mappedSections, newSection]);
                 showToast("Deck Saved", `${trimmedTitle} has been saved to the project.`);
@@ -401,6 +403,7 @@ export default function GAPlanViewer({
                 rect: currentSelection,
                 itemsCount: 0,
                 isVisible: true,
+                planId: gaPlanId || '',
             };
             executeUpdate([...mappedSections, newSection]);
             showToast("Deck Saved Successfully", `${trimmedTitle} has been added to the vessel project`);
@@ -590,6 +593,7 @@ export default function GAPlanViewer({
                             {mappedSections.map(section => (
                                 // Use isIsolationMode to hide other sections when enabled, 
                                 // otherwise show all mapped sections
+                                (!section.planId || !gaPlanId || section.planId === gaPlanId) &&
                                 ((isIsolationMode && localFocusedId) ? section.id === localFocusedId : section.isVisible) && (
                                     <div
                                         key={section.id}
