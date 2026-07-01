@@ -179,6 +179,7 @@ export default function HazardousMaterialMapping() {
     useEffect(() => {
         if (location.state && location.state.transferMaterial) {
             const transfer = location.state.transferMaterial;
+            setTransferringMaterialId(transfer.id || null);
             setViewingMaterial(null);
             setViewMode('add');
             setActiveTool('pin');
@@ -252,6 +253,7 @@ export default function HazardousMaterialMapping() {
     const [viewingMaterial, setViewingMaterial] = useState<MaterialEntry | null>(null);
     const [validationError, setValidationError] = useState<string | null>(null);
     const [bannerMessage, setBannerMessage] = useState<{ title: string; body: string; type: 'info' | 'error' } | null>(null);
+    const [transferringMaterialId, setTransferringMaterialId] = useState<string | null>(null);
 
     // Initial mode check and focus on crop
     useEffect(() => {
@@ -450,12 +452,30 @@ export default function HazardousMaterialMapping() {
                     ...entryToBackendBody(formData, tempPin),
                     ...(deckAreaId ? { deckAreaId } : {}),
                 };
-                const res = await api.post<{ success: boolean; data: Record<string, unknown> }>(
-                    ENDPOINTS.MATERIALS.LIST(vesselId),
-                    body,
-                );
-                const created = backendToEntry({ ...res.data, deckAreaName: sectionName });
-                setInventory((prev) => [...prev, created]);
+                
+                if (transferringMaterialId) {
+                    // Update existing material via PUT!
+                    const res = await api.put<{ success: boolean; data: Record<string, unknown> }>(
+                        ENDPOINTS.MATERIALS.DETAIL(vesselId, transferringMaterialId),
+                        body
+                    );
+                    const updated = backendToEntry({ ...res.data, deckAreaName: sectionName });
+                    if (deckAreaId && String(res.data.deckAreaId || res.data.deckArea) !== String(deckAreaId)) {
+                        setInventory((prev) => prev.filter(i => i.id !== transferringMaterialId));
+                    } else {
+                        setInventory((prev) => prev.map(i => i.id === transferringMaterialId ? updated : i));
+                    }
+                } else {
+                    // Create new
+                    const res = await api.post<{ success: boolean; data: Record<string, unknown> }>(
+                        ENDPOINTS.MATERIALS.LIST(vesselId),
+                        body,
+                    );
+                    const created = backendToEntry({ ...res.data, deckAreaName: sectionName });
+                    setInventory((prev) => [...prev, created]);
+                }
+                
+                setTransferringMaterialId(null);
                 resetFormAfterCreate();
             } catch (err) {
                 console.error('Failed to create material:', err);
@@ -466,7 +486,7 @@ export default function HazardousMaterialMapping() {
 
         // Demo / non-backed vessel — keep the localStorage flow.
         const newEntry: MaterialEntry = {
-            id: Date.now().toString(),
+            id: transferringMaterialId || Date.now().toString(),
             ...formData,
             pin: tempPin,
         };
@@ -488,8 +508,14 @@ export default function HazardousMaterialMapping() {
         };
         const vesselInventoryKey = `vessel_inventory_${vesselName}`;
         const existingVesselInv: Material[] = JSON.parse(localStorage.getItem(vesselInventoryKey) || '[]');
-        localStorage.setItem(vesselInventoryKey, JSON.stringify([...existingVesselInv, recordMaterial]));
+        
+        let updatedVesselInv = existingVesselInv;
+        if (transferringMaterialId) {
+            updatedVesselInv = existingVesselInv.filter(i => i.id !== `MAPPED-${transferringMaterialId}`);
+        }
+        localStorage.setItem(vesselInventoryKey, JSON.stringify([...updatedVesselInv, recordMaterial]));
 
+        setTransferringMaterialId(null);
         resetFormAfterCreate();
     };
 
