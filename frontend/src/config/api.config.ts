@@ -5,7 +5,7 @@
 // Switch from mock → real API by updating BASE_URL and USE_MOCK.
 
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://enviguide.duckdns.org/api/v1',
+  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'https://enviguide.duckdns.org/api/v1',
   // Mock mode is OFF by default when deploying with a backend.
   // Set VITE_USE_MOCK=true to override and use mock mode locally.
   USE_MOCK: import.meta.env.VITE_USE_MOCK === 'true',
