@@ -8,7 +8,7 @@ import {
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { api } from '../../lib/apiClient';
-import { ENDPOINTS } from '../../config/api.config';
+import { ENDPOINTS, API_CONFIG } from '../../config/api.config';
 import './Users.css';
 
 interface UserData {
@@ -37,6 +37,69 @@ const EMPTY_FORM: Omit<UserData, 'id'> = {
     password: ''
 };
 
+const INITIAL_MOCK_USERS: UserData[] = [
+    {
+        id: '1',
+        contactPerson: 'Bindhiya Rajendran',
+        email: 'bindhya2011@gmail.com',
+        country: 'India',
+        phone: '9585936420',
+        status: 'Inactive',
+        paymentStatus: 'Unpaid',
+        category: 'Certified hazmat Companies',
+        origin: 'Direct',
+        lastActivity: 1023
+    },
+    {
+        id: '2',
+        contactPerson: 'Company Account',
+        email: 'contact@varunasentinels.com',
+        country: 'Netherlands',
+        phone: '8899298809',
+        status: 'Active',
+        paymentStatus: 'Paid',
+        category: 'Ship Owner',
+        origin: 'Partner',
+        lastActivity: 1689
+    },
+    {
+        id: '3',
+        contactPerson: 'Frank Shaw',
+        email: 'frank.shaw@bshipmanagement.com',
+        country: 'Germany',
+        phone: '0687382356',
+        status: 'Active',
+        paymentStatus: 'Unpaid',
+        category: 'Ship Owner',
+        origin: 'Direct',
+        lastActivity: 1585
+    },
+    {
+        id: '4',
+        contactPerson: 'Austin Ajith',
+        email: 'austinajith@gmail.com',
+        country: 'India',
+        phone: '09514991354',
+        status: 'Inactive',
+        paymentStatus: 'Paid',
+        category: 'Admin User',
+        origin: 'System',
+        lastActivity: 346
+    },
+    {
+        id: '5',
+        contactPerson: 'Sir/Madam',
+        email: 'E.tatanis@harp.com',
+        country: 'Germany',
+        phone: '124578',
+        status: 'Active',
+        paymentStatus: 'Unpaid',
+        category: 'Ship Owner',
+        origin: 'Direct',
+        lastActivity: 188
+    }
+];
+
 export default function Users() {
     const [searchTerm, setSearchTerm] = useState('');
     const [users, setUsers] = useState<UserData[]>([]);
@@ -53,8 +116,23 @@ export default function Users() {
     const [modalError, setModalError] = useState<string | null>(null);
     const [modalSubmitting, setModalSubmitting] = useState(false);
 
-    // Load users from MongoDB Atlas on mount
+    // Load users from database (or mock data if enabled)
     const fetchUsers = () => {
+        if (API_CONFIG.USE_MOCK) {
+            const stored = localStorage.getItem('ihm_mock_users');
+            if (stored) {
+                try {
+                    setUsers(JSON.parse(stored));
+                } catch {
+                    setUsers(INITIAL_MOCK_USERS);
+                }
+            } else {
+                localStorage.setItem('ihm_mock_users', JSON.stringify(INITIAL_MOCK_USERS));
+                setUsers(INITIAL_MOCK_USERS);
+            }
+            return;
+        }
+
         setLoading(true);
         setError(null);
         api.get<{ success: boolean; data: any[] }>(ENDPOINTS.USERS.LIST)
@@ -99,6 +177,23 @@ export default function Users() {
         setModalSubmitting(true);
         setModalError(null);
 
+        if (API_CONFIG.USE_MOCK) {
+            setTimeout(() => {
+                const newUser: UserData = {
+                    id: String(Date.now()),
+                    ...formData,
+                    lastActivity: 0
+                };
+                const updatedList = [newUser, ...users];
+                setUsers(updatedList);
+                localStorage.setItem('ihm_mock_users', JSON.stringify(updatedList));
+                setShowAddModal(false);
+                setFormData(EMPTY_FORM);
+                setModalSubmitting(false);
+            }, 500);
+            return;
+        }
+
         try {
             const payload = {
                 name: formData.contactPerson,
@@ -136,6 +231,19 @@ export default function Users() {
         setModalSubmitting(true);
         setModalError(null);
 
+        if (API_CONFIG.USE_MOCK) {
+            setTimeout(() => {
+                const updatedList = users.map(u => u.id === selectedUser.id ? { ...u, ...formData } : u);
+                setUsers(updatedList);
+                localStorage.setItem('ihm_mock_users', JSON.stringify(updatedList));
+                setShowEditModal(false);
+                setSelectedUser(null);
+                setFormData(EMPTY_FORM);
+                setModalSubmitting(false);
+            }, 500);
+            return;
+        }
+
         try {
             const payload: Record<string, any> = {
                 name: formData.contactPerson,
@@ -170,6 +278,18 @@ export default function Users() {
         if (!selectedUser) return;
         setModalSubmitting(true);
         setModalError(null);
+
+        if (API_CONFIG.USE_MOCK) {
+            setTimeout(() => {
+                const updatedList = users.filter(u => u.id !== selectedUser.id);
+                setUsers(updatedList);
+                localStorage.setItem('ihm_mock_users', JSON.stringify(updatedList));
+                setShowDeleteModal(false);
+                setSelectedUser(null);
+                setModalSubmitting(false);
+            }, 500);
+            return;
+        }
 
         try {
             await api.delete(ENDPOINTS.USERS.DETAIL(selectedUser.id));
@@ -213,6 +333,15 @@ export default function Users() {
         setShowDeleteModal(true);
     };
 
+    const resetMockData = () => {
+        if (API_CONFIG.USE_MOCK) {
+            localStorage.setItem('ihm_mock_users', JSON.stringify(INITIAL_MOCK_USERS));
+            setUsers(INITIAL_MOCK_USERS);
+        } else {
+            fetchUsers();
+        }
+    };
+
     // In-memory searching and filtering
     const filteredUsers = users.filter(user => {
         const matchesSearch =
@@ -239,7 +368,7 @@ export default function Users() {
                                 <UsersIcon size={26} />
                             </div>
                             <div className="hero-text">
-                                <h1>User Management</h1>
+                                <h1>User Management {API_CONFIG.USE_MOCK && <span style={{fontSize: 12, padding: '3px 8px', background: '#F1F5F9', color: '#64748B', borderRadius: 6, marginLeft: 8}}>Mock Mode</span>}</h1>
                                 <p>Manage roles, registration details, and payment statuses for contact persons.</p>
                             </div>
                         </div>
@@ -289,7 +418,7 @@ export default function Users() {
                                     </button>
                                 </div>
 
-                                <button className="btn-icon" onClick={fetchUsers} title="Refresh Data">
+                                <button className="btn-icon" onClick={resetMockData} title={API_CONFIG.USE_MOCK ? "Reset Mock Data" : "Refresh Data"}>
                                     <History size={18} />
                                 </button>
                                 <button className="btn-icon" onClick={() => alert('Filters export feature is currently under review')}>
