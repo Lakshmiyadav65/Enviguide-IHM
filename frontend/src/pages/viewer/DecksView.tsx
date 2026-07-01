@@ -711,6 +711,13 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
         setShowAllMaterials(false);
     };
 
+    const handleAddNewDeck = () => {
+        const plan = uploadedPlans.find(p => p.id === activePlanId) || uploadedPlans[0];
+        if (!plan) return;
+        const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
+        window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false&showAll=true`, '_blank');
+    };
+
     // Component to show a technical cropped preview of the deck
     const DeckPreview = ({ rect, fileUrl, highlightPin }: { rect: Rect, fileUrl: string, highlightPin?: { x: number, y: number } | null }) => {
         const displayWidth = 180;
@@ -957,12 +964,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                     <button
                         className={`add-deck-btn ${(uploadedPlans.length === 0 || isUploading) ? 'disabled' : ''}`}
                         disabled={uploadedPlans.length === 0 || isUploading}
-                        onClick={() => {
-                            const plan = uploadedPlans.find(p => p.id === activePlanId) || uploadedPlans[0];
-                            if (!plan) return;
-                            const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
-                            window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false&showAll=true`, '_blank');
-                        }}
+                        onClick={handleAddNewDeck}
                     >
                         <Plus size={18} />
                         Add New Deck
@@ -1216,12 +1218,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                         <div className="add-plan-section-container">
                                             <button
                                                 className="add-plan-section-dashed-refined"
-                                                onClick={() => {
-                                                    const plan = uploadedPlans.find(p => p.id === activePlanId) || uploadedPlans[0];
-                                                    if (!plan) return;
-                                                    const ids = vesselId ? `&vesselId=${encodeURIComponent(vesselId)}&planId=${encodeURIComponent(plan.id)}` : '';
-                                                    window.open(`/viewer?url=${encodeURIComponent(plan.url)}&name=${encodeURIComponent(plan.name)}&vessel=${encodeURIComponent(vesselName)}${ids}&isolated=false&showAll=true`, '_blank');
-                                                }}
+                                                onClick={handleAddNewDeck}
                                             >
                                                 <Plus size={20} />
                                                 Add New Plan Section
