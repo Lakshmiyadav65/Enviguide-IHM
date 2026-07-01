@@ -49,6 +49,7 @@ export async function httpClient<T>(
   const timeoutId = setTimeout(() => controller.abort(), timeout ?? API_CONFIG.TIMEOUT);
 
   const tokenSent = localStorage.getItem('ihm_token');
+  console.log(`[HTTP Client] Sending ${fetchOptions.method || 'GET'} to ${path}. Token exists: ${!!tokenSent}. Token excerpt: ${tokenSent ? tokenSent.substring(0, 15) : 'none'}`);
 
   try {
     const response = await fetch(buildUrl(path, params), {
@@ -64,8 +65,10 @@ export async function httpClient<T>(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      console.warn(`[HTTP Client] Request to ${path} failed with status ${response.status}.`);
       if (response.status === 401 && !path.includes('/auth/login')) {
         const currentToken = localStorage.getItem('ihm_token');
+        console.warn(`[HTTP Client] 401 Unauthorized received. Token sent matches current token: ${currentToken === tokenSent}.`);
         if (currentToken === tokenSent) {
           localStorage.removeItem('ihm_token');
           localStorage.removeItem('ihm_user');
