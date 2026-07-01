@@ -109,6 +109,34 @@ export const UserService = {
     return apiUser;
   },
 
+  async createBulk(usersList: Array<Record<string, unknown>>) {
+    const db = getDb();
+    const createdUsers = [];
+    const hashedPassword = await bcrypt.hash('Envi123', 10);
+
+    for (const data of usersList) {
+      if (!data.email || !data.name) continue;
+      const existing = await db.collection('users').findOne({ email: data.email });
+      if (existing) continue;
+
+      const fields = extract(data);
+      fields['password'] = hashedPassword;
+      fields['status'] = data.status || 'active';
+      fields['payment_status'] = data.paymentStatus || 'Unpaid';
+      fields['created_at'] = new Date();
+      fields['updated_at'] = new Date();
+
+      const _id = crypto.randomUUID();
+      await db.collection('users').insertOne({
+        _id,
+        ...fields
+      });
+      const created = await db.collection('users').findOne({ _id });
+      createdUsers.push(toApi(created));
+    }
+    return createdUsers;
+  },
+
   async update(id: string, data: Record<string, unknown>) {
     const db = getDb();
     const fields = extract(data);

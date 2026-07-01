@@ -31,6 +31,17 @@ export async function createUser(req: Request, res: Response, next: NextFunction
   }
 }
 
+export async function createUsersBulk(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { users } = req.body as { users?: Array<Record<string, unknown>> };
+    if (!users || !Array.isArray(users)) {
+      return next(createError('users array is required', 400));
+    }
+    const created = await UserService.createBulk(users);
+    res.status(201).json({ success: true, data: created, total: created.length });
+  } catch (err) { next(err); }
+}
+
 export async function updateUser(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const user = await UserService.update(req.params.id as string, req.body as Record<string, unknown>);

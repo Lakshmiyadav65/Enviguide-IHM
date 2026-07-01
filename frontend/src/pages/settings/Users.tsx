@@ -8,7 +8,7 @@ import {
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { api } from '../../lib/apiClient';
-import { ENDPOINTS, API_CONFIG } from '../../config/api.config';
+import { ENDPOINTS } from '../../config/api.config';
 import './Users.css';
 
 interface UserData {
@@ -37,73 +37,18 @@ const EMPTY_FORM: Omit<UserData, 'id'> = {
     password: ''
 };
 
-const INITIAL_MOCK_USERS: UserData[] = [
-    {
-        id: '1',
-        contactPerson: 'Bindhiya Rajendran',
-        email: 'bindhya2011@gmail.com',
-        country: 'India',
-        phone: '9585936420',
-        status: 'Inactive',
-        paymentStatus: 'Unpaid',
-        category: 'Certified hazmat Companies',
-        origin: 'Direct',
-        lastActivity: 1023
-    },
-    {
-        id: '2',
-        contactPerson: 'Company Account',
-        email: 'contact@varunasentinels.com',
-        country: 'Netherlands',
-        phone: '8899298809',
-        status: 'Active',
-        paymentStatus: 'Paid',
-        category: 'Ship Owner',
-        origin: 'Partner',
-        lastActivity: 1689
-    },
-    {
-        id: '3',
-        contactPerson: 'Frank Shaw',
-        email: 'frank.shaw@bshipmanagement.com',
-        country: 'Germany',
-        phone: '0687382356',
-        status: 'Active',
-        paymentStatus: 'Unpaid',
-        category: 'Ship Owner',
-        origin: 'Direct',
-        lastActivity: 1585
-    },
-    {
-        id: '4',
-        contactPerson: 'Austin Ajith',
-        email: 'austinajith@gmail.com',
-        country: 'India',
-        phone: '09514991354',
-        status: 'Inactive',
-        paymentStatus: 'Paid',
-        category: 'Admin User',
-        origin: 'System',
-        lastActivity: 346
-    },
-    {
-        id: '5',
-        contactPerson: 'Sir/Madam',
-        email: 'E.tatanis@harp.com',
-        country: 'Germany',
-        phone: '124578',
-        status: 'Active',
-        paymentStatus: 'Unpaid',
-        category: 'Ship Owner',
-        origin: 'Direct',
-        lastActivity: 188
-    }
-];
-
 export default function Users() {
     const [searchTerm, setSearchTerm] = useState('');
     const [users, setUsers] = useState<UserData[]>([]);
     const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Inactive'>('All');
+    
+    // Advanced Filters panel state
+    const [showFiltersPanel, setShowFiltersPanel] = useState(false);
+    const [filterCategory, setFilterCategory] = useState('All');
+    const [filterPayment, setFilterPayment] = useState('All');
+    const [filterOrigin, setFilterOrigin] = useState('All');
+    const [filterCountry, setFilterCountry] = useState('All');
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -111,28 +56,18 @@ export default function Users() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [showBulkModal, setShowBulkModal] = useState(false);
+
     const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
     const [formData, setFormData] = useState<Omit<UserData, 'id'>>(EMPTY_FORM);
+    const [bulkText, setBulkText] = useState('');
+    
     const [modalError, setModalError] = useState<string | null>(null);
     const [modalSubmitting, setModalSubmitting] = useState(false);
 
-    // Load users from database (or mock data if enabled)
+    // Load users directly from the MongoDB Atlas database
     const fetchUsers = () => {
-        if (API_CONFIG.USE_MOCK) {
-            const stored = localStorage.getItem('ihm_mock_users');
-            if (stored) {
-                try {
-                    setUsers(JSON.parse(stored));
-                } catch {
-                    setUsers(INITIAL_MOCK_USERS);
-                }
-            } else {
-                localStorage.setItem('ihm_mock_users', JSON.stringify(INITIAL_MOCK_USERS));
-                setUsers(INITIAL_MOCK_USERS);
-            }
-            return;
-        }
-
         setLoading(true);
         setError(null);
         api.get<{ success: boolean; data: any[] }>(ENDPOINTS.USERS.LIST)
@@ -177,23 +112,6 @@ export default function Users() {
         setModalSubmitting(true);
         setModalError(null);
 
-        if (API_CONFIG.USE_MOCK) {
-            setTimeout(() => {
-                const newUser: UserData = {
-                    id: String(Date.now()),
-                    ...formData,
-                    lastActivity: 0
-                };
-                const updatedList = [newUser, ...users];
-                setUsers(updatedList);
-                localStorage.setItem('ihm_mock_users', JSON.stringify(updatedList));
-                setShowAddModal(false);
-                setFormData(EMPTY_FORM);
-                setModalSubmitting(false);
-            }, 500);
-            return;
-        }
-
         try {
             const payload = {
                 name: formData.contactPerson,
@@ -231,19 +149,6 @@ export default function Users() {
         setModalSubmitting(true);
         setModalError(null);
 
-        if (API_CONFIG.USE_MOCK) {
-            setTimeout(() => {
-                const updatedList = users.map(u => u.id === selectedUser.id ? { ...u, ...formData } : u);
-                setUsers(updatedList);
-                localStorage.setItem('ihm_mock_users', JSON.stringify(updatedList));
-                setShowEditModal(false);
-                setSelectedUser(null);
-                setFormData(EMPTY_FORM);
-                setModalSubmitting(false);
-            }, 500);
-            return;
-        }
-
         try {
             const payload: Record<string, any> = {
                 name: formData.contactPerson,
@@ -279,18 +184,6 @@ export default function Users() {
         setModalSubmitting(true);
         setModalError(null);
 
-        if (API_CONFIG.USE_MOCK) {
-            setTimeout(() => {
-                const updatedList = users.filter(u => u.id !== selectedUser.id);
-                setUsers(updatedList);
-                localStorage.setItem('ihm_mock_users', JSON.stringify(updatedList));
-                setShowDeleteModal(false);
-                setSelectedUser(null);
-                setModalSubmitting(false);
-            }, 500);
-            return;
-        }
-
         try {
             await api.delete(ENDPOINTS.USERS.DETAIL(selectedUser.id));
             setShowDeleteModal(false);
@@ -302,6 +195,90 @@ export default function Users() {
         } finally {
             setModalSubmitting(false);
         }
+    };
+
+    // Bulk Import handler
+    const handleBulkImportSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!bulkText.trim()) {
+            setModalError('Please enter user CSV data to import.');
+            return;
+        }
+
+        setModalSubmitting(true);
+        setModalError(null);
+
+        try {
+            const lines = bulkText.split('\n');
+            const parsedUsers = [];
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
+                // Format: Name, Email, Category, Country, Phone, Status, PaymentStatus, Origin
+                const [name, email, category, country, phone, status, paymentStatus, origin] = line.split(',').map(s => s?.trim() || '');
+                if (name && email) {
+                    parsedUsers.push({
+                        name,
+                        email,
+                        category: category || 'Ship Owner',
+                        country: country || '',
+                        phone: phone || '',
+                        status: (status || 'active').toLowerCase(),
+                        paymentStatus: paymentStatus || 'Unpaid',
+                        origin: origin || 'Direct'
+                    });
+                }
+            }
+
+            if (parsedUsers.length === 0) {
+                throw new Error('No valid user records found in the pasted data. Check formatting: Name,Email');
+            }
+
+            await api.post('/users/bulk', { users: parsedUsers });
+            setShowBulkModal(false);
+            setBulkText('');
+            fetchUsers();
+        } catch (err: any) {
+            console.error('Error importing bulk users:', err);
+            setModalError(err.message || 'Failed to import users. Check formatting.');
+        } finally {
+            setModalSubmitting(false);
+        }
+    };
+
+    // CSV Download Report generator
+    const handleDownloadReport = () => {
+        if (filteredUsers.length === 0) {
+            alert('No user records match current filters to export.');
+            return;
+        }
+
+        const headers = ['Contact Person', 'Email', 'Category', 'Country', 'Phone', 'Status', 'Payment Status', 'Origin'];
+        const csvRows = [headers.join(',')];
+
+        filteredUsers.forEach(u => {
+            const values = [
+                `"${u.contactPerson.replace(/"/g, '""')}"`,
+                `"${u.email.replace(/"/g, '""')}"`,
+                `"${u.category.replace(/"/g, '""')}"`,
+                `"${u.country.replace(/"/g, '""')}"`,
+                `"${u.phone.replace(/"/g, '""')}"`,
+                `"${u.status}"`,
+                `"${u.paymentStatus}"`,
+                `"${u.origin}"`
+            ];
+            csvRows.push(values.join(','));
+        });
+
+        const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + csvRows.join('\n');
+        const encodedUri = encodeURI(csvContent);
+        
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `user_accounts_report_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const openAddModal = () => {
@@ -333,26 +310,39 @@ export default function Users() {
         setShowDeleteModal(true);
     };
 
-    const resetMockData = () => {
-        if (API_CONFIG.USE_MOCK) {
-            localStorage.setItem('ihm_mock_users', JSON.stringify(INITIAL_MOCK_USERS));
-            setUsers(INITIAL_MOCK_USERS);
-        } else {
-            fetchUsers();
-        }
+    const openDetailModal = (user: UserData) => {
+        setSelectedUser(user);
+        setShowDetailModal(true);
     };
 
-    // In-memory searching and filtering
+    const openBulkModal = () => {
+        setBulkText('');
+        setModalError(null);
+        setShowBulkModal(true);
+    };
+
+    // In-memory searching, sorting and multi-field filtering
     const filteredUsers = users.filter(user => {
+        // Search Term matches
         const matchesSearch =
             (user.contactPerson || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (user.category || '').toLowerCase().includes(searchTerm.toLowerCase());
 
+        // Quick Status Toolbar filter
         const matchesStatus = filterStatus === 'All' || user.status === filterStatus;
 
-        return matchesSearch && matchesStatus;
+        // Advanced filter selectors
+        const matchesCategory = filterCategory === 'All' || user.category === filterCategory;
+        const matchesPayment = filterPayment === 'All' || user.paymentStatus === filterPayment;
+        const matchesOrigin = filterOrigin === 'All' || user.origin === filterOrigin;
+        const matchesCountry = filterCountry === 'All' || user.country === filterCountry;
+
+        return matchesSearch && matchesStatus && matchesCategory && matchesPayment && matchesOrigin && matchesCountry;
     });
+
+    // Unique countries listed in current users to populate country filter dynamically
+    const uniqueCountries = Array.from(new Set(users.map(u => u.country).filter(Boolean)));
 
     return (
         <div className="users-page-container">
@@ -368,12 +358,12 @@ export default function Users() {
                                 <UsersIcon size={26} />
                             </div>
                             <div className="hero-text">
-                                <h1>User Management {API_CONFIG.USE_MOCK && <span style={{fontSize: 12, padding: '3px 8px', background: '#F1F5F9', color: '#64748B', borderRadius: 6, marginLeft: 8}}>Mock Mode</span>}</h1>
+                                <h1>User Management</h1>
                                 <p>Manage roles, registration details, and payment statuses for contact persons.</p>
                             </div>
                         </div>
                         <div className="hero-actions">
-                            <button className="btn-bulk" onClick={() => alert('Bulk Import feature is currently under review')}>
+                            <button className="btn-bulk" onClick={openBulkModal}>
                                 <FileText size={18} />
                                 <span>Bulk Import</span>
                             </button>
@@ -418,17 +408,79 @@ export default function Users() {
                                     </button>
                                 </div>
 
-                                <button className="btn-icon" onClick={resetMockData} title={API_CONFIG.USE_MOCK ? "Reset Mock Data" : "Refresh Data"}>
+                                <button className="btn-icon" onClick={fetchUsers} title="Refresh Data">
                                     <History size={18} />
                                 </button>
-                                <button className="btn-icon" onClick={() => alert('Filters export feature is currently under review')}>
+                                <button 
+                                    className={`btn-icon ${showFiltersPanel ? 'active' : ''}`} 
+                                    onClick={() => setShowFiltersPanel(!showFiltersPanel)}
+                                    title="Advanced Filters"
+                                    style={{
+                                        borderColor: showFiltersPanel ? '#00B2FF' : undefined,
+                                        backgroundColor: showFiltersPanel ? '#F0F9FF' : undefined,
+                                        color: showFiltersPanel ? '#00B2FF' : undefined
+                                    }}
+                                >
                                     <Filter size={18} />
                                 </button>
-                                <button className="btn-icon" onClick={() => alert('Download report is currently under review')}>
+                                <button className="btn-icon" onClick={handleDownloadReport} title="Export CSV Report">
                                     <Download size={18} />
                                 </button>
                             </div>
                         </div>
+
+                        {/* Advanced Filters Panel */}
+                        {showFiltersPanel && (
+                            <div className="filters-panel" style={{
+                                padding: '16px 24px',
+                                borderBottom: '1px solid #F1F5F9',
+                                background: '#FAFCFF',
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                                gap: '16px',
+                                animation: 'fadeIn 0.2s ease-out'
+                            }}>
+                                <div className="form-group">
+                                    <label style={{fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4}}>Category Filter</label>
+                                    <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} style={{padding: '8px 10px', fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0', background: 'white'}}>
+                                        <option value="All">All Categories</option>
+                                        <option value="admin">Admin User</option>
+                                        <option value="manager">Manager</option>
+                                        <option value="viewer">Viewer</option>
+                                        <option value="surveyor">Surveyor</option>
+                                        <option value="deck officer">Deck Officer</option>
+                                        <option value="Certified hazmat Companies">Certified hazmat Companies</option>
+                                        <option value="Ship Owner">Ship Owner</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4}}>Payment Status</label>
+                                    <select value={filterPayment} onChange={(e) => setFilterPayment(e.target.value)} style={{padding: '8px 10px', fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0', background: 'white'}}>
+                                        <option value="All">All Statuses</option>
+                                        <option value="Paid">Paid</option>
+                                        <option value="Unpaid">Unpaid</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4}}>Origin Partner</label>
+                                    <select value={filterOrigin} onChange={(e) => setFilterOrigin(e.target.value)} style={{padding: '8px 10px', fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0', background: 'white'}}>
+                                        <option value="All">All Origins</option>
+                                        <option value="Direct">Direct</option>
+                                        <option value="Partner">Partner</option>
+                                        <option value="System">System</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4}}>Country</label>
+                                    <select value={filterCountry} onChange={(e) => setFilterCountry(e.target.value)} style={{padding: '8px 10px', fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0', background: 'white'}}>
+                                        <option value="All">All Countries</option>
+                                        {uniqueCountries.map(country => (
+                                            <option key={country} value={country}>{country}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        )}
 
                         {error && (
                             <div style={{ padding: '20px 24px', color: '#EF4444', fontWeight: 600, fontSize: '13px' }}>
@@ -462,7 +514,7 @@ export default function Users() {
                                                         <button className="btn-edit" title="Edit User" onClick={() => openEditModal(user)}>
                                                             <Edit2 size={14} />
                                                         </button>
-                                                        <button className="btn-history" title="View Details" onClick={() => alert(`User metadata:\nID: ${user.id}\nOrigin: ${user.origin}`)}>
+                                                        <button className="btn-history" title="View Details Card" onClick={() => openDetailModal(user)}>
                                                             <History size={14} />
                                                         </button>
                                                         <button className="btn-delete" title="Delete User" onClick={() => openDeleteModal(user)}>
@@ -829,6 +881,138 @@ export default function Users() {
                                 {modalSubmitting ? 'Deleting...' : 'Delete Account'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── USER DETAIL CARD MODAL ── */}
+            {showDetailModal && selectedUser && (
+                <div className="modal-overlay">
+                    <div className="modal-card">
+                        <div className="modal-header" style={{background: 'linear-gradient(135deg, #00B2FF 0%, #0099e0 100%)', color: 'white'}}>
+                            <h3 style={{color: 'white'}}>User Profile Details</h3>
+                            <button className="btn-icon" onClick={() => setShowDetailModal(false)} style={{border: 'none', background: 'rgba(255,255,255,0.2)', color: 'white'}}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="modal-body" style={{padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px'}}>
+                            
+                            <div style={{display: 'flex', alignItems: 'center', gap: '16px'}}>
+                                <div style={{width: '64px', height: '64px', borderRadius: '16px', background: 'linear-gradient(135deg, #DBEAFE, #F0F9FF)', color: '#0099e0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: '800'}}>
+                                    {selectedUser.contactPerson.charAt(0)}
+                                </div>
+                                <div style={{textAlign: 'left'}}>
+                                    <h2 style={{margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#0F172A'}}>{selectedUser.contactPerson}</h2>
+                                    <span style={{padding: '4px 8px', background: '#F1F5F9', borderRadius: '6px', fontSize: '11px', fontWeight: '800', color: '#475569', textTransform: 'uppercase'}}>{selectedUser.category}</span>
+                                </div>
+                            </div>
+
+                            <hr style={{border: 'none', borderBottom: '1px solid #F1F5F9', margin: '0'}} />
+
+                            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', textAlign: 'left'}}>
+                                <div>
+                                    <span style={{fontSize: '10px', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase'}}>User ID</span>
+                                    <p style={{margin: '4px 0 0 0', fontSize: '13px', color: '#334155', fontWeight: 600, wordBreak: 'break-all'}}>{selectedUser.id}</p>
+                                </div>
+                                <div>
+                                    <span style={{fontSize: '10px', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase'}}>Email Address</span>
+                                    <p style={{margin: '4px 0 0 0', fontSize: '13px', color: '#334155', fontWeight: 600}}>{selectedUser.email}</p>
+                                </div>
+                                <div>
+                                    <span style={{fontSize: '10px', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase'}}>Country</span>
+                                    <p style={{margin: '4px 0 0 0', fontSize: '13px', color: '#334155', fontWeight: 600}}>{selectedUser.country || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <span style={{fontSize: '10px', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase'}}>Phone Number</span>
+                                    <p style={{margin: '4px 0 0 0', fontSize: '13px', color: '#334155', fontWeight: 600}}>{selectedUser.phone || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <span style={{fontSize: '10px', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase'}}>Account Status</span>
+                                    <p style={{margin: '4px 0 0 0'}}>
+                                        <span className={`badge-status ${selectedUser.status.toLowerCase()}`}>{selectedUser.status}</span>
+                                    </p>
+                                </div>
+                                <div>
+                                    <span style={{fontSize: '10px', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase'}}>Payment Status</span>
+                                    <p style={{margin: '4px 0 0 0'}}>
+                                        <span className={`badge-payment ${selectedUser.paymentStatus.toLowerCase()}`}>{selectedUser.paymentStatus}</span>
+                                    </p>
+                                </div>
+                                <div>
+                                    <span style={{fontSize: '10px', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase'}}>Partner Origin</span>
+                                    <p style={{margin: '4px 0 0 0', fontSize: '13px', color: '#334155', fontWeight: 600}}>{selectedUser.origin}</p>
+                                </div>
+                                <div>
+                                    <span style={{fontSize: '10px', color: '#94A3B8', fontWeight: 800, textTransform: 'uppercase'}}>Last Activity</span>
+                                    <p style={{margin: '4px 0 0 0', fontSize: '13px', color: '#334155', fontWeight: 600}}>{selectedUser.lastActivity ? `${selectedUser.lastActivity} days ago` : 'Never'}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="modal-footer" style={{background: '#F8FAFC'}}>
+                            <button className="btn-modal-cancel" onClick={() => setShowDetailModal(false)}>
+                                Close Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── BULK IMPORT MODAL ── */}
+            {showBulkModal && (
+                <div className="modal-overlay">
+                    <div className="modal-card" style={{maxWidth: '640px'}}>
+                        <div className="modal-header">
+                            <h3>Bulk Import User Accounts</h3>
+                            <button className="btn-icon" onClick={() => setShowBulkModal(false)}>
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleBulkImportSubmit}>
+                            <div className="modal-body">
+                                {modalError && <div className="error-banner">{modalError}</div>}
+                                
+                                <p style={{fontSize: '13px', color: '#64748B', margin: '0 0 8px 0', textAlign: 'left'}}>
+                                    Enter user records (one per line) formatted as comma-separated values (CSV). 
+                                    A default password (<b>Envi123</b>) will be hashed and assigned to all imported users automatically.
+                                </p>
+                                
+                                <div style={{padding: '10px 14px', background: '#F1F5F9', borderRadius: '8px', fontSize: '11px', color: '#475569', fontFamily: 'monospace', textAlign: 'left', marginBottom: '12px'}}>
+                                    Format: <b>Name, Email, Category, Country, Phone, Status, PaymentStatus, Origin</b>
+                                    <br />
+                                    Example: <i>Bindhiya Rajendran, bindhya@gmail.com, Certified hazmat Companies, India, 9585936420, Active, Paid, Direct</i>
+                                </div>
+
+                                <div className="form-group">
+                                    <label>CSV Records *</label>
+                                    <textarea
+                                        rows={8}
+                                        placeholder="Name, Email, Category, Country, Phone&#10;Alice Doe, alice@company.com, Manager, Germany, +49170283&#10;Bob Smith, bob@shipowner.com, Ship Owner, Norway, +479023482"
+                                        value={bulkText}
+                                        onChange={(e) => setBulkText(e.target.value)}
+                                        required
+                                        style={{
+                                            padding: '10px 12px',
+                                            borderRadius: '8px',
+                                            border: '1px solid #E2E8F0',
+                                            fontSize: '13px',
+                                            background: '#F8FAFC',
+                                            color: '#0F172A',
+                                            width: '100%',
+                                            fontFamily: 'monospace',
+                                            resize: 'vertical'
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            <div className="modal-footer">
+                                <button type="button" className="btn-modal-cancel" onClick={() => setShowBulkModal(false)} disabled={modalSubmitting}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn-modal-submit" disabled={modalSubmitting}>
+                                    {modalSubmitting ? 'Importing...' : 'Import User Records'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

@@ -17,6 +17,7 @@ import { fileURLToPath } from 'url';
 import {
   listUsers, getUser, createUser, updateUser, deleteUser,
   assignUserRole, getMyProfile, updateMyProfile, uploadAvatar,
+  createUsersBulk,
 } from '../../controller/user.controller.js';
 import { authenticate, authorize } from '../../middleware/auth.middleware.js';
 
@@ -39,6 +40,8 @@ router.use(authenticate);
 router.get('/me', getMyProfile);
 router.put('/me', updateMyProfile);
 router.post('/me/avatar', upload.single('avatar'), uploadAvatar);
+
+router.post('/bulk', authorize('admin'), createUsersBulk);
 
 router.route('/')
   .get(listUsers)
