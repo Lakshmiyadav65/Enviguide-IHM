@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Ship, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +18,7 @@ export default function Login() {
     const [error, setError] = useState<string | null>(null);
     const [showForgotMsg, setShowForgotMsg] = useState(false);
     const [currentSlide, setCurrentSlide] = useState(0);
+    const [rememberMe, setRememberMe] = useState(false);
 
     const slides = [slide1, slide2, slide3];
 
@@ -39,7 +40,7 @@ export default function Login() {
         e.preventDefault();
         setError(null);
         try {
-            await auth.login(email, password);
+            await auth.login(email, password, rememberMe);
             navigate('/dashboard');
         } catch (err) {
             setError((err as Error).message || 'Login failed');
@@ -113,7 +114,11 @@ export default function Login() {
 
                         <div className="form-utils-v2">
                             <label className="remember-v2">
-                                <input type="checkbox" />
+                                <input
+                                    type="checkbox"
+                                    checked={rememberMe}
+                                    onChange={(e) => setRememberMe(e.target.checked)}
+                                />
                                 <span className="mark"></span>
                                 <span>Remember me</span>
                             </label>

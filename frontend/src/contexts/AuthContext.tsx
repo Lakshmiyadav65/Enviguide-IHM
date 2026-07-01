@@ -22,7 +22,7 @@ interface AuthContextValue {
   /** True when permission node id is in the user's effective set, or
    *  when the user is an admin (in which case everything is allowed). */
   hasPermission: (nodeId: string) => boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => void;
   /** Re-pull /auth/me — call after editing the current user's perms. */
   refresh: () => Promise<void>;
@@ -80,7 +80,7 @@ function makeMockUser(email: string): AuthUser {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(() => {
-    const stored = localStorage.getItem('ihm_user');
+    const stored = localStorage.getItem('ihm_user') || sessionStorage.getItem('ihm_user');
     if (!stored) return null;
     try {
       const parsed = JSON.parse(stored) as AuthUser;
@@ -106,14 +106,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const res = await api.get<MeResponse>(ENDPOINTS.AUTH.ME);
     const u = meToAuthUser(res.data, token);
-    localStorage.setItem('ihm_user', JSON.stringify(u));
+    if (localStorage.getItem('ihm_token')) {
+      localStorage.setItem('ihm_user', JSON.stringify(u));
+    } else {
+      sessionStorage.setItem('ihm_user', JSON.stringify(u));
+    }
     setUser(u);
     return u;
   }, []);
 
   // Validate stored token + refresh permissions on mount.
   useEffect(() => {
-    const token = localStorage.getItem('ihm_token');
+    const token = localStorage.getItem('ihm_token') || sessionStorage.getItem('ihm_token');
     if (!token) return;
 
     let active = true;
@@ -121,10 +125,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchMe(token)
       .catch(() => {
         if (!active) return;
-        const currentToken = localStorage.getItem('ihm_token');
+        const currentToken = localStorage.getItem('ihm_token') || sessionStorage.getItem('ihm_token');
         if (currentToken === token) {
           localStorage.removeItem('ihm_token');
           localStorage.removeItem('ihm_user');
+          sessionStorage.removeItem('ihm_token');
+          sessionStorage.removeItem('ihm_user');
           setUser(null);
         }
       })
@@ -137,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [fetchMe]);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, rememberMe = false) => {
     setIsLoading(true);
     try {
       // Mock mode: no backend — allow any valid email/password
@@ -146,8 +152,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           throw new Error('Invalid email or password');
         }
         const u = makeMockUser(email);
-        localStorage.setItem('ihm_token', u.token);
-        localStorage.setItem('ihm_user', JSON.stringify(u));
+        if (rememberMe) {
+          localStorage.setItem('ihm_token', u.token);
+          localStorage.setItem('ihm_user', JSON.stringify(u));
+        } else {
+          sessionStorage.setItem('ihm_token', u.token);
+          sessionStorage.setItem('ihm_user', JSON.stringify(u));
+        }
         setUser(u);
         return;
       }
@@ -159,7 +170,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         { timeout: 60_000 },
       );
       const { token } = res.data;
-      localStorage.setItem('ihm_token', token);
+      if (rememberMe) {
+        localStorage.setItem('ihm_token', token);
+      } else {
+        sessionStorage.setItem('ihm_token', token);
+      }
       // Pull /me right after login so we get permissions + isAdmin in one
       // place; the login response only carries the bare-minimum identity.
       await fetchMe(token);
@@ -172,11 +187,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     api.post(ENDPOINTS.AUTH.LOGOUT, {}).catch(() => {});
     localStorage.removeItem('ihm_token');
     localStorage.removeItem('ihm_user');
+    sessionStorage.removeItem('ihm_token');
+    sessionStorage.removeItem('ihm_user');
     setUser(null);
   }, []);
 
   const refresh = useCallback(async () => {
-    const token = localStorage.getItem('ihm_token');
+    const token = localStorage.getItem('ihm_token') || sessionStorage.getItem('ihm_token');
     if (!token) return;
     await fetchMe(token).catch(() => {});
   }, [fetchMe]);

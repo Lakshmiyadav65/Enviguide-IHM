@@ -23,7 +23,7 @@ function buildUrl(path: string, params?: Record<string, string | number | boolea
 }
 
 function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('ihm_token');
+  const token = localStorage.getItem('ihm_token') || sessionStorage.getItem('ihm_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -48,7 +48,7 @@ export async function httpClient<T>(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout ?? API_CONFIG.TIMEOUT);
 
-  const tokenSent = localStorage.getItem('ihm_token');
+  const tokenSent = localStorage.getItem('ihm_token') || sessionStorage.getItem('ihm_token');
   console.log(`[HTTP Client] Sending ${fetchOptions.method || 'GET'} to ${path}. Token exists: ${!!tokenSent}. Token excerpt: ${tokenSent ? tokenSent.substring(0, 15) : 'none'}`);
 
   try {
@@ -67,11 +67,13 @@ export async function httpClient<T>(
     if (!response.ok) {
       console.warn(`[HTTP Client] Request to ${path} failed with status ${response.status}.`);
       if (response.status === 401 && !path.includes('/auth/login')) {
-        const currentToken = localStorage.getItem('ihm_token');
+        const currentToken = localStorage.getItem('ihm_token') || sessionStorage.getItem('ihm_token');
         console.warn(`[HTTP Client] 401 Unauthorized received. Token sent matches current token: ${currentToken === tokenSent}.`);
         if (currentToken === tokenSent) {
           localStorage.removeItem('ihm_token');
           localStorage.removeItem('ihm_user');
+          sessionStorage.removeItem('ihm_token');
+          sessionStorage.removeItem('ihm_user');
           window.location.href = '/';
         }
         throw new ApiError(401, 'Session expired. Redirecting to login...');
