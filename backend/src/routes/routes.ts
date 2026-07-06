@@ -18,6 +18,10 @@ import contactRouter from './subRoutes/contact.routes.js';
 import publicRouter from './subRoutes/public.routes.js';
 import fleetRouter from './subRoutes/fleet.routes.js';
 import subFleetRouter from './subRoutes/subFleet.routes.js';
+import ownershipRouter from './subRoutes/ownership.routes.js';
+import ownershipManagerRouter from './subRoutes/ownershipManager.routes.js';
+import suspendedRouter from './subRoutes/suspended.routes.js';
+import emailRouter from './subRoutes/email.routes.js';
 
 const router = Router();
 
@@ -42,5 +46,9 @@ router.use('/master',              masterRouter);
 router.use('/dashboard',           dashboardRouter);
 router.use('/fleets',              fleetRouter);
 router.use('/sub-fleets',          subFleetRouter);
+router.use('/ownership',           ownershipRouter);
+router.use('/ownership-manager',   ownershipManagerRouter);
+router.use('/suspended',           suspendedRouter);
+router.use('/send-email',          emailRouter);
 
 export default router;

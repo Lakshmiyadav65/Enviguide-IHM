@@ -20,6 +20,7 @@ import OwnershipManager from '../pages/vessels/OwnershipManager';
 import Supplier from '../pages/inventory/Supplier';
 import Equipment from '../pages/inventory/Equipment';
 import SuspectedKeyword from '../pages/inventory/SuspectedKeyword';
+import Suspended from '../pages/vessels/Suspended';
 import UserProfile from '../pages/settings/UserProfile';
 import UserMenu from '../pages/settings/UserMenu';
 import UserRights from '../pages/settings/UserRights';
@@ -79,7 +80,7 @@ export const AppRoutes = () => {
           <Route path="/administration/review-detail/:imo" element={<AuditReviewDetail />} />
           <Route path="/administration/md-sdoc-audit" element={<MDSdocAudit />} />
           <Route path="/administration/document-audit/:imo" element={<DocumentAudit />} />
-          <Route path="/menu/suspended" element={<Dashboard />} />
+          <Route path="/menu/suspended" element={<Suspended />} />
         </Route>
 
         {/* Documents Upload: requires documents_read */}
