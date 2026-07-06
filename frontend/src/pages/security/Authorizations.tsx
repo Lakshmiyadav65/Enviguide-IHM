@@ -8,7 +8,7 @@
 // endpoints. Each cell maps to a permission_nodes row id like
 // "vessels_create" / "audits_send" — seeded by the migration.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Shield, RefreshCw, Save, Check, ShieldCheck, UserPlus, X } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
@@ -76,6 +76,17 @@ export default function Authorizations() {
 
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const isSuperAdmin = useMemo(() => {
+    if (!me) return false;
+    const role = (me.roleName || me.role || '').toLowerCase();
+    return role === 'superadmin' || role.includes('super');
+  }, [me]);
+
+  const isAutoGrantedAll = false;
 
   // The granted set for the *current* scope (user or role), and the snapshot
   // we last loaded — diffing the two drives the Save button enabled state.
@@ -200,16 +211,39 @@ export default function Authorizations() {
     return () => { cancelled = true; };
   }, [tab, selectedUserId, selectedRole]);
 
-  // ── Filtered user list (by role, when a role filter is set) ────────────────
   const filteredUsers = useMemo(() => {
     if (!selectedRole) return users;
     return users.filter((u) => (u.roleName || u.category || '').toLowerCase() === selectedRole.toLowerCase());
   }, [users, selectedRole]);
 
+  const dropdownFilteredUsers = useMemo(() => {
+    const query = searchTerm.toLowerCase().trim();
+    if (!query) return filteredUsers;
+    return filteredUsers.filter(
+      (u) =>
+        u.name.toLowerCase().includes(query) ||
+        (u.email || '').toLowerCase().includes(query)
+    );
+  }, [filteredUsers, searchTerm]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
   // ── Helpers ───────────────────────────────────────────────────────────────
-  const has = (id: string) => granted.has(id);
+  const has = (id: string) => {
+    if (isAutoGrantedAll) return true;
+    return granted.has(id);
+  };
 
   const toggle = (id: string) => {
+    if (isAutoGrantedAll) return;
     setGranted((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -218,6 +252,7 @@ export default function Authorizations() {
   };
 
   const toggleModuleAll = (mod: ModuleDef) => {
+    if (isAutoGrantedAll) return;
     const ids = ACTIONS.map((a) => nodeId(mod, a));
     const allOn = ids.every((id) => granted.has(id));
     setGranted((prev) => {
@@ -228,6 +263,7 @@ export default function Authorizations() {
   };
 
   const toggleColumn = (action: Action) => {
+    if (isAutoGrantedAll) return;
     const ids = MODULES.map((m) => nodeId(m, action));
     const allOn = ids.every((id) => granted.has(id));
     setGranted((prev) => {
@@ -237,15 +273,22 @@ export default function Authorizations() {
     });
   };
 
-  const grantAllCascade = () => setGranted(new Set(ALL_LEAF_IDS));
-  const revokeAll       = () => setGranted(new Set());
+  const grantAllCascade = () => {
+    if (isAutoGrantedAll) return;
+    setGranted(new Set(ALL_LEAF_IDS));
+  };
+  const revokeAll       = () => {
+    if (isAutoGrantedAll) return;
+    setGranted(new Set());
+  };
 
   // ── Dirty + scope label ───────────────────────────────────────────────────
   const isDirty = useMemo(() => {
+    if (isAutoGrantedAll) return false;
     if (granted.size !== initialGranted.size) return true;
     for (const id of granted) if (!initialGranted.has(id)) return true;
     return false;
-  }, [granted, initialGranted]);
+  }, [granted, initialGranted, isAutoGrantedAll]);
 
   const scopeLabel = useMemo(() => {
     if (tab === 'user') {
@@ -312,9 +355,11 @@ export default function Authorizations() {
             <p>Manage roles and module-level access permissions</p>
           </div>
           <div className="auth-hero-actions">
-            <button type="button" className="auth-btn outline" onClick={() => { resetSmForm(); setShowAddModal(true); }}>
-              <UserPlus size={15} /> Add Ship Manager
-            </button>
+            {isSuperAdmin && (
+              <button type="button" className="auth-btn outline" onClick={() => { resetSmForm(); setShowAddModal(true); }}>
+                <UserPlus size={15} /> Add Ship Manager
+              </button>
+            )}
             <button type="button" className="auth-btn ghost" onClick={refresh} disabled={!isDirty || saving}>
               <RefreshCw size={15} /> Refresh
             </button>
@@ -353,14 +398,119 @@ export default function Authorizations() {
                   {roles.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
-              <div className="auth-field auth-field-grow">
+              <div className="auth-field auth-field-grow" ref={dropdownRef} style={{ position: 'relative' }}>
                 <label>Select User <span className="auth-field-meta">({filteredUsers.length} users)</span></label>
-                <select value={selectedUserId} onChange={(e) => setSelectedUserId(e.target.value)}>
-                  <option value="">— Choose a user —</option>
-                  {filteredUsers.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name} {u.email ? `· ${u.email}` : ''}</option>
-                  ))}
-                </select>
+                <div 
+                  className="custom-dropdown-trigger" 
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color, #e2e8f0)',
+                    background: '#fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    minHeight: '38px',
+                    fontSize: '14px'
+                  }}
+                >
+                  <span style={{ color: selectedUserId ? '#0f172a' : '#64748b' }}>
+                    {selectedUserId 
+                      ? (() => {
+                          const u = users.find(x => x.id === selectedUserId);
+                          return u ? `${u.name} · ${u.email || ''}` : '— Choose a user —';
+                        })()
+                      : '— Choose a user —'}
+                  </span>
+                  <span style={{ fontSize: '10px', color: '#64748b' }}>▼</span>
+                </div>
+
+                {isDropdownOpen && (
+                  <div 
+                    className="custom-dropdown-panel"
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 1000,
+                      background: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      marginTop: '4px',
+                      maxHeight: '300px',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    }}
+                  >
+                    <div style={{ padding: '8px', borderBottom: '1px solid #f1f5f9' }}>
+                      <input
+                        type="text"
+                        placeholder="Search user by name or email..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: '100%',
+                          padding: '6px 10px',
+                          borderRadius: '4px',
+                          border: '1px solid #cbd5e1',
+                          fontSize: '13px',
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                        autoFocus
+                      />
+                    </div>
+                    <div style={{ overflowY: 'auto', flex: 1, maxHeight: '220px' }}>
+                      <div
+                        onClick={() => {
+                          setSelectedUserId('');
+                          setIsDropdownOpen(false);
+                          setSearchTerm('');
+                        }}
+                        style={{
+                          padding: '8px 12px',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          color: '#64748b',
+                          borderBottom: '1px solid #f1f5f9'
+                        }}
+                      >
+                        — Choose a user —
+                      </div>
+                      {dropdownFilteredUsers.length === 0 ? (
+                        <div style={{ padding: '12px', textAlign: 'center', fontSize: '13px', color: '#64748b' }}>
+                          No users found
+                        </div>
+                      ) : (
+                        dropdownFilteredUsers.map((u) => (
+                          <div
+                            key={u.id}
+                            onClick={() => {
+                              setSelectedUserId(u.id);
+                              setIsDropdownOpen(false);
+                              setSearchTerm('');
+                            }}
+                            style={{
+                              padding: '8px 12px',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              backgroundColor: selectedUserId === u.id ? '#f1f5f9' : 'transparent',
+                              borderBottom: '1px solid #f8fafc'
+                            }}
+                          >
+                            <div style={{ fontWeight: 500, color: '#0f172a' }}>{u.name}</div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>{u.email}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -394,7 +544,7 @@ export default function Authorizations() {
               type="button"
               className="auth-quick-link"
               onClick={() => toggleColumn(a)}
-              disabled={!scopeReady}
+              disabled={!scopeReady || isAutoGrantedAll}
               title={`Toggle ${ACTION_LABELS[a]} across all modules`}
             >
               {ACTION_LABELS[a]}
@@ -404,7 +554,7 @@ export default function Authorizations() {
             type="button"
             className={`auth-quick-link auth-quick-grant ${allCascadeOn ? 'on' : ''}`}
             onClick={() => allCascadeOn ? revokeAll() : grantAllCascade()}
-            disabled={!scopeReady}
+            disabled={!scopeReady || isAutoGrantedAll}
           >
             <strong>All</strong> – Grant all (cascades)
           </button>
@@ -412,6 +562,24 @@ export default function Authorizations() {
 
         {/* Matrix */}
         <section className="auth-matrix-card">
+          {isAutoGrantedAll && (
+            <div className="auth-admin-alert" style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '12px 18px',
+              margin: '16px',
+              background: '#F0FDF4',
+              border: '1px solid #BBF7D0',
+              borderRadius: '8px',
+              color: '#15803D',
+              fontSize: '14px',
+              fontWeight: 500
+            }}>
+              <ShieldCheck size={18} />
+              <span>All module permissions are automatically granted and locked for Admins and Super Admins.</span>
+            </div>
+          )}
           <table className="auth-matrix">
             <thead>
               <tr>
@@ -442,7 +610,7 @@ export default function Authorizations() {
                             type="button"
                             className={`auth-cell ${on ? 'on' : ''}`}
                             onClick={() => toggle(id)}
-                            disabled={!scopeReady}
+                            disabled={!scopeReady || isAutoGrantedAll}
                             aria-pressed={on}
                             aria-label={`${m.label} – ${ACTION_LABELS[a]}`}
                           >
@@ -456,7 +624,7 @@ export default function Authorizations() {
                         type="button"
                         className={`auth-cell ${allOn ? 'on' : ''}`}
                         onClick={() => toggleModuleAll(m)}
-                        disabled={!scopeReady}
+                        disabled={!scopeReady || isAutoGrantedAll}
                         aria-pressed={allOn}
                         aria-label={`${m.label} – Grant all`}
                       >

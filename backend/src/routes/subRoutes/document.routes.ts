@@ -11,7 +11,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import {
-  listDocuments, uploadDocument, getDocument, updateDocument, deleteDocument,
+  listDocuments, uploadDocument, getDocument, updateDocument, deleteDocument, streamDocument,
 } from '../../controller/document.controller.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 
@@ -46,9 +46,14 @@ router.route('/')
   .get(listDocuments)
   .post(upload.single('file'), uploadDocument);
 
+// Stream proxy — serves file inline (for iframe preview) or as attachment (for download)
+// ?disposition=attachment triggers download mode
+router.get('/:id/stream', streamDocument);
+
 router.route('/:id')
   .get(getDocument)
   .put(updateDocument)
   .delete(deleteDocument);
 
 export default router;
+

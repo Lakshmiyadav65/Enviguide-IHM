@@ -2,8 +2,9 @@ import type { Request, Response, NextFunction } from 'express';
 import { DocumentService } from '../services/document.service.js';
 import { VesselService } from '../services/vessel.service.js';
 import { createError } from '../middleware/errorHandler.js';
+import { persistUploadedFile, deleteStoredFile, getStoredFileStream } from '../services/storage.service.js';
 
-const VALID_TYPES = ['IHM Report', 'SOC', 'Ship Particulars', 'MD', 'SDoC', 'Other'];
+const VALID_TYPES = ['IHM Report', 'SOC', 'Ship Particulars', 'MD', 'SDoC', 'Other', 'Certificate', 'Manual', 'Drawing', 'Declaration'];
 const VALID_STATUS = ['pending', 'approved', 'rejected', 'expired'];
 
 async function verify(userId: string, vesselId: string, next: NextFunction) {
@@ -46,13 +47,17 @@ export async function uploadDocument(req: Request, res: Response, next: NextFunc
       return next(createError(`documentType must be one of: ${VALID_TYPES.join(', ')}`, 400));
     }
 
+    // Persist to storage (scopes under S3 bucket as: vessels/<vesselId>/documents/<filename>)
+    const stored = await persistUploadedFile(req.file.path, req.file.originalname, `vessels/${vesselId}/documents`, req.file.mimetype);
+
     const data = {
       name: name || req.file.originalname,
       documentType,
       category: category || 'general',
       status: 'pending',
       fileName: req.file.originalname,
-      filePath: `/uploads/documents/${req.file.filename}`,
+      filePath: stored.url,
+      storageKey: stored.key || null,
       fileSize: req.file.size,
       mimeType: req.file.mimetype,
       uploadedBy: req.user!.email,
@@ -107,7 +112,57 @@ export async function deleteDocument(req: Request, res: Response, next: NextFunc
     const existing = await DocumentService.getDocumentById(req.params.id as string, vesselId);
     if (!existing) return next(createError('Document not found', 404));
 
+    // Clean up S3 storage if storageKey is active
+    if (existing.storageKey) {
+      await deleteStoredFile(existing.storageKey as string);
+    }
+
     await DocumentService.deleteDocument(req.params.id as string);
     res.status(204).send();
+  } catch (err) { next(err); }
+}
+
+
+/**
+ * GET /api/v1/vessels/:vesselId/documents/:id/stream
+ * Streams the file through the backend with Content-Disposition: inline so
+ * the browser renders it inside the iframe instead of downloading it.
+ * Also defeats S3/Supabase X-Frame-Options headers.
+ * ?disposition=attachment  →  switches to download mode
+ */
+export async function streamDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const vesselId = req.params.vesselId as string;
+    const v = await verify(req.user!.userId, vesselId, next);
+    if (!v) return;
+
+    const doc = await DocumentService.getDocumentById(req.params.id as string, vesselId);
+    if (!doc) return next(createError('Document not found', 404));
+
+    const filePath = (doc.storageKey || doc.filePath) as string | undefined;
+    if (!filePath) return next(createError('File not available', 404));
+
+    const disposition = req.query.disposition === 'attachment' ? 'attachment' : 'inline';
+    // Original filename stored at upload time; fall back to doc.name
+    const safeName = String(doc.fileName || doc.name || 'document').replace(/"/g, '');
+
+    const stream = await getStoredFileStream(filePath);
+    if (!stream) {
+      // Local dev fallback — file is on disk, serve inline via redirect
+      // (express static handler already sets correct headers for local files)
+      return res.redirect(String(doc.filePath));
+    }
+
+    const mime = (doc.mimeType || stream.contentType || 'application/octet-stream') as string;
+    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Disposition', `${disposition}; filename="${safeName}"`);
+    // Allow embedding in iframes from the same origin
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.removeHeader('X-Content-Type-Options');
+    if (stream.contentLength) res.setHeader('Content-Length', String(stream.contentLength));
+    res.setHeader('Cache-Control', 'private, max-age=120');
+
+    (stream.body as NodeJS.ReadableStream).pipe(res);
+    (stream.body as NodeJS.ReadableStream).on('error', () => res.destroy());
   } catch (err) { next(err); }
 }

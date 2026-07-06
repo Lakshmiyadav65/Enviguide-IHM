@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { PermissionService } from '../services/permission.service.js';
 import { createError } from '../middleware/errorHandler.js';
+import { AuthService } from '../services/auth.service.js';
 
 /** GET /api/v1/permissions/nodes — full permission tree */
 export async function listPermissionNodes(_req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -32,8 +33,36 @@ export async function deletePermissionNode(req: Request, res: Response, next: Ne
 /** GET /api/v1/permissions/users/:userId */
 export async function getUserPermissions(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const ids = await PermissionService.getUserPermissions(req.params.userId as string);
-    res.json({ success: true, data: ids });
+    const userId = req.params.userId as string;
+    const ids = await PermissionService.getUserPermissions(userId);
+
+    if (ids.includes('__custom_override__')) {
+      res.json({ success: true, data: ids.filter(x => x !== '__custom_override__') });
+    } else {
+      const user = await AuthService.findUserById(userId);
+      if (!user) {
+        return next(createError('User not found', 404));
+      }
+      let roleName = user.role_name;
+      const cat = (user.category || '').toLowerCase();
+      if (!roleName) {
+        if (cat.includes('super')) {
+          roleName = 'superadmin';
+        } else if (cat.includes('admin')) {
+          roleName = 'admin';
+        } else if (cat.includes('manager')) {
+          roleName = 'ship_manager';
+        } else if (cat.includes('staff')) {
+          roleName = 'staff';
+        }
+      }
+      const normalizedRole = roleName ? roleName.toLowerCase() : '';
+      let rolePerms: string[] = [];
+      if (normalizedRole) {
+        rolePerms = await PermissionService.getRolePermissions(normalizedRole).catch(() => []);
+      }
+      res.json({ success: true, data: rolePerms });
+    }
   } catch (err) { next(err); }
 }
 
@@ -42,7 +71,8 @@ export async function setUserPermissions(req: Request, res: Response, next: Next
   try {
     const { nodeIds } = req.body as { nodeIds?: unknown };
     if (!Array.isArray(nodeIds)) return next(createError('nodeIds[] is required', 400));
-    await PermissionService.setUserPermissions(req.params.userId as string, nodeIds as string[]);
+    const customNodeIds = [...new Set([...(nodeIds as string[]), '__custom_override__'])];
+    await PermissionService.setUserPermissions(req.params.userId as string, customNodeIds);
     res.json({ success: true });
   } catch (err) { next(err); }
 }

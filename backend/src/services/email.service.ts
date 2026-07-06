@@ -117,6 +117,7 @@ export interface SendMailInput {
   text?: string;
   html?: string;
   replyTo?: string;
+  attachments?: Array<{ filename: string; path: string }>;
 }
 
 export interface SendMailResult {
@@ -288,6 +289,7 @@ export async function sendMail(input: SendMailInput): Promise<SendMailResult> {
       subject: redirected.subject,
       text: redirected.text,
       html: redirected.html,
+      attachments: input.attachments,
     });
     emailLog.info(`✓ smtp ok id=${(result as { messageId?: string }).messageId ?? ''} ${Date.now() - t0}ms`);
     return { messageId: (result as { messageId?: string }).messageId ?? '', transport: 'smtp' };

@@ -29,6 +29,9 @@ export const ENDPOINTS = {
     DECKS: (id: string) => `/vessels/${id}/decks`,
     MATERIALS: (id: string) => `/vessels/${id}/materials`,
     CERTIFICATES: (id: string) => `/vessels/${id}/certificates`,
+    DOCUMENTS: (id: string) => `/vessels/${id}/documents`,
+    DOCUMENT_DETAIL: (id: string, docId: string) => `/vessels/${id}/documents/${docId}`,
+    DOCUMENT_STREAM: (id: string, docId: string) => `/vessels/${id}/documents/${docId}/stream`,
   },
 
   // GA Plans (nested under a vessel)

@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import './UploadPurchaseOrder.css';
@@ -13,7 +13,8 @@ import {
     FileText,
     Wand2,
     CheckCircle2,
-    ArrowLeft
+    ArrowLeft,
+    Download
 } from 'lucide-react';
 import { INITIAL_VESSELS } from '../../data/vesselData';
 import type { Vessel } from '../../types';
@@ -310,9 +311,16 @@ export default function UploadPurchaseOrder() {
                 });
                 return newHeader;
             } else {
+                const rowVesselName = fieldMappings.vesselName ? String(row[Number(fieldMappings.vesselName)] || '').trim() : '';
+                const finalVesselName = rowVesselName || shipName;
+                const rowItemName = fieldMappings.equipmentName 
+                    ? String(row[Number(fieldMappings.equipmentName)] || '').trim() 
+                    : (fieldMappings.itemDescription ? String(row[Number(fieldMappings.itemDescription)] || '').trim() : '');
+                const finalItemName = rowItemName || 'Item';
+
                 const newRow = [
-                    shipName, // Name (default to vessel name)
-                    fieldMappings.vesselName ? String(row[Number(fieldMappings.vesselName)] || '') : shipName,
+                    finalItemName, // Name (Product Name)
+                    finalVesselName, // Vessel Name
                     fieldMappings.poNumber ? String(row[Number(fieldMappings.poNumber)] || '') : '',
                     imo, // IMO Number (from selected vessel)
                     fieldMappings.poSentDate ? String(row[Number(fieldMappings.poSentDate)] || '') : '',
@@ -593,6 +601,27 @@ export default function UploadPurchaseOrder() {
                                                 )}
                                             </div>
                                             <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept={getAcceptedFileTypes()} style={{ display: 'none' }} />
+                                            <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end' }}>
+                                                <a 
+                                                    href="/sample_purchase_order.csv" 
+                                                    download="sample_purchase_order.csv"
+                                                    style={{ 
+                                                        fontSize: '11px', 
+                                                        color: '#00B0FA', 
+                                                        fontWeight: 700, 
+                                                        textDecoration: 'none',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        cursor: 'pointer',
+                                                        transition: 'color 0.2s'
+                                                    }}
+                                                    onMouseOver={(e) => (e.currentTarget.style.color = '#008AC5')}
+                                                    onMouseOut={(e) => (e.currentTarget.style.color = '#00B0FA')}
+                                                >
+                                                    <Download size={12} /> DOWNLOAD SAMPLE CSV FILE
+                                                </a>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

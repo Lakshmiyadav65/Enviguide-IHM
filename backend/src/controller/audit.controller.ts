@@ -1,6 +1,7 @@
 // -- Audit Controller (Pending Audits & Reviews) -----------
 import type { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
+import fs from 'fs';
 import { AuditService } from '../services/audit.service.js';
 import { DocumentService } from '../services/document.service.js';
 import { sendMail } from '../services/email.service.js';
@@ -22,13 +23,13 @@ const LINE_ITEM_HEADER = [
 
 function lineItemRowToArray(row: Record<string, unknown>): unknown[] {
   const arr = [
-    row.name, row.vessel_name, row.po_number, row.imo_number,
-    row.po_sent_date, row.md_requested_date, row.item_description, row.is_suspected,
-    row.impa_code, row.issa_code, row.equipment_code, row.equipment_name,
-    row.maker, row.model, row.part_number, row.unit, row.quantity,
-    row.vendor_remark, row.vendor_email, row.vendor_name,
+    row.name, row.vesselName, row.poNumber, row.imoNumber,
+    row.poSentDate, row.mdRequestedDate, row.itemDescription, row.isSuspected,
+    row.impaCode, row.issaCode, row.equipmentCode, row.equipmentName,
+    row.maker, row.model, row.partNumber, row.unit, row.quantity,
+    row.vendorRemark, row.vendorEmail, row.vendorName,
   ].map((v) => (v == null ? '' : String(v)));
-  const extra = (row.extra_data as unknown[]) ?? [];
+  const extra = (row.extraData as unknown[]) ?? [];
   if (Array.isArray(extra)) arr.push(...extra.map((v) => (v == null ? '' : String(v))));
   return arr;
 }
@@ -202,25 +203,26 @@ function rewriteSuspectedBlock(body: string, rows: unknown[][]): string {
 export async function sendClarificationEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const db = getDb();
-    const {
-      imo,
-      vesselName,
-      to,
-      cc,
-      subject,
-      body,
-      suspectedItems,
-    } = req.body as {
-      imo?: string;
-      vesselName?: string;
-      to?: string[];
-      cc?: string[];
-      subject?: string;
-      body?: string;
-      suspectedItems?: unknown[];
-    };
+    const imo = req.body.imo as string | undefined;
+    const vesselName = req.body.vesselName as string | undefined;
+    const subject = req.body.subject as string | undefined;
+    const body = req.body.body as string | undefined;
 
-    if (!imo || !to || to.length === 0 || !subject || !body) {
+    const rawTo = req.body.to || req.body['to[]'];
+    const rawCc = req.body.cc || req.body['cc[]'];
+    const to = Array.isArray(rawTo) ? rawTo.map(String) : (typeof rawTo === 'string' ? [rawTo] : []);
+    const cc = Array.isArray(rawCc) ? rawCc.map(String) : (typeof rawCc === 'string' ? [rawCc] : []);
+
+    let suspectedItems = req.body.suspectedItems;
+    if (typeof suspectedItems === 'string') {
+      try {
+        suspectedItems = JSON.parse(suspectedItems);
+      } catch {
+        suspectedItems = [];
+      }
+    }
+
+    if (!imo || to.length === 0 || !subject || !body) {
       return next(createError('imo, to, subject, and body are required', 400));
     }
 
@@ -426,6 +428,13 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
       `[clarification-email] queued ${persisted.length} batch(es) for IMO ${imo} — dispatching in background`,
     );
 
+    const attachments = Array.isArray(req.files)
+      ? (req.files as Express.Multer.File[]).map((f) => ({
+          filename: f.originalname,
+          path: f.path,
+        }))
+      : [];
+
     void Promise.allSettled(
       persisted.map(async (p) => {
         const label = `[clarification-email] ${p.clarificationId} → ${p.to.join(', ')}`;
@@ -439,6 +448,7 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
             subject,
             text: p.bodyWithLink,
             html: p.html,
+            attachments,
           });
           const elapsed = Date.now() - t0;
           console.log(
@@ -461,7 +471,12 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
         }
       }),
     ).then(() => {
-      console.log(`[clarification-email] all batches finished for IMO ${imo}`);
+      console.log(`[clarification-email] all batches finished for IMO ${imo}. Cleaning up attachments.`);
+      for (const f of attachments) {
+        fs.unlink(f.path, (err: NodeJS.ErrnoException | null) => {
+          if (err) console.error(`[clarification-email] failed to delete temp file ${f.path}:`, err);
+        });
+      }
     });
   } catch (err) { next(err); }
 }

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './ReviewWizard.css';
 import { api } from '../../lib/apiClient';
 import { ENDPOINTS } from '../../config/api.config';
@@ -391,19 +391,54 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
         else handleFinalize();
     };
 
-    const handleFinalize = () => {
+    const handleFinalize = async () => {
         const header = data[0];
         const suspectedIdx = header.indexOf('Is Suspected');
         const descIdx = header.indexOf('Item Description');
         const poIdx = header.indexOf('PO Number');
         const emailIdx = header.indexOf('Vendor Email');
+        const equipNameIdx = header.indexOf('Equipment Name');
+        const makerIdx = header.indexOf('Maker');
+        const modelIdx = header.indexOf('Model');
+        const partNoIdx = header.indexOf('Part Number');
+        const qtyIdx = header.indexOf('Quantity');
+        const unitIdx = header.indexOf('Unit');
+        const impaIdx = header.indexOf('IMPA Code');
+        const issaIdx = header.indexOf('ISSA Code');
+        const vendorNameIdx = header.indexOf('Vendor Name');
+        const mdReqIdx = header.indexOf('MD Requested Date');
 
         const suspected = data.slice(1).filter(row => row[suspectedIdx] === 'Yes');
 
         if (suspected.length > 0) {
             setSuspectedItems(suspected);
             const vendorEmails = Array.from(new Set(suspected.map(r => r[emailIdx]).filter(e => e))) as string[];
-            const body = `Dear Team,\n\nWe are currently reviewing the IHM documentation for ${vesselName} (IMO: ${imo}). During our audit, we identified some items that require additional clarification or documentation (SDoC/MD).\n\nSuspected Items List:\n${suspected.map((r, i) => `${i + 1}. PO: ${r[poIdx]} - ${r[descIdx]}`).join('\n')}\n\nPlease provide the requested info at your earliest convenience.\n\nBest Regards,\nIHM Audit Team`;
+            const body = `Dear Team,\n\nWe are currently reviewing the IHM documentation for ${vesselName} (IMO: ${imo}). During our audit, we identified some items that require additional clarification or documentation (SDoC/MD).\n\nSuspected Items Details:\n${suspected.map((r, i) => {
+                const desc = descIdx !== -1 ? r[descIdx] : '';
+                const po = poIdx !== -1 ? r[poIdx] : '';
+                const equip = equipNameIdx !== -1 ? r[equipNameIdx] : '';
+                const maker = makerIdx !== -1 ? r[makerIdx] : '';
+                const model = modelIdx !== -1 ? r[modelIdx] : '';
+                const part = partNoIdx !== -1 ? r[partNoIdx] : '';
+                const qty = qtyIdx !== -1 ? r[qtyIdx] : '';
+                const unit = unitIdx !== -1 ? r[unitIdx] : '';
+                const impa = impaIdx !== -1 ? r[impaIdx] : '';
+                const issa = issaIdx !== -1 ? r[issaIdx] : '';
+                const vName = vendorNameIdx !== -1 ? r[vendorNameIdx] : '';
+                const reqDate = mdReqIdx !== -1 ? r[mdReqIdx] : '';
+
+                let itemText = `--------------------------------------------------\n`;
+                itemText += `${i + 1}. Item Description: ${desc}\n`;
+                if (po) itemText += `   - PO Number: ${po}\n`;
+                if (equip) itemText += `   - Equipment Name: ${equip}\n`;
+                if (maker || model) itemText += `   - Maker/Model: ${maker || 'N/A'} / ${model || 'N/A'}\n`;
+                if (part) itemText += `   - Part Number: ${part}\n`;
+                if (impa || issa) itemText += `   - IMPA/ISSA Code: ${impa || 'N/A'} / ${issa || 'N/A'}\n`;
+                if (qty) itemText += `   - Quantity: ${qty} ${unit || ''}\n`;
+                if (vName) itemText += `   - Supplier: ${vName}\n`;
+                if (reqDate) itemText += `   - MD Requested Date: ${reqDate}\n`;
+                return itemText;
+            }).join('')}\n--------------------------------------------------\n\nPlease provide the requested info at your earliest convenience.\n\nBest Regards,\nIHM Audit Team`;
 
             setMailContent({
                 to: vendorEmails.join(', '),
@@ -413,6 +448,13 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
             initChips(vendorEmails.join(', '));
             setShowMailModal(true);
         } else {
+            try {
+                if (auditId) {
+                    await api.patch(`/audits/reviews/${auditId}/complete`, {});
+                }
+            } catch (err) {
+                console.error('Failed to complete review on backend:', err);
+            }
             onComplete();
         }
     };
@@ -441,21 +483,24 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
 
         setIsSending(true);
         try {
+            const formData = new FormData();
+            formData.append('imo', imo);
+            formData.append('vesselName', vesselName || '');
+            formData.append('subject', mailContent.subject);
+            formData.append('body', mailContent.body);
+            formData.append('suspectedItems', JSON.stringify(suspectedItems));
+
+            toChips.forEach((toEmail) => formData.append('to[]', toEmail));
+            ccList.forEach((ccEmail) => formData.append('cc[]', ccEmail));
+            attachedFiles.forEach((file) => formData.append('attachments', file));
+
             // SMTP through Gmail can take 5-10s per recipient, and the
             // backend splits per-vendor — one mail per vendor + an orphan
             // batch. Allow up to 2 minutes before giving up so a clean send
             // through 5+ recipients doesn't trip the default 15s timeout.
-            await api.post(
+            await api.upload(
                 ENDPOINTS.AUDITS.CLARIFICATION_EMAIL,
-                {
-                    imo,
-                    vesselName,
-                    to: toChips,
-                    cc: ccList,
-                    subject: mailContent.subject,
-                    body: mailContent.body,
-                    suspectedItems,
-                },
+                formData,
                 { timeout: 120_000 },
             );
 
@@ -888,6 +933,55 @@ const ReviewWizard = ({ imo, vesselName, auditId, onClose, onComplete }: ReviewW
                                         <Send size={15} style={{ marginRight: 6 }} />
                                     )}
                                     {isSending ? 'Sending…' : 'Send'}
+                                </button>
+                                <button
+                                    className="gmail-skip-finalize-btn"
+                                    onClick={async () => {
+                                        if (isSending) return;
+                                        setIsSending(true);
+                                        try {
+                                            if (auditId) {
+                                                await api.patch(`/audits/reviews/${auditId}/complete`, {});
+                                            }
+                                            setToastData({
+                                                title: 'Review Finalized',
+                                                message: 'The review was finalized and marked Completed without sending clarification email.'
+                                            });
+                                            setShowToast(true);
+                                            setShowMailModal(false);
+                                            setTimeout(() => { onComplete(); }, 1500);
+                                        } catch (err) {
+                                            const msg = err instanceof Error ? err.message : 'Unknown error';
+                                            setToastData({
+                                                title: 'Failed to complete review',
+                                                message: msg
+                                            });
+                                            setShowToast(true);
+                                        } finally {
+                                            setIsSending(false);
+                                        }
+                                    }}
+                                    disabled={isSending}
+                                    style={{
+                                        background: '#F1F5F9',
+                                        color: '#475569',
+                                        border: '1px solid #CBD5E1',
+                                        borderRadius: '8px',
+                                        padding: '0 16px',
+                                        fontSize: '13px',
+                                        fontWeight: 700,
+                                        height: '36px',
+                                        marginLeft: '10px',
+                                        cursor: 'pointer',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'background 0.2s'
+                                    }}
+                                    onMouseOver={(e) => (e.currentTarget.style.background = '#E2E8F0')}
+                                    onMouseOut={(e) => (e.currentTarget.style.background = '#F1F5F9')}
+                                >
+                                    Skip & Finalize
                                 </button>
                                 <div className="gmail-tool-icons">
                                     <span className="tool-icon-btn"><Type size={22} /></span>

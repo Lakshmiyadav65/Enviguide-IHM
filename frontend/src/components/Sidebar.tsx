@@ -101,7 +101,7 @@ const menuItems: MenuItem[] = [
         label: 'Security',
         children: [
             { path: '/security/users', label: 'Users', requires: 'security_read' },
-            { path: '/security/authorizations', label: 'Authorizations', requires: 'security_read' },
+            { path: '/security/authorizations', label: 'Authorizations', requires: 'security_update' },
         ]
     },
     { path: '/contact', icon: Mail, label: 'Contact Us' },
@@ -132,7 +132,6 @@ export default function Sidebar() {
     const visibleMenu = useMemo<MenuItem[]>(() => {
         if (!user) return menuItems;
         if (user.isAdmin) return menuItems;
-        if (!user.permissions || user.permissions.length === 0) return menuItems;
         const out: MenuItem[] = [];
         for (const item of menuItems) {
             if (item.children && item.children.length > 0) {

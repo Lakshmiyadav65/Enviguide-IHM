@@ -31,7 +31,8 @@ export async function isUserAdmin(userId: string | undefined | null): Promise<bo
     { projection: { category: 1 } }
   ) as { category?: string } | null;
 
-  const isAdmin = !!row && String(row.category ?? '').toLowerCase() === 'admin';
+  const cat = String(row?.category ?? '').toLowerCase();
+  const isAdmin = !!row && (cat === 'admin' || cat === 'superadmin' || cat.includes('admin'));
   cache.set(userId, { isAdmin, expires: now + TTL_MS });
   return isAdmin;
 }

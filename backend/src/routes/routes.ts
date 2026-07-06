@@ -16,6 +16,8 @@ import equipmentRouter from './subRoutes/equipment.routes.js';
 import suspectedKeywordRouter from './subRoutes/suspectedKeyword.routes.js';
 import contactRouter from './subRoutes/contact.routes.js';
 import publicRouter from './subRoutes/public.routes.js';
+import fleetRouter from './subRoutes/fleet.routes.js';
+import subFleetRouter from './subRoutes/subFleet.routes.js';
 
 const router = Router();
 
@@ -38,5 +40,7 @@ router.use('/audits',              auditRouter);
 router.use('/security',            securityRouter);
 router.use('/master',              masterRouter);
 router.use('/dashboard',           dashboardRouter);
+router.use('/fleets',              fleetRouter);
+router.use('/sub-fleets',          subFleetRouter);
 
 export default router;

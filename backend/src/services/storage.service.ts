@@ -57,6 +57,7 @@ export async function persistUploadedFile(
   localPath: string,
   originalName: string,
   folder: string,
+  mimeType?: string,
 ): Promise<StoredFile> {
   if (!s3Configured) {
     const idx = localPath.replace(/\\/g, '/').lastIndexOf('/uploads/');
@@ -70,11 +71,23 @@ export async function persistUploadedFile(
   const key = `${folder}/${Date.now()}-${randomSuffix()}${ext}`;
   const body = fs.readFileSync(localPath);
 
+  let contentType = mimeType;
+  if (!contentType) {
+    const lower = originalName.toLowerCase();
+    if (lower.endsWith('.pdf')) contentType = 'application/pdf';
+    else if (lower.endsWith('.png')) contentType = 'image/png';
+    else if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) contentType = 'image/jpeg';
+    else if (lower.endsWith('.gif')) contentType = 'image/gif';
+    else if (lower.endsWith('.svg')) contentType = 'image/svg+xml';
+    else contentType = 'application/octet-stream';
+  }
+
   await getClient().send(
     new PutObjectCommand({
       Bucket: env.S3_BUCKET!,
       Key: key,
       Body: body,
+      ContentType: contentType,
       ContentDisposition: `inline; filename="${originalName.replace(/"/g, '')}"`,
     }),
   );

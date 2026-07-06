@@ -40,41 +40,81 @@ export const AppRoutes = () => {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/vessels" element={<Vessels />} />
-        <Route path="/vessels/ship" element={<Vessels />} />
-        <Route path="/vessels/fleet" element={<Fleet />} />
-        <Route path="/vessels/sub-fleet" element={<SubFleet />} />
-        <Route path="/vessels/:id" element={<Vessels />} />
-        <Route path="/decks" element={<Vessels />} />
-        <Route path="/viewer" element={<FullPlanViewer />} />
-        <Route path="/mapping" element={<HazardousMaterialMapping />} />
-        <Route path="/materials" element={<Dashboard />} />
-        <Route path="/purchase-orders" element={<Dashboard />} />
-        <Route path="/administration" element={<Dashboard />} />
-        <Route path="/administration/upload-po" element={<UploadPurchaseOrder />} />
-        <Route path="/administration/pending-audits" element={<PendingAudits />} />
-        <Route path="/administration/pending-reviews" element={<PendingReviews />} />
-        <Route path="/administration/review-detail/:imo" element={<AuditReviewDetail />} />
-        <Route path="/administration/md-sdoc-audit" element={<MDSdocAudit />} />
-        <Route path="/administration/document-audit/:imo" element={<DocumentAudit />} />
-        <Route path="/administration/upload-docs" element={<DocTab />} />
-        <Route path="/security" element={<Dashboard />} />
-        <Route path="/security/users" element={<Users />} />
-        <Route path="/security/user-profile" element={<UserProfile />} />
-        <Route path="/security/user-menu" element={<UserMenu />} />
-        <Route path="/security/user-rights" element={<UserRights />} />
-        <Route path="/security/user-role-rights" element={<UserRoleRights />} />
-        <Route path="/security/user-category" element={<UserCategory />} />
-        <Route path="/security/authorizations" element={<Authorizations />} />
+
+        {/* Vessels group: requires vessels_read */}
+        <Route element={<ProtectedRoute requiredPermission="vessels_read" />}>
+          <Route path="/vessels" element={<Vessels />} />
+          <Route path="/vessels/ship" element={<Vessels />} />
+          <Route path="/vessels/fleet" element={<Fleet />} />
+          <Route path="/vessels/sub-fleet" element={<SubFleet />} />
+          <Route path="/vessels/:id" element={<Vessels />} />
+          <Route path="/decks" element={<Vessels />} />
+          <Route path="/viewer" element={<FullPlanViewer />} />
+          <Route path="/menu/registered" element={<Registered />} />
+          <Route path="/menu/ownership" element={<Ownership />} />
+          <Route path="/menu/ownership-manager" element={<OwnershipManager />} />
+        </Route>
+
+        {/* Materials Record group: requires materials_read */}
+        <Route element={<ProtectedRoute requiredPermission="materials_read" />}>
+          <Route path="/mapping" element={<HazardousMaterialMapping />} />
+          <Route path="/materials" element={<Dashboard />} />
+        </Route>
+
+        {/* Purchase Orders: requires purchase_orders_read */}
+        <Route element={<ProtectedRoute requiredPermission="purchase_orders_read" />}>
+          <Route path="/purchase-orders" element={<Dashboard />} />
+        </Route>
+
+        {/* Purchase Orders Creation: requires purchase_orders_create */}
+        <Route element={<ProtectedRoute requiredPermission="purchase_orders_create" />}>
+          <Route path="/administration/upload-po" element={<UploadPurchaseOrder />} />
+        </Route>
+
+        {/* Audits/Administration: requires audits_read */}
+        <Route element={<ProtectedRoute requiredPermission="audits_read" />}>
+          <Route path="/administration" element={<Dashboard />} />
+          <Route path="/administration/pending-audits" element={<PendingAudits />} />
+          <Route path="/administration/pending-reviews" element={<PendingReviews />} />
+          <Route path="/administration/review-detail/:imo" element={<AuditReviewDetail />} />
+          <Route path="/administration/md-sdoc-audit" element={<MDSdocAudit />} />
+          <Route path="/administration/document-audit/:imo" element={<DocumentAudit />} />
+          <Route path="/menu/suspended" element={<Dashboard />} />
+        </Route>
+
+        {/* Documents Upload: requires documents_read */}
+        <Route element={<ProtectedRoute requiredPermission="documents_read" />}>
+          <Route path="/administration/upload-docs" element={<DocTab />} />
+        </Route>
+
+        {/* Security / User management: requires security_read */}
+        <Route element={<ProtectedRoute requiredPermission="security_read" />}>
+          <Route path="/security" element={<Dashboard />} />
+          <Route path="/security/users" element={<Users />} />
+          <Route path="/security/user-profile" element={<UserProfile />} />
+          <Route path="/security/user-menu" element={<UserMenu />} />
+          <Route path="/security/user-rights" element={<UserRights />} />
+          <Route path="/security/user-role-rights" element={<UserRoleRights />} />
+          <Route path="/security/user-category" element={<UserCategory />} />
+        </Route>
+
+        {/* Security authorizations edit: requires security_update */}
+        <Route element={<ProtectedRoute requiredPermission="security_update" />}>
+          <Route path="/security/authorizations" element={<Authorizations />} />
+        </Route>
+
+        {/* Settings / Inventory: requires settings_read */}
+        <Route element={<ProtectedRoute requiredPermission="settings_read" />}>
+          <Route path="/menu/supplier" element={<Supplier />} />
+          <Route path="/menu/equipment" element={<Equipment />} />
+          <Route path="/menu/suspected-keyword" element={<SuspectedKeyword />} />
+        </Route>
+
+        {/* Master Data and Inventory stubs */}
         <Route path="/master-data" element={<Dashboard />} />
         <Route path="/inventory" element={<Dashboard />} />
-        <Route path="/menu/registered" element={<Registered />} />
-        <Route path="/menu/ownership" element={<Ownership />} />
-        <Route path="/menu/ownership-manager" element={<OwnershipManager />} />
-        <Route path="/menu/supplier" element={<Supplier />} />
-        <Route path="/menu/equipment" element={<Equipment />} />
-        <Route path="/menu/suspended" element={<Dashboard />} />
-        <Route path="/menu/suspected-keyword" element={<SuspectedKeyword />} />
+
+        {/* Public contact form */}
         <Route path="/contact" element={<Contact />} />
       </Route>
 

@@ -99,15 +99,34 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
       return next(createError('User not found', 404));
     }
 
-    // Effective permissions = direct user grants ∪ role grants. The Authorizations
-    // page edits both buckets; the frontend treats their union as the truth.
     const userPerms = await PermissionService.getUserPermissions(user.id);
-    let rolePerms: string[] = [];
-    const roleName = (user as { role_name?: string | null }).role_name;
-    if (roleName) {
-      rolePerms = await PermissionService.getRolePermissions(roleName).catch(() => []);
+    let effective: string[] = [];
+    let roleName = (user as { role_name?: string | null }).role_name;
+
+    if (userPerms.includes('__custom_override__')) {
+      effective = userPerms.filter(x => x !== '__custom_override__');
+    } else {
+      let rolePerms: string[] = [];
+      
+      if (!roleName) {
+        const cat = (user.category || '').toLowerCase();
+        if (cat.includes('super')) {
+          roleName = 'superadmin';
+        } else if (cat.includes('admin')) {
+          roleName = 'admin';
+        } else if (cat.includes('manager')) {
+          roleName = 'ship_manager';
+        } else if (cat.includes('staff')) {
+          roleName = 'staff';
+        }
+      }
+
+      const normalizedRole = roleName ? roleName.toLowerCase() : '';
+      if (normalizedRole) {
+        rolePerms = await PermissionService.getRolePermissions(normalizedRole).catch(() => []);
+      }
+      effective = Array.from(new Set([...userPerms, ...rolePerms]));
     }
-    const effective = Array.from(new Set([...userPerms, ...rolePerms]));
 
     // 'isAdmin' bypasses the permission check on the frontend — admin /
     // superadmin / manager users see everything regardless of grants.
@@ -119,9 +138,9 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
     // admin whose category was set by a different code path.
     const cat  = (user.category || '').toLowerCase();
     const role = (roleName || '').toLowerCase();
-    const isAdminTag = (s: string) =>
-      s.includes('admin') || s === 'superadmin' || s === 'manager';
-    const isAdmin = isAdminTag(cat) || isAdminTag(role);
+    const isSuperAdminTag = (s: string) =>
+      s === 'superadmin' || s.includes('super');
+    const isAdmin = isSuperAdminTag(cat) || isSuperAdminTag(role);
 
     res.json({
       success: true,

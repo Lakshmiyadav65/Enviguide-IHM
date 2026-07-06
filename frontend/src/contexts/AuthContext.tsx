@@ -7,6 +7,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: 'admin' | 'manager' | 'viewer' | string;
+  roleName?: string | null;
   /** True for admin / superadmin accounts — bypasses permission checks. */
   isAdmin: boolean;
   /** Effective permission node ids (user grants ∪ role grants). Empty
@@ -56,6 +57,7 @@ function meToAuthUser(d: MeResponse['data'], token: string): AuthUser {
     name: d.name,
     email: d.email,
     role: d.role as AuthUser['role'],
+    roleName: (d as any).roleName ?? null,
     isAdmin: !!d.isAdmin,
     permissions: Array.isArray(d.permissions) ? d.permissions : [],
     token,
@@ -72,6 +74,7 @@ function makeMockUser(email: string): AuthUser {
     name: email.split('@')[0] || 'Admin',
     email: email || 'admin@enviguide.com',
     role: 'admin',
+    roleName: 'superadmin',
     isAdmin: true,
     permissions: [],
     token: MOCK_TOKEN,
@@ -89,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...parsed,
         isAdmin: !!parsed.isAdmin,
         permissions: Array.isArray(parsed.permissions) ? parsed.permissions : [],
+        roleName: parsed.roleName ?? null,
       };
     } catch {
       return null;

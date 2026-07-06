@@ -66,7 +66,7 @@ router.get('/mds-doc',                       getMdsDocAudit);
 router.get('/mds-pending',                   getMdsPendingOverview);
 router.get('/vessels/:vesselId/po-items',    getVesselPoItems);
 
-router.post('/clarification-email',          sendClarificationEmail);
+router.post('/clarification-email', upload.array('attachments'), sendClarificationEmail);
 
 router.patch('/:id/send-for-review',         sendAuditForReview);
 router.patch('/reviews/:id/complete',        completeReview);

@@ -15,6 +15,7 @@ interface UserRow {
   last_activity: Date | null;
   created_at: Date;
   updated_at: Date;
+  role_name?: string | null;
 }
 
 // Convert MongoDB document to UserRow structure expected by Auth routes
@@ -32,6 +33,7 @@ function toUserRow(doc: any): UserRow | null {
     last_activity: doc.last_activity ? new Date(doc.last_activity) : null,
     created_at: new Date(doc.created_at),
     updated_at: new Date(doc.updated_at),
+    role_name: doc.role_name ?? null,
   };
 }
 

@@ -250,3 +250,189 @@ body:has(.sidebar.collapsed) .pending-audits-main {
     color: white;
     border-color: var(--primary-blue);
 }
+
+/* Modal Backdrop Blur */
+.modal-backdrop-blur {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+}
+
+/* Small, Design-Accurate Send for Review Modal */
+.send-review-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 460px;
+    z-index: 10001;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    animation: modalScaleIn 0.2s ease-out;
+}
+
+@keyframes modalScaleIn {
+    from {
+        transform: translate(-50%, -48%) scale(0.96);
+        opacity: 0;
+    }
+    to {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+}
+
+.send-review-header {
+    background: #0F2033;
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.send-review-header h2 {
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+}
+
+.close-btn-white {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    display: flex;
+    padding: 2px;
+    transition: color 0.2s;
+}
+
+.close-btn-white:hover {
+    color: white;
+}
+
+.send-review-body {
+    padding: 24px 24px;
+    text-align: left;
+}
+
+.send-review-body h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1E293B;
+    margin: 0 0 12px 0;
+}
+
+.send-review-body p {
+    font-size: 13px;
+    color: #64748B;
+    line-height: 1.5;
+    margin: 0 0 16px 0;
+}
+
+.send-review-body label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.send-review-body input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+    margin-bottom: 16px;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.send-review-body input:focus {
+    border-color: #0088CC;
+}
+
+.send-review-footer {
+    padding: 16px 24px 24px 24px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 24px;
+    background: #f8fafc;
+    border-top: 1px solid #f1f5f9;
+}
+
+.btn-text-cancel {
+    background: none;
+    border: none;
+    color: #94A3B8;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-text-cancel:hover {
+    color: #64748B;
+}
+
+.btn-primary-send {
+    background: #0088CC;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 12px rgba(0, 136, 204, 0.2);
+    transition: all 0.22s;
+}
+
+.btn-primary-send:hover {
+    background: #0077B3;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 136, 204, 0.3);
+}
+
+.danger-modal .send-review-header {
+    background: #EF4444;
+}
+
+.btn-danger-send {
+    background: #EF4444;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+    transition: all 0.22s;
+}
+
+.btn-danger-send:hover {
+    background: #DC2626;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.3);
+}

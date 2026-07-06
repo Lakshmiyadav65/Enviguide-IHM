@@ -12,6 +12,7 @@ const FIELD_MAP: Record<string, string> = {
   mimeType: 'mime_type',
   uploadedBy: 'uploaded_by',
   description: 'description',
+  storageKey: 'storage_key',
 };
 
 const REVERSE_MAP: Record<string, string> = {};

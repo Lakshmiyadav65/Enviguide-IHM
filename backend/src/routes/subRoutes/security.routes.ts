@@ -1,4 +1,4 @@
-﻿// -- Security Routes --------------------------------------
+// -- Security Routes --------------------------------------
 // Users, rights, roles, categories, menus
 
 import { Router } from 'express';
@@ -16,7 +16,7 @@ router.use(authenticate);
 
 // Users (admin only for write)
 router.get('/users',         listUsers);
-router.post('/users',        authorize('admin'), createUser);
+router.post('/users',        authorize('superadmin'), createUser);
 router.get('/users/:id',     getUser);
 router.put('/users/:id',     authorize('admin', 'manager'), updateUser);
 router.delete('/users/:id',  authorize('admin'), deleteUser);

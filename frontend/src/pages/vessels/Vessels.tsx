@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
     Search, Plus, Check, ShieldCheck, BarChart2, ShoppingCart, Layers,
@@ -83,6 +83,7 @@ export default function Vessels() {
     const [bannerMessage, setBannerMessage] = useState<{ title: string; body: string; type: 'info' | 'error' } | null>(null);
 
     const [selectedDoc, setSelectedDoc] = useState<any>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [docToDelete, setDocToDelete] = useState<any>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -345,6 +346,47 @@ export default function Vessels() {
         return vesselList.find(v => v.name === activeVesselName);
     }, [vesselList, activeVesselName, activeVesselImo]);
 
+    const [docsLoading, setDocsLoading] = useState(false);
+
+    const fetchDocuments = useCallback(async () => {
+        if (!activeVesselData?.id) return;
+        setDocsLoading(true);
+        try {
+            const res = await api.get<{ success: boolean; data: any[] }>(
+                `/vessels/${activeVesselData.id}/documents`
+            );
+            const mappedDocs = (res.data || []).map((doc: any) => ({
+                id: doc.id || doc._id,
+                name: doc.name,
+                type: doc.documentType || doc.document_type,
+                uploadedBy: doc.uploadedByName || doc.uploaded_by_name || 'System',
+                date: new Date(doc.createdAt || doc.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+                status: doc.status || 'Active',
+                filePath: doc.filePath || doc.file_path,
+                initials: (doc.uploadedByName || doc.uploaded_by_name || 'System')
+                    .split(' ')
+                    .map((n: string) => n[0])
+                    .join('')
+                    .toUpperCase()
+                    .slice(0, 2)
+            }));
+            setVesselDocuments(prev => ({
+                ...prev,
+                [activeVesselName]: mappedDocs
+            }));
+        } catch (err) {
+            console.error('Failed to fetch documents:', err);
+        } finally {
+            setDocsLoading(false);
+        }
+    }, [activeVesselData?.id, activeVesselName]);
+
+    useEffect(() => {
+        if (activeTab === 'documents') {
+            fetchDocuments();
+        }
+    }, [activeTab, fetchDocuments]);
+
     // Sync formData with selected vessel when not editing/adding
     useEffect(() => {
         if (!isEditing && !isAdding && activeVesselData) {
@@ -554,21 +596,52 @@ export default function Vessels() {
     };
 
     // Documents Logic
+    const handlePreviewDocClick = async (doc: any) => {
+        setSelectedDoc(doc);
+        setPreviewUrl(null);
+        if (!activeVesselData?.id) return;
+
+        try {
+            const token = localStorage.getItem('ihm_token') || sessionStorage.getItem('ihm_token') || '';
+            const base = API_CONFIG.BASE_URL.replace(/\/+$/, '');
+            const streamUrl = `${base}/vessels/${activeVesselData.id}/documents/${doc.id}/stream`;
+
+            const response = await fetch(streamUrl, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+
+            if (!response.ok) throw new Error(`Stream failed: ${response.status}`);
+
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            setPreviewUrl(blobUrl);
+        } catch (err) {
+            console.error('Failed to load document preview:', err);
+            setPreviewUrl(null);
+        }
+    };
+
     const handleDeleteDocClick = (doc: any) => {
         setDocToDelete(doc);
         setShowDeleteConfirm(true);
     };
 
     const confirmDeleteDoc = () => {
-        if (docToDelete) {
-            setVesselDocuments(prev => ({
-                ...prev,
-                [activeVesselName]: prev[activeVesselName].filter(d => d.id !== docToDelete.id)
-            }));
-            setShowDeleteConfirm(false);
-            setDocToDelete(null);
-            setModalMessage('Document deleted successfully!');
-            setShowModal(true);
+        if (docToDelete && activeVesselData?.id) {
+            api.delete(`/vessels/${activeVesselData.id}/documents/${docToDelete.id}`)
+                .then(() => {
+                    setVesselDocuments(prev => ({
+                        ...prev,
+                        [activeVesselName]: (prev[activeVesselName] || []).filter(d => d.id !== docToDelete.id)
+                    }));
+                    setShowDeleteConfirm(false);
+                    setDocToDelete(null);
+                    setModalMessage('Document deleted successfully!');
+                    setShowModal(true);
+                })
+                .catch((err) => {
+                    alert(err.message || 'Failed to delete document');
+                });
         }
     };
 
@@ -587,25 +660,60 @@ export default function Vessels() {
             return;
         }
 
-        const newDoc = {
-            id: Date.now(),
-            name: selectedFile.name,
-            type: newDocType,
-            uploadedBy: 'John Admin',
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-            status: 'Active',
-            initials: 'JA'
-        };
+        if (!activeVesselData?.id) {
+            setBannerMessage({
+                title: 'No Vessel Selected',
+                body: 'Please select or load a vessel first',
+                type: 'error'
+            });
+            return;
+        }
 
-        setVesselDocuments(prev => ({
-            ...prev,
-            [activeVesselName]: [newDoc, ...prev[activeVesselName]]
-        }));
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('documentType', newDocType);
+        formData.append('category', 'general');
 
-        setModalMessage(`'${selectedFile.name}' uploaded successfully!`);
-        setShowModal(true);
-        setSelectedFile(null); // Reset selection
-        if (docInputRef.current) docInputRef.current.value = ''; // Reset input
+        setBannerMessage(null);
+        api.upload<{ success: boolean; data: any }>(
+            `/vessels/${activeVesselData.id}/documents`,
+            formData
+        )
+        .then((res) => {
+            const rawDoc = res.data;
+            const newDoc = {
+                id: rawDoc.id || rawDoc._id,
+                name: rawDoc.name,
+                type: rawDoc.documentType || rawDoc.document_type,
+                uploadedBy: rawDoc.uploadedByName || rawDoc.uploaded_by_name || 'System',
+                date: new Date(rawDoc.createdAt || rawDoc.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+                status: rawDoc.status || 'Active',
+                filePath: rawDoc.filePath || rawDoc.file_path,
+                initials: (rawDoc.uploadedByName || rawDoc.uploaded_by_name || 'System')
+                    .split(' ')
+                    .map((n: string) => n[0])
+                    .join('')
+                    .toUpperCase()
+                    .slice(0, 2)
+            };
+            setVesselDocuments(prev => ({
+                ...prev,
+                [activeVesselName]: [newDoc, ...(prev[activeVesselName] || [])]
+            }));
+
+            setModalMessage(`'${selectedFile.name}' uploaded successfully!`);
+            setShowModal(true);
+            setSelectedFile(null); // Reset selection
+            setNewDocType('Select Document Type'); // Reset dropdown selection
+            if (docInputRef.current) docInputRef.current.value = ''; // Reset input
+        })
+        .catch((err) => {
+            setBannerMessage({
+                title: 'Upload Failed',
+                body: err.message || 'An error occurred during file upload',
+                type: 'error'
+            });
+        });
     };
 
     const handleDocFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -635,6 +743,13 @@ export default function Vessels() {
 
     const renderContent = () => {
         if (activeTab === 'documents') {
+            if (docsLoading) {
+                return (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: '#64748b' }}>
+                        Loading documents...
+                    </div>
+                );
+            }
             const currentDocs = vesselDocuments[activeVesselName] || [];
             const filteredDocs = currentDocs.filter(doc =>
                 doc.name.toLowerCase().includes(docSearch.toLowerCase()) &&
@@ -811,7 +926,7 @@ export default function Vessels() {
                                         <td><span className={`status-pill ${doc.status.toLowerCase()}`}>{doc.status}</span></td>
                                         <td>
                                             <div className="doc-actions">
-                                                <button className="action-icn-btn" onClick={() => setSelectedDoc(doc)}><Eye size={14} /></button>
+                                                <button className="action-icn-btn" onClick={() => handlePreviewDocClick(doc)}><Eye size={14} /></button>
                                                 <button className="action-icn-btn"><Send size={14} /></button>
                                                 <button className="action-icn-btn" onClick={() => handleDeleteDocClick(doc)}><Trash2 size={14} /></button>
                                             </div>
@@ -833,106 +948,90 @@ export default function Vessels() {
                         </div>
                     </div>
 
-                    {/* Quick Preview Panel */}
+                    {/* ── Document Quick Preview Modal ── */}
                     {selectedDoc && (
-                        <div className="preview-overlay">
-                            <div className="preview-backdrop" onClick={() => setSelectedDoc(null)} />
-                            <div className="preview-panel">
-                                <div className="preview-header">
-                                    <div className="preview-header-left">
-                                        <Eye size={20} color="#00B0FA" />
-                                        <h3>QUICK PREVIEW</h3>
+                        <div className="doc-preview-modal-overlay" onClick={() => {
+                            if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+                            setSelectedDoc(null);
+                            setPreviewUrl(null);
+                        }}>
+                            <div className="doc-preview-modal" onClick={e => e.stopPropagation()}>
+                                {/* Header */}
+                                <div className="doc-preview-modal-header">
+                                    <div className="doc-preview-modal-title">
+                                        <Eye size={18} color="#00B0FA" />
+                                        <div>
+                                            <h2>{selectedDoc.name}</h2>
+                                            <span>{selectedDoc.type} · {activeVesselName}</span>
+                                        </div>
                                     </div>
-                                    <div className="preview-header-actions">
-                                        <button className="preview-action-btn primary" onClick={() => window.open('https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', '_blank')}>
-                                            <ExternalLink size={18} /> OPEN IN FULL VIEWER
-                                        </button>
+                                    <div className="doc-preview-modal-actions">
+                                        {/* Download — triggers browser save-as with original filename */}
                                         <button
-                                            className="preview-icon-btn"
+                                            className="doc-preview-btn secondary"
+                                            title="Download"
                                             onClick={() => {
-                                                const link = document.createElement('a');
-                                                link.href = 'data:application/pdf;base64,JVBERi0xLjcKCjEgMCBvYmogICUgZW50cnkgcG9pbnQKPDwKICAvVHlwZSAvQ2F0YWxvZwogIC9QYWdlcyAyIDAgUgo+PgplbmRvYmoKCjIgMCBvYmogCjw8CiAgL1R5cGUgL1BhZ2VzCiAgL01lZGlhQm94IFsgMCAwIDU5NSA4NDIgXQogIC9Db3VudCAxCiAgL0tpZHMgWyAzIDAgUiBdCj4+CmVuZG9iagoKMyAwIG9iago8PAogIC9UeXBlIC9QYWdlCiAgL1BhcmVudCAyIDAgUgo+PgplbmRvYmoKCnhyZWYKMCA0CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAxMCAwMDAwMCBuIAowMDAwMDAwMDYwIDAwMDAwIG4gCjAwMDAwMDAxNTcgMDAwMDAgbiAKdHJhaWxlcgo8PAogIC9TaXplIDQKICAvUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKMjEwCiUlRU9GCg=='; // Blank PDF
-                                                link.download = `${selectedDoc?.name || 'document'}.pdf`;
-                                                document.body.appendChild(link);
-                                                link.click();
-                                                document.body.removeChild(link);
+                                                if (!previewUrl) return;
+                                                const a = document.createElement('a');
+                                                a.href = previewUrl;
+                                                a.download = selectedDoc.name || 'document';
+                                                document.body.appendChild(a);
+                                                a.click();
+                                                document.body.removeChild(a);
                                             }}
                                         >
-                                            <Download size={18} />
+                                            <Download size={16} /> Download
                                         </button>
-                                        <button className="preview-icon-btn" onClick={() => setSelectedDoc(null)}><X size={20} /></button>
+                                        {/* Open in Full Viewer — opens blob URL in new tab (renders inline, no download) */}
+                                        <button
+                                            className="doc-preview-btn primary"
+                                            onClick={() => {
+                                                if (previewUrl) window.open(previewUrl, '_blank');
+                                            }}
+                                        >
+                                            <ExternalLink size={16} /> Open in Full Viewer
+                                        </button>
+                                        <button className="doc-preview-close-btn" onClick={() => {
+                                            if (previewUrl?.startsWith('blob:')) URL.revokeObjectURL(previewUrl);
+                                            setSelectedDoc(null);
+                                            setPreviewUrl(null);
+                                        }}>
+                                            <X size={20} />
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="preview-panel-content">
-                                    <div className="preview-document-card fit-content">
-                                        <div className="doc-header-visual">
-                                            <div className={`doc-visual-icon ${selectedDoc.type.toLowerCase()}`}>
-                                                <FileText size={40} />
-                                            </div>
-                                            <div className="doc-badge-type">{selectedDoc.type.toUpperCase()} <span className="format-p">PDF</span></div>
-                                            <div className="doc-id-ref">IAPP-2023-98765-P</div>
-                                        </div>
 
-                                        <h2 className="preview-doc-title">{selectedDoc.name.toUpperCase()}</h2>
-
-                                        <div className="preview-metadata-grid">
-                                            <div className="meta-item">
-                                                <label>VESSEL NAME</label>
-                                                <span>{activeVesselName}</span>
-                                            </div>
-                                            <div className="meta-item">
-                                                <label>DISTINCTIVE NUMBER</label>
-                                                <span>IMO {activeVesselData?.imoNumber || 'N/A'}</span>
-                                            </div>
-                                            <div className="meta-item">
-                                                <label>PORT OF REGISTRY</label>
-                                                <span>{activeVesselData?.portOfRegistry || 'N/A'}</span>
-                                            </div>
-                                            <div className="meta-item">
-                                                <label>GROSS TONNAGE</label>
-                                                <span>{activeVesselData?.grossTonnage || 'N/A'}</span>
-                                            </div>
+                                {/* Document Viewer Area */}
+                                <div className="doc-preview-modal-body">
+                                    {!previewUrl ? (
+                                        <div className="doc-preview-loading">
+                                            <div className="doc-preview-spinner" />
+                                            <span>Loading document preview…</span>
                                         </div>
-
-                                        <div className="doc-visual-placeholder" style={{ padding: 0, overflow: 'hidden', background: '#f1f5f9' }}>
-                                            <iframe
-                                                src="https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf#toolbar=0&navpanes=0&scrollbar=0"
-                                                style={{ width: '100%', height: '100%', border: 'none' }}
-                                                title="Document Preview"
-                                            />
-                                        </div>
-                                        <div className="preview-footer">
-                                            <div className="footer-meta-col">
-                                                <label>SIGNED BY</label>
-                                                <div className="meta-val">
-                                                    <div className="avatar">CA</div>
-                                                    <span>Capt. Anders</span>
-                                                </div>
-                                            </div>
-                                            <div className="footer-meta-col">
-                                                <label>EXPIRY DATE</label>
-                                                <div className="meta-val">
-                                                    <Calendar size={16} color="#F59E0B" />
-                                                    <span>Oct 24, 2028</span>
-                                                </div>
-                                            </div>
-                                            <div className="footer-meta-col">
-                                                <label>LAST MODIFIED</label>
-                                                <div className="meta-val">
-                                                    <AlertTriangle size={16} color="#64748B" />
-                                                    <span>2 days ago</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    ) : (
+                                        <iframe
+                                            key={previewUrl}
+                                            src={previewUrl}
+                                            title="Document Preview"
+                                            className="doc-preview-iframe"
+                                            allow="fullscreen"
+                                        />
+                                    )}
                                 </div>
-                                <div className="preview-disclaimer">
-                                    <AlertTriangle size={14} />
-                                    <span>This is a secure preview. For technical editing, please use the Full Viewer.</span>
+
+                                {/* Footer metadata strip */}
+                                <div className="doc-preview-modal-footer">
+                                    <span><strong>Vessel:</strong> {activeVesselName}</span>
+                                    <span><strong>Type:</strong> {selectedDoc.type}</span>
+                                    <span><strong>Uploaded by:</strong> {selectedDoc.uploadedBy}</span>
+                                    <span><strong>Date:</strong> {selectedDoc.date}</span>
+                                    <span className={`status-pill ${selectedDoc.status?.toLowerCase()}`}>{selectedDoc.status}</span>
                                 </div>
                             </div>
                         </div>
                     )}
+
+
 
                     {/* Delete Confirmation Modal */}
                     {showDeleteConfirm && (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Search, Plus, Edit2,
     Trash2, Filter, Download, Mail,
@@ -9,6 +9,7 @@ import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { api } from '../../lib/apiClient';
 import { ENDPOINTS } from '../../config/api.config';
+import { useAuth } from '../../contexts/AuthContext';
 import './Users.css';
 
 interface UserData {
@@ -38,8 +39,15 @@ const EMPTY_FORM: Omit<UserData, 'id'> = {
 };
 
 export default function Users() {
+    const { user: me } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [users, setUsers] = useState<UserData[]>([]);
+
+    const isSuperAdmin = useMemo(() => {
+        if (!me) return false;
+        const role = (me.roleName || me.role || '').toLowerCase();
+        return role === 'superadmin' || role.includes('super');
+    }, [me]);
     const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Inactive'>('All');
     
     // Advanced Filters panel state
@@ -363,14 +371,18 @@ export default function Users() {
                             </div>
                         </div>
                         <div className="hero-actions">
-                            <button className="btn-bulk" onClick={openBulkModal}>
-                                <FileText size={18} />
-                                <span>Bulk Import</span>
-                            </button>
-                            <button className="btn-add" onClick={openAddModal}>
-                                <Plus size={18} />
-                                <span>Add New User</span>
-                            </button>
+                            {isSuperAdmin && (
+                                <>
+                                    <button className="btn-bulk" onClick={openBulkModal}>
+                                        <FileText size={18} />
+                                        <span>Bulk Import</span>
+                                    </button>
+                                    <button className="btn-add" onClick={openAddModal}>
+                                        <Plus size={18} />
+                                        <span>Add New User</span>
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
 
