@@ -749,17 +749,21 @@ export async function sendClarificationItemReminder(
     const bodyBase = overrides.body?.trim()
       || `This is a reminder regarding our earlier request. We still need the MDS / SDoC documents for vessel ${clar.vessel_name || clar.imo_number}.`;
     const bodyWithLink = `${bodyBase}\n\n---\nUpload documents directly via this secure link (no login required):\n${supplierLink}\n\nThis link expires on ${expiresText} (72 hours from now).`;
-    const html = bodyWithLink
-      .split('\n')
-      .map((line) => {
-        const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        if (line.trim() === supplierLink) {
-          return `<div><a href="${supplierLink}" style="color:#00B0FA;font-weight:600">${supplierLink}</a></div>`;
-        }
-        return `<div>${escaped || '&nbsp;'}</div>`;
-      })
-      .join('');
+    
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+        <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">EnviGuide IHM Compliance Reminder</h2>
+        <p style="color: #334155; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${bodyBase}</p>
+        <div style="margin: 32px 0; text-align: center;">
+          <a href="${supplierLink}" style="background-color: #00B0FA; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 6px; display: inline-block; font-size: 16px; box-shadow: 0 4px 6px -1px rgba(0, 176, 250, 0.2)">Upload IHM Documents</a>
+        </div>
+        <p style="color: #64748b; font-size: 13px; border-top: 1px solid #e2e8f0; padding-top: 16px; margin-bottom: 0;">
+          This secure link does not require a login. It will expire on ${expiresText} (72 hours from now).
+        </p>
+      </div>
+    `;
 
+    let mailWarning: string | null = null;
     try {
       await sendMail({
         to: toField,
@@ -769,10 +773,8 @@ export async function sendClarificationItemReminder(
         html,
       });
     } catch (mailErr) {
-      return next(createError(
-        `Email not sent: ${mailErr instanceof Error ? mailErr.message : 'Unknown mail error'}`,
-        502,
-      ));
+      mailWarning = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
+      console.warn(`[sendMail warning] Mail delivery failed: ${mailWarning}`);
     }
 
     const updated = await AuditService.incrementReminderAndExtendToken(
@@ -783,6 +785,7 @@ export async function sendClarificationItemReminder(
 
     res.json({
       success: true,
+      mailWarning,
       data: {
         reminderCount: updated?.reminder_count ?? null,
         sentTo: toField,
@@ -877,17 +880,21 @@ export async function sendClarificationBulkReminder(
     const bodyBase = body.body?.trim()
       || `This is a reminder regarding our earlier request. We still need the MDS / SDoC documents for vessel ${clar.vessel_name || clar.imo_number}. ${itemIndices.length} item(s) are still outstanding.`;
     const bodyWithLink = `${bodyBase}\n\n---\nUpload documents directly via this secure link (no login required):\n${supplierLink}\n\nThis link expires on ${expiresText} (72 hours from now).`;
-    const html = bodyWithLink
-      .split('\n')
-      .map((line) => {
-        const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        if (line.trim() === supplierLink) {
-          return `<div><a href="${supplierLink}" style="color:#00B0FA;font-weight:600">${supplierLink}</a></div>`;
-        }
-        return `<div>${escaped || '&nbsp;'}</div>`;
-      })
-      .join('');
+    
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+        <h2 style="color: #0f172a; margin-top: 0; font-size: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">EnviGuide IHM Compliance Reminder</h2>
+        <p style="color: #334155; font-size: 15px; line-height: 1.6; white-space: pre-wrap;">${bodyBase}</p>
+        <div style="margin: 32px 0; text-align: center;">
+          <a href="${supplierLink}" style="background-color: #00B0FA; color: #ffffff; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 6px; display: inline-block; font-size: 16px; box-shadow: 0 4px 6px -1px rgba(0, 176, 250, 0.2)">Upload IHM Documents</a>
+        </div>
+        <p style="color: #64748b; font-size: 13px; border-top: 1px solid #e2e8f0; padding-top: 16px; margin-bottom: 0;">
+          This secure link does not require a login. It will expire on ${expiresText} (72 hours from now).
+        </p>
+      </div>
+    `;
 
+    let mailWarning: string | null = null;
     try {
       await sendMail({
         to: toField,
@@ -897,10 +904,8 @@ export async function sendClarificationBulkReminder(
         html,
       });
     } catch (mailErr) {
-      return next(createError(
-        `Email not sent: ${mailErr instanceof Error ? mailErr.message : 'Unknown mail error'}`,
-        502,
-      ));
+      mailWarning = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
+      console.warn(`[sendMail warning] Mail delivery failed: ${mailWarning}`);
     }
 
     const updatedRows = await AuditService.incrementRemindersAndExtendToken(
@@ -911,6 +916,7 @@ export async function sendClarificationBulkReminder(
 
     res.json({
       success: true,
+      mailWarning,
       data: {
         clarificationId,
         itemCount: itemIndices.length,

@@ -75,12 +75,11 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
     const [activeFilter, setActiveFilter] = useState('All');
     const [openSuppliers, setOpenSuppliers] = useState<string[]>(['s1']);
     const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState<PurchaseOrderItem | null>(null);
-    const [editForm, setEditForm] = useState({
+    const [editingRowId, setEditingRowId] = useState<string | null>(null);
+    const [inlineEditForm, setInlineEditForm] = useState({
         itemDescription: '',
         poNumber: '',
-        impaCode: '',
+        ihmProductCode: '',
         quantity: '1',
         unit: 'PCS',
         vendorEmail: '',
@@ -167,42 +166,37 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
     useEffect(loadClarifications, [vesselId]);
 
     const handleEditClick = (item: PurchaseOrderItem) => {
-        setEditingItem(item);
-        setEditForm({
+        setEditingRowId(item.id);
+        setInlineEditForm({
             itemDescription: item.itemDescription,
             poNumber: item.poNumber,
-            impaCode: item.ihmProductCode === 'N/A' ? '' : item.ihmProductCode,
-            quantity: item.quantityTotal.split(' | ')[0] || '1',
+            ihmProductCode: item.ihmProductCode === 'N/A' ? '' : item.ihmProductCode,
+            quantity: item.quantityTotal.split('|')[0]?.trim() || '1',
             unit: item.unit,
             vendorEmail: item.vendorEmail || '',
             vendorName: item.vendorName || '',
             isSuspected: item.isSuspected || false
         });
-        setIsEditModalOpen(true);
     };
 
-    const handleEditSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!editingItem) return;
+    const handleInlineSave = async (id: string) => {
         try {
             const res = await api.put<{ success: boolean; data: any }>(
-                `/audits/line-items/${editingItem.id}`,
+                `/audits/line-items/${id}`,
                 {
-                    poNumber: editForm.poNumber,
-                    itemDescription: editForm.itemDescription,
-                    impaCode: editForm.impaCode,
-                    quantity: Number(editForm.quantity) || 1,
-                    unit: editForm.unit,
-                    vendorEmail: editForm.vendorEmail,
-                    vendorName: editForm.vendorName,
-                    isSuspected: editForm.isSuspected
+                    poNumber: inlineEditForm.poNumber,
+                    itemDescription: inlineEditForm.itemDescription,
+                    impaCode: inlineEditForm.ihmProductCode,
+                    quantity: Number(inlineEditForm.quantity) || 1,
+                    unit: inlineEditForm.unit,
+                    vendorEmail: inlineEditForm.vendorEmail,
+                    vendorName: inlineEditForm.vendorName,
+                    isSuspected: inlineEditForm.isSuspected
                 }
             );
             if (res.success) {
                 loadClarifications();
-                setIsEditModalOpen(false);
-                setEditingItem(null);
-                alert('Item updated successfully.');
+                setEditingRowId(null);
             }
         } catch (err: any) {
             alert(err.message || 'Failed to update item');
@@ -621,132 +615,229 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                             </td>
                                                         </tr>
                                                     )}
-                                                    {supplier.items.map(item => (
-                                                        <tr key={item.id} className={item.selected ? 'row-is-selected' : ''}>
-                                                            <td className="ch-col">
-                                                                <div className={`po-v4-row-action-checkbox-styled ${item.selected ? 'checked' : ''}`} onClick={(e) => toggleItemSelection(item.id, e)}>
-                                                                    {item.selected && <Check size={14} strokeWidth={3} className="check-icon-v4" />}
-                                                                </div>
-                                                            </td>
-                                                            <td className="ac-col">
-                                                                <div className="po-v4-row-action-btns-premium">
-                                                                    <button
-                                                                        type="button"
-                                                                        className="po-v4-action-icon-btn-v4 view"
-                                                                        title={item.reminderCount && item.reminderCount > 0
-                                                                            ? `Send reminder ${(item.reminderCount ?? 0) + 1}`
-                                                                            : 'Send reminder'}
-                                                                        onClick={() => handleOpenReminder(item)}
-                                                                        disabled={!item.clarificationId || item.mdsStatus === 'received'}
-                                                                        style={{
-                                                                            visibility: item.isSuspected && item.clarificationId ? 'visible' : 'hidden',
-                                                                            opacity: item.mdsStatus === 'received' ? 0.4 : 1,
-                                                                            cursor: item.mdsStatus === 'received' ? 'not-allowed' : 'pointer',
-                                                                        }}
-                                                                    >
-                                                                        <Mail size={14} />
-                                                                    </button>
-                                                                    {/* Approve action lives on the MD SDoC Audit Pending page
-                                                                     *  (DocumentAudit). The PO Viewer only displays status —
-                                                                     *  the Reviewed badge below confirms the outcome. */}
-                                                                    {item.reviewedAt && (
-                                                                        <span
-                                                                            title={item.reviewedBy ? `Reviewed by ${item.reviewedBy}` : 'Reviewed'}
-                                                                            style={{
-                                                                                display: 'inline-flex',
-                                                                                alignItems: 'center',
-                                                                                gap: 4,
-                                                                                padding: '2px 8px',
-                                                                                background: '#ECFDF5',
-                                                                                color: '#065F46',
-                                                                                border: '1px solid #A7F3D0',
-                                                                                borderRadius: 999,
-                                                                                fontSize: 10,
-                                                                                fontWeight: 700,
-                                                                                letterSpacing: '0.04em',
-                                                                                textTransform: 'uppercase',
-                                                                            }}
-                                                                        >
-                                                                            <CheckCircle2 size={12} />
-                                                                            Reviewed
-                                                                        </span>
-                                                                    )}
-                                                                    <button type="button" className="po-v4-action-icon-btn-v4 edit" title="Edit Item" onClick={() => handleEditClick(item)}><Edit2 size={14} /></button>
-                                                                    <button type="button" className="po-v4-action-icon-btn-v4 delete" title="Delete Item" onClick={() => handleDeleteClick(item.id)}><Trash2 size={14} /></button>
-                                                                </div>
-                                                            </td>
-                                                            <td className="doc-col">
-                                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                                                    {(['md', 'sdoc'] as const).map((kind) => {
-                                                                        const filePath = kind === 'md' ? item.mdFilePath : item.sdocFilePath;
-                                                                        const fileName = kind === 'md' ? item.mdFileName : item.sdocFileName;
-                                                                        const label = kind.toUpperCase();
-                                                                        // Admin is view-only. Suppliers upload via the public
-                                                                        // link; here we just render a clickable pill when the
-                                                                        // doc has arrived, or a greyed-out placeholder while
-                                                                        // we're still waiting for the supplier.
-                                                                        return filePath ? (
-                                                                            <a
-                                                                                key={kind}
-                                                                                href={filePath}
-                                                                                target="_blank"
-                                                                                rel="noopener noreferrer"
-                                                                                className="po-v4-action-icon-btn-v4 doc"
-                                                                                title={`View ${label} — ${fileName || 'document'}`}
-                                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: '#10B981', fontSize: 10, fontWeight: 700 }}
+                                                    {supplier.items.map(item => {
+                                                        const isEditing = editingRowId === item.id;
+                                                        return (
+                                                            <tr key={item.id} className={item.selected ? 'row-is-selected' : ''}>
+                                                                <td className="ch-col">
+                                                                    <div className={`po-v4-row-action-checkbox-styled ${item.selected ? 'checked' : ''}`} onClick={(e) => toggleItemSelection(item.id, e)}>
+                                                                        {item.selected && <Check size={14} strokeWidth={3} className="check-icon-v4" />}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="ac-col">
+                                                                    {isEditing ? (
+                                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="po-v4-action-icon-btn-v4 view"
+                                                                                title="Save changes"
+                                                                                onClick={() => handleInlineSave(item.id)}
+                                                                                style={{ color: '#10B981', borderColor: '#10B981', background: '#ECFDF5' }}
                                                                             >
-                                                                                <FileText size={14} />
-                                                                                {label}
-                                                                            </a>
-                                                                        ) : (
-                                                                            <span
-                                                                                key={kind}
-                                                                                className="po-v4-action-icon-btn-v4 doc"
-                                                                                title={`Awaiting supplier ${label} upload`}
-                                                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: '#CBD5E1', fontSize: 10, fontWeight: 700, cursor: 'not-allowed', opacity: 0.6 }}
+                                                                                <Check size={14} />
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                className="po-v4-action-icon-btn-v4 delete"
+                                                                                title="Cancel editing"
+                                                                                onClick={() => setEditingRowId(null)}
+                                                                                style={{ color: '#EF4444', borderColor: '#EF4444', background: '#FEF2F2' }}
                                                                             >
-                                                                                <FileText size={14} />
-                                                                                {label}
-                                                                            </span>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            </td>
-                                                            <td className="em-col">{item.emailStatus}</td>
-                                                            <td className="ihm-col">{item.ihmProductCode}</td>
-                                                            <td className="po-col">{item.poNumber}</td>
-                                                            <td className="mdr-col">{item.mdsReq}</td>
-                                                            <td className="mdc-col">{item.mdsRec}</td>
-                                                            <td className="it-col">
-                                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                                                    <span>{item.itemDescription}</span>
-                                                                    {item.isSuspected && (
-                                                                        <span style={{
-                                                                            fontSize: '10px',
-                                                                            fontWeight: 700,
-                                                                            color: '#F97316',
-                                                                            background: '#FFF7ED',
-                                                                            padding: '2px 6px',
-                                                                            borderRadius: '4px',
-                                                                            border: '1px solid #FFEDD5',
-                                                                            width: 'fit-content'
-                                                                        }}>
-                                                                            SUSPECTED
-                                                                        </span>
+                                                                                <X size={14} />
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="po-v4-row-action-btns-premium">
+                                                                            <button
+                                                                                type="button"
+                                                                                className="po-v4-action-icon-btn-v4 view"
+                                                                                title={item.reminderCount && item.reminderCount > 0
+                                                                                    ? `Send reminder ${(item.reminderCount ?? 0) + 1}`
+                                                                                    : 'Send reminder'}
+                                                                                onClick={() => handleOpenReminder(item)}
+                                                                                disabled={!item.clarificationId || item.mdsStatus === 'received'}
+                                                                                style={{
+                                                                                    visibility: item.isSuspected && item.clarificationId ? 'visible' : 'hidden',
+                                                                                    opacity: item.mdsStatus === 'received' ? 0.4 : 1,
+                                                                                    cursor: item.mdsStatus === 'received' ? 'not-allowed' : 'pointer',
+                                                                                }}
+                                                                            >
+                                                                                <Mail size={14} />
+                                                                            </button>
+                                                                            {item.reviewedAt && (
+                                                                                <span
+                                                                                    title={item.reviewedBy ? `Reviewed by ${item.reviewedBy}` : 'Reviewed'}
+                                                                                    style={{
+                                                                                        display: 'inline-flex',
+                                                                                        alignItems: 'center',
+                                                                                        gap: 4,
+                                                                                        padding: '2px 8px',
+                                                                                        background: '#ECFDF5',
+                                                                                        color: '#065F46',
+                                                                                        border: '1px solid #A7F3D0',
+                                                                                        borderRadius: 999,
+                                                                                        fontSize: 10,
+                                                                                        fontWeight: 700,
+                                                                                        letterSpacing: '0.04em',
+                                                                                        textTransform: 'uppercase',
+                                                                                    }}
+                                                                                >
+                                                                                    <CheckCircle2 size={12} />
+                                                                                    Reviewed
+                                                                                </span>
+                                                                            )}
+                                                                            <button type="button" className="po-v4-action-icon-btn-v4 edit" title="Edit Item" onClick={() => handleEditClick(item)}><Edit2 size={14} /></button>
+                                                                            <button type="button" className="po-v4-action-icon-btn-v4 delete" title="Delete Item" onClick={() => handleDeleteClick(item.id)}><Trash2 size={14} /></button>
+                                                                        </div>
                                                                     )}
-                                                                </div>
-                                                            </td>
-                                                            <td className="da-col">{item.orderDate}</td>
-                                                            <td className="qt-col">
-                                                                <span className="q-p red">{item.quantityTotal.split('|')[0]}</span>
-                                                                <span className="q-s">|</span>
-                                                                <span className="q-p green">{item.quantityTotal.split('|')[1]}</span>
-                                                                <span className="q-s">|</span>
-                                                                <span className="q-p blue">{item.quantityTotal.split('|')[2]}</span>
-                                                            </td>
-                                                            <td className="un-col">{item.unit}</td>
-                                                        </tr>
-                                                    ))}
+                                                                </td>
+                                                                <td className="doc-col">
+                                                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                                                        {(['md', 'sdoc'] as const).map((kind) => {
+                                                                            const filePath = kind === 'md' ? item.mdFilePath : item.sdocFilePath;
+                                                                            const fileName = kind === 'md' ? item.mdFileName : item.sdocFileName;
+                                                                            const label = kind.toUpperCase();
+                                                                            return filePath ? (
+                                                                                <a
+                                                                                    key={kind}
+                                                                                    href={filePath}
+                                                                                    target="_blank"
+                                                                                    rel="noopener noreferrer"
+                                                                                    className="po-v4-action-icon-btn-v4 doc"
+                                                                                    title={`View ${label} — ${fileName || 'document'}`}
+                                                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: '#10B981', fontSize: 10, fontWeight: 700 }}
+                                                                                >
+                                                                                    <FileText size={14} />
+                                                                                    {label}
+                                                                                </a>
+                                                                            ) : (
+                                                                                <span
+                                                                                    key={kind}
+                                                                                    className="po-v4-action-icon-btn-v4 doc"
+                                                                                    title={`Awaiting supplier ${label} upload`}
+                                                                                    style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: '#CBD5E1', fontSize: 10, fontWeight: 700, cursor: 'not-allowed', opacity: 0.6 }}
+                                                                                >
+                                                                                    <FileText size={14} />
+                                                                                    {label}
+                                                                                </span>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </td>
+                                                                <td className="em-col">{item.emailStatus}</td>
+                                                                <td className="ihm-col">
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={inlineEditForm.ihmProductCode}
+                                                                            style={{ width: '80px', background: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '4px 6px', borderRadius: '4px', fontSize: '12px' }}
+                                                                            onChange={(e) => setInlineEditForm({ ...inlineEditForm, ihmProductCode: e.target.value })}
+                                                                        />
+                                                                    ) : (
+                                                                        item.ihmProductCode
+                                                                    )}
+                                                                </td>
+                                                                <td className="po-col">
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={inlineEditForm.poNumber}
+                                                                            style={{ width: '100px', background: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '4px 6px', borderRadius: '4px', fontSize: '12px' }}
+                                                                            onChange={(e) => setInlineEditForm({ ...inlineEditForm, poNumber: e.target.value })}
+                                                                        />
+                                                                    ) : (
+                                                                        item.poNumber
+                                                                    )}
+                                                                </td>
+                                                                <td className="mdr-col">{item.mdsReq}</td>
+                                                                <td className="mdc-col">{item.mdsRec}</td>
+                                                                <td className="it-col">
+                                                                    {isEditing ? (
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '220px' }}>
+                                                                            <textarea
+                                                                                value={inlineEditForm.itemDescription}
+                                                                                placeholder="Item Description *"
+                                                                                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '6px', borderRadius: '4px', fontSize: '12px', resize: 'vertical', minHeight: '50px' }}
+                                                                                onChange={(e) => setInlineEditForm({ ...inlineEditForm, itemDescription: e.target.value })}
+                                                                            />
+                                                                            <input
+                                                                                type="text"
+                                                                                placeholder="Supplier Contact Name"
+                                                                                value={inlineEditForm.vendorName}
+                                                                                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '4px 6px', borderRadius: '4px', fontSize: '11px' }}
+                                                                                onChange={(e) => setInlineEditForm({ ...inlineEditForm, vendorName: e.target.value })}
+                                                                            />
+                                                                            <input
+                                                                                type="email"
+                                                                                placeholder="Supplier Contact Email"
+                                                                                value={inlineEditForm.vendorEmail}
+                                                                                style={{ width: '100%', background: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '4px 6px', borderRadius: '4px', fontSize: '11px' }}
+                                                                                onChange={(e) => setInlineEditForm({ ...inlineEditForm, vendorEmail: e.target.value })}
+                                                                            />
+                                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#94a3b8', cursor: 'pointer', userSelect: 'none' }}>
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={inlineEditForm.isSuspected}
+                                                                                    style={{ width: '14px', height: '14px', accentColor: '#00B0FA', cursor: 'pointer' }}
+                                                                                    onChange={(e) => setInlineEditForm({ ...inlineEditForm, isSuspected: e.target.checked })}
+                                                                                />
+                                                                                Suspected (triggers clarification)
+                                                                            </label>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                                            <span>{item.itemDescription}</span>
+                                                                            {item.isSuspected && (
+                                                                                <span style={{
+                                                                                    fontSize: '10px',
+                                                                                    fontWeight: 700,
+                                                                                    color: '#F97316',
+                                                                                    background: '#FFF7ED',
+                                                                                    padding: '2px 6px',
+                                                                                    borderRadius: '4px',
+                                                                                    border: '1px solid #FFEDD5',
+                                                                                    width: 'fit-content'
+                                                                                }}>
+                                                                                    SUSPECTED
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                                <td className="da-col">{item.orderDate}</td>
+                                                                <td className="qt-col">
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="number"
+                                                                            value={inlineEditForm.quantity}
+                                                                            style={{ width: '60px', background: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '4px 6px', borderRadius: '4px', fontSize: '12px' }}
+                                                                            onChange={(e) => setInlineEditForm({ ...inlineEditForm, quantity: e.target.value })}
+                                                                        />
+                                                                    ) : (
+                                                                        <>
+                                                                            <span className="q-p red">{item.quantityTotal.split('|')[0]}</span>
+                                                                            <span className="q-s">|</span>
+                                                                            <span className="q-p green">{item.quantityTotal.split('|')[1]}</span>
+                                                                            <span className="q-s">|</span>
+                                                                            <span className="q-p blue">{item.quantityTotal.split('|')[2]}</span>
+                                                                        </>
+                                                                    )}
+                                                                </td>
+                                                                <td className="un-col">
+                                                                    {isEditing ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            value={inlineEditForm.unit}
+                                                                            style={{ width: '50px', background: '#0f172a', border: '1px solid #334155', color: '#fff', padding: '4px 6px', borderRadius: '4px', fontSize: '12px' }}
+                                                                            onChange={(e) => setInlineEditForm({ ...inlineEditForm, unit: e.target.value })}
+                                                                        />
+                                                                    ) : (
+                                                                        item.unit
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -843,109 +934,6 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                 </div>
             )}
 
-            {/* Edit Modal */}
-            {isEditModalOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-container" style={{ maxWidth: '600px', width: '100%', background: '#1e293b', border: '1px solid #334155', color: '#f8fafc' }}>
-                        <div className="modal-header" style={{ borderBottom: '1px solid #334155' }}>
-                            <h2 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 600 }}>Edit Line Item Details</h2>
-                            <button className="modal-close-btn" style={{ color: '#94a3b8' }} onClick={() => setIsEditModalOpen(false)}><X size={18} /></button>
-                        </div>
-                        <form onSubmit={handleEditSubmit}>
-                            <div className="modal-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                <div className="form-group">
-                                    <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>Item Description *</label>
-                                    <textarea 
-                                        required 
-                                        value={editForm.itemDescription} 
-                                        style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', minHeight: '80px', marginTop: '4px' }}
-                                        onChange={(e) => setEditForm({ ...editForm, itemDescription: e.target.value })} 
-                                    />
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                    <div className="form-group">
-                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>PO Number *</label>
-                                        <input 
-                                            type="text" 
-                                            required 
-                                            value={editForm.poNumber} 
-                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
-                                            onChange={(e) => setEditForm({ ...editForm, poNumber: e.target.value })} 
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>IMPA / ISSA Code</label>
-                                        <input 
-                                            type="text" 
-                                            value={editForm.impaCode} 
-                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
-                                            onChange={(e) => setEditForm({ ...editForm, impaCode: e.target.value })} 
-                                        />
-                                    </div>
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                    <div className="form-group">
-                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>Quantity *</label>
-                                        <input 
-                                            type="number" 
-                                            required 
-                                            min="1"
-                                            value={editForm.quantity} 
-                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
-                                            onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })} 
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>Unit *</label>
-                                        <input 
-                                            type="text" 
-                                            required 
-                                            placeholder="e.g. PCS, SET"
-                                            value={editForm.unit} 
-                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
-                                            onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} 
-                                        />
-                                    </div>
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                                    <div className="form-group">
-                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>Supplier Name</label>
-                                        <input 
-                                            type="text" 
-                                            value={editForm.vendorName} 
-                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
-                                            onChange={(e) => setEditForm({ ...editForm, vendorName: e.target.value })} 
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>Supplier Email</label>
-                                        <input 
-                                            type="email" 
-                                            value={editForm.vendorEmail} 
-                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
-                                            onChange={(e) => setEditForm({ ...editForm, vendorEmail: e.target.value })} 
-                                        />
-                                    </div>
-                                </div>
-                                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-                                    <input 
-                                        type="checkbox" 
-                                        id="editIsSuspected"
-                                        checked={editForm.isSuspected} 
-                                        style={{ width: '16px', height: '16px', accentColor: '#00B0FA', cursor: 'pointer' }}
-                                        onChange={(e) => setEditForm({ ...editForm, isSuspected: e.target.checked })} 
-                                    />
-                                    <label htmlFor="editIsSuspected" style={{ cursor: 'pointer', margin: 0, color: '#f8fafc', fontSize: '13px' }}>Mark as Suspected (triggers IHM clarification flow)</label>
-                                </div>
-                            </div>
-                            <div className="modal-footer" style={{ borderTop: '1px solid #334155', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                                <button type="button" className="btn-secondary-standard" style={{ padding: '10px 18px', borderRadius: '6px', fontWeight: 600 }} onClick={() => setIsEditModalOpen(false)}>Cancel</button>
-                                <button type="submit" className="btn-primary-standard" style={{ padding: '10px 18px', borderRadius: '6px', fontWeight: 600, background: '#00B0FA', border: 'none', color: '#fff' }}>Save Changes</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
