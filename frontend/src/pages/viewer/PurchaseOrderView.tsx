@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     ChevronDown, Search, Edit2, Trash2,
     FileText, Filter, Mail, X, Send, Paperclip,
@@ -43,16 +43,27 @@ interface PurchaseOrderItem {
     reviewedBy?: string | null;
     vendorName?: string;
     vendorEmail?: string;
+    updatedAt?: string | null;
 }
 
 const FILTER_TAGS = [
-    'Pending Mds', 'Received Mds', 'Reviewed Mds', 'Tracked Items', 'Non Tracked Items',
+    'All', 'Pending Mds', 'Received Mds', 'Reviewed Mds', 'Tracked Items', 'Non Tracked Items',
     'Request Pending', 'Reminder 1', 'Reminder 2', 'Non-Responsive Supplier',
-    'HM Red', 'HM Green', 'PCHM', 'Non HM', 'Review Repeated Items', 'Suspected Items', 'All'
+    'HM Red', 'HM Green', 'PCHM'
 ];
 
 // Real items now come from GET /audits/:imo/clarifications. Mock data removed.
 const initializeData = (): PurchaseOrderItem[] => [];
+
+function getDaysSince(dateStr: string | null | undefined): number {
+    if (!dateStr) return 0;
+    const now = new Date();
+    const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const actionDate = new Date(dateStr);
+    const d2 = new Date(actionDate.getFullYear(), actionDate.getMonth(), actionDate.getDate());
+    const diffTime = d1.getTime() - d2.getTime();
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+}
 
 interface PurchaseOrderViewProps {
     imo: string;
@@ -64,6 +75,18 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
     const [activeFilter, setActiveFilter] = useState('All');
     const [openSuppliers, setOpenSuppliers] = useState<string[]>(['s1']);
     const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingItem, setEditingItem] = useState<PurchaseOrderItem | null>(null);
+    const [editForm, setEditForm] = useState({
+        itemDescription: '',
+        poNumber: '',
+        impaCode: '',
+        quantity: '1',
+        unit: 'PCS',
+        vendorEmail: '',
+        vendorName: '',
+        isSuspected: false
+    });
 
     // Fetch clarification history for this IMO from the backend. Each clarification
     // email may reference many suspected POs; we flatten them into one row per item
@@ -78,7 +101,7 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
         )
             .then((res) => {
                 const rows = res.data?.items || [];
-                const items: PurchaseOrderItem[] = rows.map((r, i) => {
+                const items: PurchaseOrderItem[] = rows.map((r) => {
                     const mdsStatus = String(r.mds_status ?? 'none');
                     const isSuspected = String(r.is_suspected ?? 'No') === 'Yes';
                     const mdStatus = String(r.md_status ?? r.mds_status ?? 'none');
@@ -94,6 +117,7 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                     const hmStatusRaw = r.hm_status ? String(r.hm_status).toLowerCase() : null;
                     const reviewedAt = r.reviewed_at ? String(r.reviewed_at) : null;
                     const reviewedBy = r.reviewed_by ? String(r.reviewed_by) : null;
+                    const updatedAt = r.updated_at ? String(r.updated_at) : null;
 
                     let emailStatus: string;
                     if (!isSuspected) emailStatus = 'NOT SENT';
@@ -105,9 +129,7 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                     else emailStatus = 'SENT';
 
                     return {
-                        id: r.clarification_id
-                            ? `${r.clarification_id}-${r.clarification_item_index}`
-                            : `row-${r.row_index ?? i}`,
+                        id: String(r.id),
                         clarificationId: r.clarification_id ? String(r.clarification_id) : undefined,
                         itemIndex: r.clarification_item_index != null ? Number(r.clarification_item_index) : undefined,
                         emailStatus,
@@ -134,6 +156,7 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                         reviewedBy,
                         vendorName: String(r.vendor_name ?? ''),
                         vendorEmail: String(r.vendor_email ?? ''),
+                        updatedAt,
                     };
                 });
                 setAllItems(items);
@@ -142,6 +165,60 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
     };
 
     useEffect(loadClarifications, [vesselId]);
+
+    const handleEditClick = (item: PurchaseOrderItem) => {
+        setEditingItem(item);
+        setEditForm({
+            itemDescription: item.itemDescription,
+            poNumber: item.poNumber,
+            impaCode: item.ihmProductCode === 'N/A' ? '' : item.ihmProductCode,
+            quantity: item.quantityTotal.split(' | ')[0] || '1',
+            unit: item.unit,
+            vendorEmail: item.vendorEmail || '',
+            vendorName: item.vendorName || '',
+            isSuspected: item.isSuspected || false
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleEditSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingItem) return;
+        try {
+            const res = await api.put<{ success: boolean; data: any }>(
+                `/audits/line-items/${editingItem.id}`,
+                {
+                    poNumber: editForm.poNumber,
+                    itemDescription: editForm.itemDescription,
+                    impaCode: editForm.impaCode,
+                    quantity: Number(editForm.quantity) || 1,
+                    unit: editForm.unit,
+                    vendorEmail: editForm.vendorEmail,
+                    vendorName: editForm.vendorName,
+                    isSuspected: editForm.isSuspected
+                }
+            );
+            if (res.success) {
+                loadClarifications();
+                setIsEditModalOpen(false);
+                setEditingItem(null);
+                alert('Item updated successfully.');
+            }
+        } catch (err: any) {
+            alert(err.message || 'Failed to update item');
+        }
+    };
+
+    const handleDeleteClick = async (id: string) => {
+        if (!window.confirm('Are you sure you want to delete this purchase order line item?')) return;
+        try {
+            await api.delete(`/audits/line-items/${id}`);
+            loadClarifications();
+            alert('Item deleted successfully.');
+        } catch (err: any) {
+            alert(err.message || 'Failed to delete item');
+        }
+    };
 
     // Admin is view-only on supplier documents — uploads happen exclusively
     // through the public supplier link (handled by the public controller).
@@ -164,19 +241,7 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
         setOpenSuppliers(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
     };
 
-    // Set of item-description keys that appear on 2+ rows — feeds the
-    // 'Review Repeated Items' filter.
-    const repeatedKeys = useMemo(() => {
-        const counts = new Map<string, number>();
-        for (const item of allItems) {
-            const key = item.itemDescription.trim().toLowerCase();
-            if (!key) continue;
-            counts.set(key, (counts.get(key) ?? 0) + 1);
-        }
-        const out = new Set<string>();
-        counts.forEach((c, k) => { if (c >= 2) out.add(k); });
-        return out;
-    }, [allItems]);
+
 
     const currentSuppliersData = useMemo(() => {
         // One predicate per filter pill. Each rule is documented in the
@@ -190,36 +255,29 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
             const reminders = item.reminderCount ?? 0;
             const hasClar = !!item.clarificationId;
             const hm = (item.hmStatus ?? '').toLowerCase();
-            const descKey = item.itemDescription.trim().toLowerCase();
 
             switch (activeFilter) {
-                case 'Suspected Items':
-                    return item.isSuspected === true;
                 case 'Request Pending':
-                    // Suspected, but the admin hasn't sent a request yet.
-                    return item.isSuspected === true && !hasClar;
+                    return item.isSuspected === true && !hasClar && !isReceived;
                 case 'Pending Mds':
-                    // Request sent, no doc back, no reminders yet.
-                    return item.isSuspected === true && hasClar && !isReceived && reminders === 0;
+                    return item.isSuspected === true && !isReceived && !item.reviewedAt &&
+                        (!hasClar || (reminders === 0 && getDaysSince(item.mdsReq) < 7));
                 case 'Reminder 1':
-                    return item.isSuspected === true && hasClar && !isReceived && reminders === 1;
+                    return item.isSuspected === true && !isReceived && !item.reviewedAt &&
+                        hasClar && reminders === 0 && getDaysSince(item.mdsReq) >= 7;
                 case 'Reminder 2':
-                    return item.isSuspected === true && hasClar && !isReceived && reminders === 2;
+                    return item.isSuspected === true && !isReceived && !item.reviewedAt &&
+                        hasClar && reminders === 1 && getDaysSince(item.updatedAt) >= 7;
                 case 'Non-Responsive Supplier':
-                    return item.isSuspected === true && hasClar && !isReceived && reminders >= 3;
+                    return item.isSuspected === true && !isReceived && !item.reviewedAt &&
+                        hasClar && (reminders >= 3 || (reminders === 2 && getDaysSince(item.updatedAt) >= 7));
                 case 'Received Mds':
-                    // Vendor uploaded both docs but the admin hasn't
-                    // approved yet — once approved the row moves to
-                    // 'Reviewed Mds' instead.
                     return isReceived && !item.reviewedAt;
                 case 'Reviewed Mds':
-                    // Admin has signed off on the documents.
                     return Boolean(item.reviewedAt);
                 case 'Tracked Items':
-                    // Anything we've taken action on (request sent at least once).
                     return hasClar;
                 case 'Non Tracked Items':
-                    // Items we haven't started chasing — commodity rows + suspected-but-unsent.
                     return !hasClar;
                 case 'HM Red':
                     return hm === 'red';
@@ -227,10 +285,6 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                     return hm === 'green';
                 case 'PCHM':
                     return hm === 'pchm';
-                case 'Non HM':
-                    return item.isSuspected !== true;
-                case 'Review Repeated Items':
-                    return descKey.length > 0 && repeatedKeys.has(descKey);
                 default:
                     return false;
             }
@@ -617,8 +671,8 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                                             Reviewed
                                                                         </span>
                                                                     )}
-                                                                    <button type="button" className="po-v4-action-icon-btn-v4 edit" title="Edit Item"><Edit2 size={14} /></button>
-                                                                    <button type="button" className="po-v4-action-icon-btn-v4 delete" title="Delete Item"><Trash2 size={14} /></button>
+                                                                    <button type="button" className="po-v4-action-icon-btn-v4 edit" title="Edit Item" onClick={() => handleEditClick(item)}><Edit2 size={14} /></button>
+                                                                    <button type="button" className="po-v4-action-icon-btn-v4 delete" title="Delete Item" onClick={() => handleDeleteClick(item.id)}><Trash2 size={14} /></button>
                                                                 </div>
                                                             </td>
                                                             <td className="doc-col">
@@ -786,6 +840,110 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                         </div>
                     </div>
                     <button className="undo-action-btn" onClick={() => setShowToast(false)}>CLOSE</button>
+                </div>
+            )}
+
+            {/* Edit Modal */}
+            {isEditModalOpen && (
+                <div className="modal-overlay">
+                    <div className="modal-container" style={{ maxWidth: '600px', width: '100%', background: '#1e293b', border: '1px solid #334155', color: '#f8fafc' }}>
+                        <div className="modal-header" style={{ borderBottom: '1px solid #334155' }}>
+                            <h2 style={{ color: '#f8fafc', fontSize: '18px', fontWeight: 600 }}>Edit Line Item Details</h2>
+                            <button className="modal-close-btn" style={{ color: '#94a3b8' }} onClick={() => setIsEditModalOpen(false)}><X size={18} /></button>
+                        </div>
+                        <form onSubmit={handleEditSubmit}>
+                            <div className="modal-body" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                <div className="form-group">
+                                    <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>Item Description *</label>
+                                    <textarea 
+                                        required 
+                                        value={editForm.itemDescription} 
+                                        style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', minHeight: '80px', marginTop: '4px' }}
+                                        onChange={(e) => setEditForm({ ...editForm, itemDescription: e.target.value })} 
+                                    />
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <div className="form-group">
+                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>PO Number *</label>
+                                        <input 
+                                            type="text" 
+                                            required 
+                                            value={editForm.poNumber} 
+                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
+                                            onChange={(e) => setEditForm({ ...editForm, poNumber: e.target.value })} 
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>IMPA / ISSA Code</label>
+                                        <input 
+                                            type="text" 
+                                            value={editForm.impaCode} 
+                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
+                                            onChange={(e) => setEditForm({ ...editForm, impaCode: e.target.value })} 
+                                        />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <div className="form-group">
+                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>Quantity *</label>
+                                        <input 
+                                            type="number" 
+                                            required 
+                                            min="1"
+                                            value={editForm.quantity} 
+                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
+                                            onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })} 
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>Unit *</label>
+                                        <input 
+                                            type="text" 
+                                            required 
+                                            placeholder="e.g. PCS, SET"
+                                            value={editForm.unit} 
+                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
+                                            onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })} 
+                                        />
+                                    </div>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                    <div className="form-group">
+                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>Supplier Name</label>
+                                        <input 
+                                            type="text" 
+                                            value={editForm.vendorName} 
+                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
+                                            onChange={(e) => setEditForm({ ...editForm, vendorName: e.target.value })} 
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 600 }}>Supplier Email</label>
+                                        <input 
+                                            type="email" 
+                                            value={editForm.vendorEmail} 
+                                            style={{ background: '#0f172a', border: '1px solid #334155', color: '#f8fafc', padding: '10px', borderRadius: '6px', width: '100%', marginTop: '4px' }}
+                                            onChange={(e) => setEditForm({ ...editForm, vendorEmail: e.target.value })} 
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+                                    <input 
+                                        type="checkbox" 
+                                        id="editIsSuspected"
+                                        checked={editForm.isSuspected} 
+                                        style={{ width: '16px', height: '16px', accentColor: '#00B0FA', cursor: 'pointer' }}
+                                        onChange={(e) => setEditForm({ ...editForm, isSuspected: e.target.checked })} 
+                                    />
+                                    <label htmlFor="editIsSuspected" style={{ cursor: 'pointer', margin: 0, color: '#f8fafc', fontSize: '13px' }}>Mark as Suspected (triggers IHM clarification flow)</label>
+                                </div>
+                            </div>
+                            <div className="modal-footer" style={{ borderTop: '1px solid #334155', padding: '16px 24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                <button type="button" className="btn-secondary-standard" style={{ padding: '10px 18px', borderRadius: '6px', fontWeight: 600 }} onClick={() => setIsEditModalOpen(false)}>Cancel</button>
+                                <button type="submit" className="btn-primary-standard" style={{ padding: '10px 18px', borderRadius: '6px', fontWeight: 600, background: '#00B0FA', border: 'none', color: '#fff' }}>Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
         </div>

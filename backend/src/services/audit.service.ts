@@ -581,6 +581,7 @@ export const AuditService = {
           hmStatus: ci.hm_status,
           reviewedAt: ci.reviewed_at,
           reviewedBy: ci.reviewed_by,
+          updatedAt: ci.updated_at || cr.created_at,
         });
       }
     }
@@ -593,6 +594,7 @@ export const AuditService = {
       const po = String(row.po_number ?? '').trim();
       const state = stateByPO.get(po);
       return {
+        id: String(row._id),
         row_index: row.row_index,
         name: row.name,
         vessel_name: row.vessel_name,
@@ -633,6 +635,7 @@ export const AuditService = {
         hm_status: state?.hmStatus ?? null,
         reviewed_at: state?.reviewedAt ?? null,
         reviewed_by: state?.reviewedBy ?? null,
+        updated_at: state?.updatedAt ?? null,
       };
     });
 

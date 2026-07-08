@@ -31,6 +31,8 @@ import {
   streamDocumentPreview,
   getMdsPendingOverview, getVesselPoItems,
   deleteAudit,
+  updateAuditLineItem,
+  deleteAuditLineItem,
 } from '../../controller/audit.controller.js';
 import { authenticate } from '../../middleware/auth.middleware.js';
 
@@ -75,6 +77,8 @@ router.delete('/:id',                        deleteAudit);
 
 router.get('/by-id/:auditId/line-items',     getAuditLineItemsById);
 router.patch('/by-id/:auditId/line-items',   replaceAuditLineItemsById);
+router.put('/line-items/:id',                updateAuditLineItem);
+router.delete('/line-items/:id',             deleteAuditLineItem);
 
 router.get('/:imo/line-items',               getAuditLineItems);
 router.patch('/:imo/line-items',             replaceAuditLineItems);

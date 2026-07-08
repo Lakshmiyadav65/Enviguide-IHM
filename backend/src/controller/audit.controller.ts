@@ -1095,3 +1095,75 @@ export async function deleteAudit(req: Request, res: Response, next: NextFunctio
     res.json({ success: true, data: { id } });
   } catch (err) { next(err); }
 }
+
+/** PUT /api/v1/audits/line-items/:id — update a single line item */
+export async function updateAuditLineItem(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const db = getDb();
+    const item = await db.collection('audit_line_items').findOne({ _id: id });
+    if (!item) return next(createError('Line item not found', 404));
+
+    const audit = await AuditService.getAuditById(String(item.audit_id), req.user!.userId);
+    if (!audit) return next(createError('Unauthorized to update this line item', 403));
+
+    const body = req.body as Record<string, unknown>;
+    const updateFields: Record<string, unknown> = {};
+
+    const camelToSnakeMap: Record<string, string> = {
+      poNumber: 'po_number',
+      itemDescription: 'item_description',
+      isSuspected: 'is_suspected',
+      impaCode: 'impa_code',
+      issaCode: 'issa_code',
+      equipmentCode: 'equipment_code',
+      equipmentName: 'equipment_name',
+      maker: 'maker',
+      model: 'model',
+      partNumber: 'part_number',
+      unit: 'unit',
+      quantity: 'quantity',
+      vendorRemark: 'vendor_remark',
+      vendorEmail: 'vendor_email',
+      vendorName: 'vendor_name'
+    };
+
+    for (const [camel, snake] of Object.entries(camelToSnakeMap)) {
+      if (camel in body) {
+        if (camel === 'isSuspected') {
+          updateFields[snake] = body[camel] === true || String(body[camel]).toLowerCase() === 'yes' ? 'Yes' : 'No';
+        } else {
+          updateFields[snake] = body[camel];
+        }
+      }
+    }
+
+    updateFields.updated_at = new Date();
+
+    await db.collection('audit_line_items').updateOne({ _id: id }, { $set: updateFields });
+    const updated = await db.collection('audit_line_items').findOne({ _id: id });
+    res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
+}
+
+/** DELETE /api/v1/audits/line-items/:id — delete a single line item */
+export async function deleteAuditLineItem(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const db = getDb();
+    const item = await db.collection('audit_line_items').findOne({ _id: id });
+    if (!item) return next(createError('Line item not found', 404));
+
+    const audit = await AuditService.getAuditById(String(item.audit_id), req.user!.userId);
+    if (!audit) return next(createError('Unauthorized to delete this line item', 403));
+
+    await db.collection('audit_line_items').deleteOne({ _id: id });
+
+    await db.collection('audit_summaries').updateOne(
+      { _id: item.audit_id },
+      { $inc: { total_items: -1 }, $set: { last_activity: new Date() } }
+    );
+
+    res.status(204).send();
+  } catch (err) { next(err); }
+}

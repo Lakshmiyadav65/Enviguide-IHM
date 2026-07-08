@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
     Search, Plus, Filter, ChevronRight, ChevronLeft, ChevronDown, AlertCircle,
     Database, Package, Download, X, CheckCircle, MoreVertical
@@ -218,8 +218,6 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
             part1: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART I').length,
             part2: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART II').length,
             part3: vesselSpecificMaterials.filter(m => m.ihmPart === 'PART III').length,
-            nonHaz: vesselSpecificMaterials.filter(m => m.category === 'safe' || m.thresholdMessage === 'Non-Hazardous').length,
-            archived: 0
         };
     }, [vesselSpecificMaterials]);
 
@@ -534,9 +532,7 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
                     { label: 'All Materials', count: counts.all, key: 'All' },
                     { label: 'Part I', count: counts.part1, key: 'Part I' },
                     { label: 'Part II', count: counts.part2, key: 'Part II' },
-                    { label: 'Part III', count: counts.part3, key: 'Part III' },
-                    { label: 'Non-Hazardous', count: counts.nonHaz, key: 'Non-Hazardous' },
-                    { label: 'Archived', count: counts.archived, key: 'Archived' }
+                    { label: 'Part III', count: counts.part3, key: 'Part III' }
                 ].map(tab => (
                     <div
                         key={tab.key}
