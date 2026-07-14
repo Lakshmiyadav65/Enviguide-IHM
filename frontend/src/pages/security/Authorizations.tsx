@@ -51,7 +51,7 @@ const ALL_LEAF_IDS: string[] = MODULES.flatMap((m) => ACTIONS.map((a) => nodeId(
 
 // Default roles shown if the backend returns nothing (fresh DB / no role grants
 // recorded yet). Two portals only for now: Admin + Ship Owner.
-const FALLBACK_ROLES = ['admin', 'superadmin', 'owner', 'ship_manager', 'staff'] as const;
+const FALLBACK_ROLES = ['admin', 'superadmin', 'owner', 'ship_manager', 'vessel'] as const;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

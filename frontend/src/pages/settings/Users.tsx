@@ -45,20 +45,29 @@ export default function Users() {
     const [users, setUsers] = useState<UserData[]>([]);
 
 
-    const canCreateUser = useMemo(() => {
+    const isSuperAdmin = useMemo(() => {
         if (!me) return false;
-        return hasPermission('security_create');
-    }, [me, hasPermission]);
+        const role = (me.roleName || me.role || '').toLowerCase();
+        return role === 'superadmin' || role.includes('super');
+    }, [me]);
+
+    const isAdminOrSuper = useMemo(() => {
+        if (!me) return false;
+        const role = (me.roleName || me.role || '').toLowerCase();
+        return role === 'superadmin' || role.includes('super') || role === 'admin' || role.includes('admin') || me.isAdmin;
+    }, [me]);
+
+    const canCreateUser = useMemo(() => {
+        return isSuperAdmin;
+    }, [isSuperAdmin]);
 
     const canUpdateUser = useMemo(() => {
-        if (!me) return false;
-        return hasPermission('security_update');
-    }, [me, hasPermission]);
+        return isAdminOrSuper || hasPermission('security_update');
+    }, [isAdminOrSuper, hasPermission]);
 
     const canDeleteUser = useMemo(() => {
-        if (!me) return false;
-        return hasPermission('security_delete');
-    }, [me, hasPermission]);
+        return isAdminOrSuper || hasPermission('security_delete');
+    }, [isAdminOrSuper, hasPermission]);
     const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Inactive'>('All');
     
     // Advanced Filters panel state
@@ -496,13 +505,11 @@ export default function Users() {
                                     <label style={{fontSize: 10, fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4}}>Category Filter</label>
                                     <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} style={{padding: '8px 10px', fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F0', background: 'white'}}>
                                         <option value="All">All Categories</option>
-                                        <option value="admin">Admin User</option>
-                                        <option value="manager">Manager</option>
-                                        <option value="viewer">Viewer</option>
-                                        <option value="surveyor">Surveyor</option>
-                                        <option value="deck officer">Deck Officer</option>
-                                        <option value="Certified hazmat Companies">Certified hazmat Companies</option>
+                                        <option value="Super Admin">Super Admin</option>
+                                        <option value="Admin">Admin</option>
                                         <option value="Ship Owner">Ship Owner</option>
+                                        <option value="Ship Manager">Ship Manager</option>
+                                        <option value="Vessel">Vessel</option>
                                     </select>
                                 </div>
                                 <div className="form-group">
@@ -748,13 +755,11 @@ export default function Users() {
                                         value={formData.category}
                                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                                     >
-                                        <option value="admin">Admin User</option>
-                                        <option value="manager">Manager</option>
-                                        <option value="viewer">Viewer</option>
-                                        <option value="surveyor">Surveyor</option>
-                                        <option value="deck officer">Deck Officer</option>
-                                        <option value="Certified hazmat Companies">Certified hazmat Companies</option>
+                                        <option value="Super Admin">Super Admin</option>
+                                        <option value="Admin">Admin</option>
                                         <option value="Ship Owner">Ship Owner</option>
+                                        <option value="Ship Manager">Ship Manager</option>
+                                        <option value="Vessel">Vessel</option>
                                     </select>
                                 </div>
 
@@ -895,13 +900,11 @@ export default function Users() {
                                         value={formData.category}
                                         onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                                     >
-                                        <option value="admin">Admin User</option>
-                                        <option value="manager">Manager</option>
-                                        <option value="viewer">Viewer</option>
-                                        <option value="surveyor">Surveyor</option>
-                                        <option value="deck officer">Deck Officer</option>
-                                        <option value="Certified hazmat Companies">Certified hazmat Companies</option>
+                                        <option value="Super Admin">Super Admin</option>
+                                        <option value="Admin">Admin</option>
                                         <option value="Ship Owner">Ship Owner</option>
+                                        <option value="Ship Manager">Ship Manager</option>
+                                        <option value="Vessel">Vessel</option>
                                     </select>
                                 </div>
 

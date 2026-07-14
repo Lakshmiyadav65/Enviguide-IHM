@@ -116,8 +116,10 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
           roleName = 'admin';
         } else if (cat.includes('manager')) {
           roleName = 'ship_manager';
-        } else if (cat.includes('staff')) {
-          roleName = 'staff';
+        } else if (cat.includes('vessel')) {
+          roleName = 'vessel';
+        } else if (cat.includes('owner')) {
+          roleName = 'owner';
         }
       }
 
@@ -129,18 +131,12 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
     }
 
     // 'isAdmin' bypasses the permission check on the frontend — admin /
-    // superadmin / manager users see everything regardless of grants.
-    // We check both `category` (the legacy field that holds 'admin' /
-    // 'manager' / 'viewer' or display strings like 'Admin User') and
-    // `role_name` (the new field set when an admin assigns a role).
-    // Anything containing 'admin' or 'manager' counts — generous on
-    // purpose so we don't accidentally hide the entire UI from an
-    // admin whose category was set by a different code path.
+    // superadmin users see everything regardless of grants.
     const cat  = (user.category || '').toLowerCase();
     const role = (roleName || '').toLowerCase();
-    const isSuperAdminTag = (s: string) =>
-      s === 'superadmin' || s.includes('super');
-    const isAdmin = isSuperAdminTag(cat) || isSuperAdminTag(role);
+    const isAdminOrSuper = (s: string) =>
+      s === 'superadmin' || s.includes('super') || s === 'admin' || s.includes('admin');
+    const isAdmin = isAdminOrSuper(cat) || isAdminOrSuper(role);
 
     res.json({
       success: true,

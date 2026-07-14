@@ -99,7 +99,7 @@ export const UserService = {
     fields['created_at'] = new Date();
     fields['updated_at'] = new Date();
 
-    if (!fields['role_name'] && fields['category']) {
+    if (fields['category']) {
       const cat = String(fields['category']).toLowerCase();
       if (cat.includes('super')) {
         fields['role_name'] = 'superadmin';
@@ -107,10 +107,12 @@ export const UserService = {
         fields['role_name'] = 'admin';
       } else if (cat.includes('manager')) {
         fields['role_name'] = 'ship_manager';
-      } else if (cat.includes('staff')) {
-        fields['role_name'] = 'staff';
+      } else if (cat.includes('vessel')) {
+        fields['role_name'] = 'vessel';
+      } else if (cat.includes('owner')) {
+        fields['role_name'] = 'owner';
       } else {
-        fields['role_name'] = 'viewer';
+        fields['role_name'] = 'owner';
       }
     }
 
@@ -145,7 +147,7 @@ export const UserService = {
       fields['created_at'] = new Date();
       fields['updated_at'] = new Date();
 
-      if (!fields['role_name'] && fields['category']) {
+      if (fields['category']) {
         const cat = String(fields['category']).toLowerCase();
         if (cat.includes('super')) {
           fields['role_name'] = 'superadmin';
@@ -153,10 +155,12 @@ export const UserService = {
           fields['role_name'] = 'admin';
         } else if (cat.includes('manager')) {
           fields['role_name'] = 'ship_manager';
-        } else if (cat.includes('staff')) {
-          fields['role_name'] = 'staff';
+        } else if (cat.includes('vessel')) {
+          fields['role_name'] = 'vessel';
+        } else if (cat.includes('owner')) {
+          fields['role_name'] = 'owner';
         } else {
-          fields['role_name'] = 'viewer';
+          fields['role_name'] = 'owner';
         }
       }
 
@@ -191,10 +195,12 @@ export const UserService = {
         fields['role_name'] = 'admin';
       } else if (cat.includes('manager')) {
         fields['role_name'] = 'ship_manager';
-      } else if (cat.includes('staff')) {
-        fields['role_name'] = 'staff';
+      } else if (cat.includes('vessel')) {
+        fields['role_name'] = 'vessel';
+      } else if (cat.includes('owner')) {
+        fields['role_name'] = 'owner';
       } else {
-        fields['role_name'] = 'viewer';
+        fields['role_name'] = 'owner';
       }
     }
 
