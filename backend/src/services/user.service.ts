@@ -97,6 +97,21 @@ export const UserService = {
     fields['created_at'] = new Date();
     fields['updated_at'] = new Date();
 
+    if (!fields['role_name'] && fields['category']) {
+      const cat = String(fields['category']).toLowerCase();
+      if (cat.includes('super')) {
+        fields['role_name'] = 'superadmin';
+      } else if (cat.includes('admin')) {
+        fields['role_name'] = 'admin';
+      } else if (cat.includes('manager')) {
+        fields['role_name'] = 'ship_manager';
+      } else if (cat.includes('staff')) {
+        fields['role_name'] = 'staff';
+      } else {
+        fields['role_name'] = 'viewer';
+      }
+    }
+
     const _id = crypto.randomUUID();
     await db.collection('users').insertOne({
       _id,
@@ -126,6 +141,21 @@ export const UserService = {
       fields['created_at'] = new Date();
       fields['updated_at'] = new Date();
 
+      if (!fields['role_name'] && fields['category']) {
+        const cat = String(fields['category']).toLowerCase();
+        if (cat.includes('super')) {
+          fields['role_name'] = 'superadmin';
+        } else if (cat.includes('admin')) {
+          fields['role_name'] = 'admin';
+        } else if (cat.includes('manager')) {
+          fields['role_name'] = 'ship_manager';
+        } else if (cat.includes('staff')) {
+          fields['role_name'] = 'staff';
+        } else {
+          fields['role_name'] = 'viewer';
+        }
+      }
+
       const _id = crypto.randomUUID();
       await db.collection('users').insertOne({
         _id,
@@ -143,6 +173,21 @@ export const UserService = {
 
     if (data.password) {
       fields['password'] = await bcrypt.hash(data.password as string, 10);
+    }
+
+    if (fields['category']) {
+      const cat = String(fields['category']).toLowerCase();
+      if (cat.includes('super')) {
+        fields['role_name'] = 'superadmin';
+      } else if (cat.includes('admin')) {
+        fields['role_name'] = 'admin';
+      } else if (cat.includes('manager')) {
+        fields['role_name'] = 'ship_manager';
+      } else if (cat.includes('staff')) {
+        fields['role_name'] = 'staff';
+      } else {
+        fields['role_name'] = 'viewer';
+      }
     }
 
     if (Object.keys(fields).length === 0) return null;

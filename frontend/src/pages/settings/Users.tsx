@@ -39,15 +39,31 @@ const EMPTY_FORM: Omit<UserData, 'id'> = {
 };
 
 export default function Users() {
-    const { user: me } = useAuth();
+    const { user: me, hasPermission } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [users, setUsers] = useState<UserData[]>([]);
 
-    const isSuperAdmin = useMemo(() => {
+
+    const canCreateUser = useMemo(() => {
         if (!me) return false;
         const role = (me.roleName || me.role || '').toLowerCase();
-        return role === 'superadmin' || role.includes('super');
-    }, [me]);
+        const isAdminOrSuper = me.isAdmin || role === 'admin' || role === 'superadmin' || role.includes('admin') || role.includes('super');
+        return isAdminOrSuper && hasPermission('security_create');
+    }, [me, hasPermission]);
+
+    const canUpdateUser = useMemo(() => {
+        if (!me) return false;
+        const role = (me.roleName || me.role || '').toLowerCase();
+        const isAdminOrSuper = me.isAdmin || role === 'admin' || role === 'superadmin' || role.includes('admin') || role.includes('super');
+        return isAdminOrSuper && hasPermission('security_update');
+    }, [me, hasPermission]);
+
+    const canDeleteUser = useMemo(() => {
+        if (!me) return false;
+        const role = (me.roleName || me.role || '').toLowerCase();
+        const isAdminOrSuper = me.isAdmin || role === 'admin' || role === 'superadmin' || role.includes('admin') || role.includes('super');
+        return isAdminOrSuper && hasPermission('security_delete');
+    }, [me, hasPermission]);
     const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Inactive'>('All');
     
     // Advanced Filters panel state
@@ -371,7 +387,7 @@ export default function Users() {
                             </div>
                         </div>
                         <div className="hero-actions">
-                            {isSuperAdmin && (
+                            {canCreateUser && (
                                 <>
                                     <button className="btn-bulk" onClick={openBulkModal}>
                                         <FileText size={18} />
@@ -523,15 +539,19 @@ export default function Users() {
                                             <tr key={user.id}>
                                                 <td className="sticky-col">
                                                     <div className="action-btns">
-                                                        <button className="btn-edit" title="Edit User" onClick={() => openEditModal(user)}>
-                                                            <Edit2 size={14} />
-                                                        </button>
+                                                        {canUpdateUser && (
+                                                            <button className="btn-edit" title="Edit User" onClick={() => openEditModal(user)}>
+                                                                <Edit2 size={14} />
+                                                            </button>
+                                                        )}
                                                         <button className="btn-history" title="View Details Card" onClick={() => openDetailModal(user)}>
                                                             <History size={14} />
                                                         </button>
-                                                        <button className="btn-delete" title="Delete User" onClick={() => openDeleteModal(user)}>
-                                                            <Trash2 size={14} />
-                                                        </button>
+                                                        {canDeleteUser && (
+                                                            <button className="btn-delete" title="Delete User" onClick={() => openDeleteModal(user)}>
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td>

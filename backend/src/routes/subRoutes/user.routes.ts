@@ -19,7 +19,7 @@ import {
   assignUserRole, getMyProfile, updateMyProfile, uploadAvatar,
   createUsersBulk,
 } from '../../controller/user.controller.js';
-import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { authenticate, authorize, requirePermission } from '../../middleware/auth.middleware.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const avatarDir = path.resolve(__dirname, '..', '..', '..', 'uploads', 'avatars');
@@ -41,17 +41,17 @@ router.get('/me', getMyProfile);
 router.put('/me', updateMyProfile);
 router.post('/me/avatar', upload.single('avatar'), uploadAvatar);
 
-router.post('/bulk', authorize('superadmin'), createUsersBulk);
+router.post('/bulk', authorize('admin', 'superadmin'), requirePermission('security_create'), createUsersBulk);
 
 router.route('/')
   .get(listUsers)
-  .post(authorize('superadmin'), createUser);
+  .post(authorize('admin', 'superadmin'), requirePermission('security_create'), createUser);
 
-router.post('/:id/role', authorize('admin'), assignUserRole);
+router.post('/:id/role', authorize('admin', 'superadmin'), requirePermission('security_update'), assignUserRole);
 
 router.route('/:id')
   .get(getUser)
-  .put(authorize('admin'), updateUser)
-  .delete(authorize('admin'), deleteUser);
+  .put(authorize('admin', 'superadmin'), requirePermission('security_update'), updateUser)
+  .delete(authorize('admin', 'superadmin'), requirePermission('security_delete'), deleteUser);
 
 export default router;
