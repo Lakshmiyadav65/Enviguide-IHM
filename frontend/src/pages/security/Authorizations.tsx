@@ -9,7 +9,7 @@
 // "vessels_create" / "audits_send" — seeded by the migration.
 
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Shield, RefreshCw, Save, Check, ShieldCheck, UserPlus, X } from 'lucide-react';
+import { Shield, RefreshCw, Save, Check, ShieldCheck, UserPlus, X, Eye, EyeOff } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { api } from '../../lib/apiClient';
@@ -105,9 +105,14 @@ export default function Authorizations() {
   const [smError, setSmError] = useState<string | null>(null);
   const [smSaving, setSmSaving] = useState(false);
 
+  const [showSmPassword, setShowSmPassword] = useState(false);
+  const [showSmConfirmPassword, setShowSmConfirmPassword] = useState(false);
+
   const resetSmForm = () => {
     setSmForm({ name: '', email: '', phone: '', country: '', password: '', confirmPassword: '' });
     setSmError(null);
+    setShowSmPassword(false);
+    setShowSmConfirmPassword(false);
   };
 
   const submitShipManager = async () => {
@@ -735,27 +740,69 @@ export default function Authorizations() {
                 <div className="sm-row sm-row-2">
                   <div className="sm-field">
                     <label htmlFor="sm-password">Temporary Password <span className="sm-required">*</span></label>
-                    <input
-                      id="sm-password"
-                      name="sm-password"
-                      type="password"
-                      autoComplete="new-password"
-                      value={smForm.password}
-                      onChange={(e) => setSmForm((f) => ({ ...f, password: e.target.value }))}
-                      placeholder="At least 6 characters"
-                    />
+                    <div className="password-input-wrapper" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        id="sm-password"
+                        name="sm-password"
+                        type={showSmPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        value={smForm.password}
+                        onChange={(e) => setSmForm((f) => ({ ...f, password: e.target.value }))}
+                        placeholder="At least 6 characters"
+                        style={{ width: '100%', paddingRight: '40px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSmPassword(!showSmPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#64748B',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '4px'
+                        }}
+                      >
+                        {showSmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                   <div className="sm-field">
                     <label htmlFor="sm-confirm-password">Confirm Password <span className="sm-required">*</span></label>
-                    <input
-                      id="sm-confirm-password"
-                      name="sm-confirm-password"
-                      type="password"
-                      autoComplete="new-password"
-                      value={smForm.confirmPassword}
-                      onChange={(e) => setSmForm((f) => ({ ...f, confirmPassword: e.target.value }))}
-                      placeholder="Re-enter password"
-                    />
+                    <div className="password-input-wrapper" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <input
+                        id="sm-confirm-password"
+                        name="sm-confirm-password"
+                        type={showSmConfirmPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
+                        value={smForm.confirmPassword}
+                        onChange={(e) => setSmForm((f) => ({ ...f, confirmPassword: e.target.value }))}
+                        placeholder="Re-enter password"
+                        style={{ width: '100%', paddingRight: '40px' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSmConfirmPassword(!showSmConfirmPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#64748B',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '4px'
+                        }}
+                      >
+                        {showSmConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 

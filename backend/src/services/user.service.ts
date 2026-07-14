@@ -88,11 +88,13 @@ export const UserService = {
       throw new Error('email, name and password are required');
     }
     const db = getDb();
-    const existing = await db.collection('users').findOne({ email: data.email });
+    const emailNormalized = String(data.email).trim().toLowerCase();
+    const existing = await db.collection('users').findOne({ email: emailNormalized });
     if (existing) throw new Error('Email already registered');
 
     const hashed = await bcrypt.hash(data.password as string, 10);
     const fields = extract(data);
+    fields['email'] = emailNormalized;
     fields['password'] = hashed;
     fields['created_at'] = new Date();
     fields['updated_at'] = new Date();
@@ -131,10 +133,12 @@ export const UserService = {
 
     for (const data of usersList) {
       if (!data.email || !data.name) continue;
-      const existing = await db.collection('users').findOne({ email: data.email });
+      const emailNormalized = String(data.email).trim().toLowerCase();
+      const existing = await db.collection('users').findOne({ email: emailNormalized });
       if (existing) continue;
 
       const fields = extract(data);
+      fields['email'] = emailNormalized;
       fields['password'] = hashedPassword;
       fields['status'] = data.status || 'active';
       fields['payment_status'] = data.paymentStatus || 'Unpaid';
@@ -170,6 +174,10 @@ export const UserService = {
   async update(id: string, data: Record<string, unknown>) {
     const db = getDb();
     const fields = extract(data);
+
+    if (fields['email']) {
+      fields['email'] = String(fields['email']).trim().toLowerCase();
+    }
 
     if (data.password) {
       fields['password'] = await bcrypt.hash(data.password as string, 10);

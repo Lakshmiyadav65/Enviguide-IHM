@@ -40,7 +40,7 @@ function toUserRow(doc: any): UserRow | null {
 export const AuthService = {
   async findUserByEmail(email: string) {
     const db = getDb();
-    const doc = await db.collection('users').findOne({ email });
+    const doc = await db.collection('users').findOne({ email: String(email).trim().toLowerCase() });
     return toUserRow(doc);
   },
 

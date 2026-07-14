@@ -3,7 +3,8 @@ import {
     Search, Plus, Edit2,
     Trash2, Filter, Download, Mail,
     Phone, Globe, Tag, FileText, AlertTriangle,
-    History, Users as UsersIcon, ChevronLeft, ChevronRight, X
+    History, Users as UsersIcon, ChevronLeft, ChevronRight, X,
+    Eye, EyeOff
 } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
@@ -82,6 +83,9 @@ export default function Users() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
+
+    const [showAddPassword, setShowAddPassword] = useState(false);
+    const [showEditPassword, setShowEditPassword] = useState(false);
 
     const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
     const [formData, setFormData] = useState<Omit<UserData, 'id'>>(EMPTY_FORM);
@@ -308,6 +312,7 @@ export default function Users() {
     const openAddModal = () => {
         setFormData(EMPTY_FORM);
         setModalError(null);
+        setShowAddPassword(false);
         setShowAddModal(true);
     };
 
@@ -325,6 +330,7 @@ export default function Users() {
             password: ''
         });
         setModalError(null);
+        setShowEditPassword(false);
         setShowEditModal(true);
     };
 
@@ -669,12 +675,33 @@ export default function Users() {
 
                                 <div className="form-group">
                                     <label>Password (Default: Envi123)</label>
-                                    <input
-                                        type="password"
-                                        placeholder="Min 6 characters"
-                                        value={formData.password}
-                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    />
+                                    <div className="password-input-wrapper" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                        <input
+                                            type={showAddPassword ? 'text' : 'password'}
+                                            placeholder="Min 6 characters"
+                                            value={formData.password}
+                                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                            style={{ width: '100%', paddingRight: '40px' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAddPassword(!showAddPassword)}
+                                            style={{
+                                                position: 'absolute',
+                                                right: '10px',
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                color: '#64748B',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                padding: '4px'
+                                            }}
+                                        >
+                                            {showAddPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="form-group">
@@ -797,12 +824,33 @@ export default function Users() {
 
                                 <div className="form-group">
                                     <label>New Password (Leave blank to keep current)</label>
-                                    <input
-                                        type="password"
-                                        placeholder="Enter new password"
-                                        value={formData.password}
-                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    />
+                                    <div className="password-input-wrapper" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                        <input
+                                            type={showEditPassword ? 'text' : 'password'}
+                                            placeholder="Enter new password"
+                                            value={formData.password}
+                                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                            style={{ width: '100%', paddingRight: '40px' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowEditPassword(!showEditPassword)}
+                                            style={{
+                                                position: 'absolute',
+                                                right: '10px',
+                                                background: 'none',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                color: '#64748B',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                padding: '4px'
+                                            }}
+                                        >
+                                            {showEditPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="form-group">
