@@ -4,7 +4,7 @@ import {
     Trash2, Filter, Download, Mail,
     Phone, Globe, Tag, FileText, AlertTriangle,
     History, Users as UsersIcon, ChevronLeft, ChevronRight, X,
-    Eye, EyeOff
+    Eye, EyeOff, CheckCircle2
 } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
@@ -94,6 +94,15 @@ export default function Users() {
     const [modalError, setModalError] = useState<string | null>(null);
     const [modalSubmitting, setModalSubmitting] = useState(false);
 
+    const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+    const showToast = (type: 'success' | 'error', message: string) => {
+        setToast({ type, message });
+        setTimeout(() => {
+            setToast(null);
+        }, 4000);
+    };
+
     // Load users directly from the MongoDB Atlas database
     const fetchUsers = () => {
         setLoading(true);
@@ -157,9 +166,16 @@ export default function Users() {
             setShowAddModal(false);
             setFormData(EMPTY_FORM);
             fetchUsers();
+            showToast('success', 'User account created successfully!');
         } catch (err: any) {
             console.error('Error creating user:', err);
-            setModalError(err.message || 'Failed to create user. Please try again.');
+            const msg = err.message || 'Failed to create user.';
+            if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('email')) {
+                showToast('error', 'Email already registered');
+            } else {
+                showToast('error', msg);
+            }
+            setModalError(msg);
         } finally {
             setModalSubmitting(false);
         }
@@ -198,9 +214,16 @@ export default function Users() {
             setSelectedUser(null);
             setFormData(EMPTY_FORM);
             fetchUsers();
+            showToast('success', 'User account updated successfully!');
         } catch (err: any) {
             console.error('Error updating user:', err);
-            setModalError(err.message || 'Failed to update user. Please try again.');
+            const msg = err.message || 'Failed to update user.';
+            if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('email')) {
+                showToast('error', 'Email already registered');
+            } else {
+                showToast('error', msg);
+            }
+            setModalError(msg);
         } finally {
             setModalSubmitting(false);
         }
@@ -217,9 +240,10 @@ export default function Users() {
             setShowDeleteModal(false);
             setSelectedUser(null);
             fetchUsers();
+            showToast('success', 'User account deleted successfully!');
         } catch (err: any) {
             console.error('Error deleting user:', err);
-            setModalError(err.message || 'Failed to delete user.');
+            showToast('error', err.message || 'Failed to delete user.');
         } finally {
             setModalSubmitting(false);
         }
@@ -1094,6 +1118,35 @@ export default function Users() {
                             </div>
                         </form>
                     </div>
+                </div>
+            )}
+
+            {toast && (
+                <div className="toast-centered" style={{
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    backgroundColor: toast.type === 'error' ? '#FEF2F2' : '#ECFDF5',
+                    color: toast.type === 'error' ? '#991B1B' : '#065F46',
+                    border: `1px solid ${toast.type === 'error' ? '#FCA5A5' : '#6EE7B7'}`,
+                    padding: '16px 28px',
+                    borderRadius: '12px',
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                    zIndex: 10000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    fontWeight: 600,
+                    fontSize: '15px',
+                    pointerEvents: 'none'
+                }}>
+                    {toast.type === 'error' ? (
+                        <AlertTriangle size={20} color="#EF4444" />
+                    ) : (
+                        <CheckCircle2 size={20} color="#10B981" />
+                    )}
+                    <span>{toast.message}</span>
                 </div>
             )}
         </div>
