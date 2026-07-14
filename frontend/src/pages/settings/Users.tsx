@@ -47,23 +47,17 @@ export default function Users() {
 
     const canCreateUser = useMemo(() => {
         if (!me) return false;
-        const role = (me.roleName || me.role || '').toLowerCase();
-        const isAdminOrSuper = me.isAdmin || role === 'admin' || role === 'superadmin' || role.includes('admin') || role.includes('super');
-        return isAdminOrSuper && hasPermission('security_create');
+        return hasPermission('security_create');
     }, [me, hasPermission]);
 
     const canUpdateUser = useMemo(() => {
         if (!me) return false;
-        const role = (me.roleName || me.role || '').toLowerCase();
-        const isAdminOrSuper = me.isAdmin || role === 'admin' || role === 'superadmin' || role.includes('admin') || role.includes('super');
-        return isAdminOrSuper && hasPermission('security_update');
+        return hasPermission('security_update');
     }, [me, hasPermission]);
 
     const canDeleteUser = useMemo(() => {
         if (!me) return false;
-        const role = (me.roleName || me.role || '').toLowerCase();
-        const isAdminOrSuper = me.isAdmin || role === 'admin' || role === 'superadmin' || role.includes('admin') || role.includes('super');
-        return isAdminOrSuper && hasPermission('security_delete');
+        return hasPermission('security_delete');
     }, [me, hasPermission]);
     const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Inactive'>('All');
     

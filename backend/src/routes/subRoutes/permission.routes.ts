@@ -14,22 +14,22 @@ import {
   getUserPermissions, setUserPermissions,
   getRolePermissions, setRolePermissions, listRoles,
 } from '../../controller/permission.controller.js';
-import { authenticate, authorize } from '../../middleware/auth.middleware.js';
+import { authenticate, authorize, requirePermission } from '../../middleware/auth.middleware.js';
 
 const router = Router();
 router.use(authenticate);
 
 router.get('/nodes', listPermissionNodes);
-router.post('/nodes', authorize('admin'), upsertPermissionNode);
-router.delete('/nodes/:id', authorize('admin'), deletePermissionNode);
+router.post('/nodes', requirePermission('security_update'), upsertPermissionNode);
+router.delete('/nodes/:id', requirePermission('security_update'), deletePermissionNode);
 
 router.get('/roles', listRoles);
 router.route('/roles/:roleName')
   .get(getRolePermissions)
-  .put(authorize('admin'), setRolePermissions);
+  .put(requirePermission('security_update'), setRolePermissions);
 
 router.route('/users/:userId')
   .get(getUserPermissions)
-  .put(authorize('admin'), setUserPermissions);
+  .put(requirePermission('security_update'), setUserPermissions);
 
 export default router;
