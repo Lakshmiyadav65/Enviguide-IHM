@@ -45,6 +45,12 @@ export default function Vessels() {
     const [isEditing, setIsEditing] = useState(false);
     const [, setApiLoading] = useState(true);
 
+    const isVesselRole = useMemo(() => {
+        if (!user) return false;
+        const role = (user.roleName || user.role || '').toLowerCase();
+        return role === 'vessel' || role.includes('vessel');
+    }, [user]);
+
     const isOwnerOrManager = useMemo(() => {
         if (!user) return false;
         const role = (user.roleName || user.role || '').toLowerCase();
@@ -59,7 +65,7 @@ export default function Vessels() {
         const isVessel = role === 'vessel' || role.includes('vessel');
 
         if (isVessel) {
-            return vesselList.filter(v => v.id === user.vesselId);
+            return vesselList.filter(v => v.id === user.vesselId || (v.name && user.name && String(v.name).toLowerCase() === String(user.name).toLowerCase()));
         } else if (isOwner) {
             return vesselList.filter(v => {
                 const ownerStr = String(v.shipOwner || '').toLowerCase();
@@ -104,7 +110,7 @@ export default function Vessels() {
                     const isVessel = role === 'vessel' || role.includes('vessel');
                     
                     if (isVessel) {
-                        filtered = vessels.filter(v => v.id === user.vesselId);
+                        filtered = vessels.filter(v => v.id === user.vesselId || (v.name && user.name && String(v.name).toLowerCase() === String(user.name).toLowerCase()));
                     } else if (isOwner) {
                         filtered = vessels.filter(v => {
                             const ownerStr = String(v.shipOwner || '').toLowerCase();
@@ -140,7 +146,7 @@ export default function Vessels() {
                     const isVessel = role === 'vessel' || role.includes('vessel');
                     
                     if (isVessel) {
-                        filtered = INITIAL_VESSELS.filter(v => v.id === user.vesselId);
+                        filtered = INITIAL_VESSELS.filter(v => v.id === user.vesselId || (v.name && user.name && String(v.name).toLowerCase() === String(user.name).toLowerCase()));
                     } else if (isOwner) {
                         filtered = INITIAL_VESSELS.filter(v => {
                             const ownerStr = String(v.shipOwner || '').toLowerCase();
@@ -2216,7 +2222,7 @@ export default function Vessels() {
 
                     <div className="vessels-content-layout">
                         {/* Secondary Sidebar - Always visible for context */}
-                        {true && (
+                        {!isVesselRole && (
                             <aside className="secondary-sidebar">
                                 <div className="sidebar-section-header">
                                     <span>VESSEL SELECTION</span>
