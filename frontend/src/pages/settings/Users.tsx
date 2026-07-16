@@ -820,16 +820,18 @@ export default function Users() {
                                     </div>
                                 )}
 
-                                <div className="form-group">
-                                    <label>{formData.category === 'Vessel' ? 'Vessel User Display Name *' : 'Contact Person Name *'}</label>
-                                    <input
-                                        type="text"
-                                        placeholder={formData.category === 'Vessel' ? "e.g. MV Ocean Pioneer" : "e.g. John Doe"}
-                                        value={formData.contactPerson}
-                                        onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
-                                        required
-                                    />
-                                </div>
+                                {(formData.category === 'Super Admin' || formData.category === 'Admin') && (
+                                    <div className="form-group">
+                                        <label>Contact Person Name *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. John Doe"
+                                            value={formData.contactPerson}
+                                            onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                )}
 
                                 {formData.category === 'Vessel' ? (
                                     <div className="form-group">
@@ -1040,15 +1042,17 @@ export default function Users() {
                                     </div>
                                 )}
 
-                                <div className="form-group">
-                                    <label>{formData.category === 'Vessel' ? 'Vessel User Display Name *' : 'Contact Person Name *'}</label>
-                                    <input
-                                        type="text"
-                                        value={formData.contactPerson}
-                                        onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
-                                        required
-                                    />
-                                </div>
+                                {(formData.category === 'Super Admin' || formData.category === 'Admin') && (
+                                    <div className="form-group">
+                                        <label>Contact Person Name *</label>
+                                        <input
+                                            type="text"
+                                            value={formData.contactPerson}
+                                            onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                )}
 
                                 {formData.category === 'Vessel' ? (
                                     <div className="form-group">
@@ -1058,7 +1062,6 @@ export default function Users() {
                                             value={formData.username}
                                             onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                                             required
-                                            disabled // username typically shouldn't be altered once registered
                                         />
                                     </div>
                                 ) : (
@@ -1069,7 +1072,6 @@ export default function Users() {
                                             value={formData.email}
                                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                             required
-                                            disabled // email typically shouldn't be altered once registered
                                         />
                                     </div>
                                 )}
