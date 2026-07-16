@@ -159,6 +159,9 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
         status: user.status,
         isAdmin,
         permissions: effective,
+        vesselId: user.vessel_id ?? null,
+        shipManager: user.ship_manager ?? null,
+        shipOwner: user.ship_owner ?? null,
       },
     });
   } catch (err) {
