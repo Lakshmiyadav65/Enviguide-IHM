@@ -134,8 +134,9 @@ export default function Sidebar() {
         
         const role = (user.roleName || user.role || '').toLowerCase();
         const isOwnerOrManager = role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role.includes('owner') || role.includes('manager');
+        const isVessel = role === 'vessel' || role.includes('vessel');
 
-        if (isOwnerOrManager) {
+        if (isOwnerOrManager || isVessel) {
             const out: MenuItem[] = [];
             for (const item of menuItems) {
                 if (item.path === '/dashboard') {

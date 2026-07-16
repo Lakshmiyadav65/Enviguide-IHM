@@ -620,7 +620,7 @@ export default function Dashboard() {
     const isOwnerOrManager = useMemo(() => {
         if (!user) return false;
         const role = (user.roleName || user.role || '').toLowerCase();
-        return role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role.includes('owner') || role.includes('manager');
+        return role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role === 'vessel' || role.includes('owner') || role.includes('manager') || role.includes('vessel');
     }, [user]);
 
     if (isOwnerOrManager) {
