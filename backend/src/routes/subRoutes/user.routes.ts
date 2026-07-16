@@ -41,11 +41,11 @@ router.get('/me', getMyProfile);
 router.put('/me', updateMyProfile);
 router.post('/me/avatar', upload.single('avatar'), uploadAvatar);
 
-router.post('/bulk', authorize('superadmin'), requirePermission('security_create'), createUsersBulk);
+router.post('/bulk', authorize('admin', 'superadmin'), requirePermission('security_create'), createUsersBulk);
 
 router.route('/')
   .get(listUsers)
-  .post(authorize('superadmin'), requirePermission('security_create'), createUser);
+  .post(authorize('admin', 'superadmin'), requirePermission('security_create'), createUser);
 
 router.post('/:id/role', authorize('admin', 'superadmin'), requirePermission('security_update'), assignUserRole);
 

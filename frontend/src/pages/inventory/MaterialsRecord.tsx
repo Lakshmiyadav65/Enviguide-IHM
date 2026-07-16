@@ -3,6 +3,7 @@ import {
     Search, Plus, Filter, ChevronRight, ChevronLeft, ChevronDown, AlertCircle,
     Database, Package, Download, X, CheckCircle, MoreVertical
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import './MaterialsRecord.css';
 
@@ -64,6 +65,13 @@ function backendToMaterial(m: Record<string, unknown>): Material {
 
 export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecordProps) {
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const isOwnerOrManager = useMemo(() => {
+        if (!user) return false;
+        const role = (user.roleName || user.role || '').toLowerCase();
+        return role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role.includes('owner') || role.includes('manager');
+    }, [user]);
+
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTag, setActiveTag] = useState('All');
     const [riskFilter, setRiskFilter] = useState('Risk Level');
@@ -482,9 +490,11 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
                         <Filter size={18} />
                     </button>
 
-                    <button className="export-record-btn-top" style={{ marginLeft: '4px' }}>
-                        <Download size={16} /> Export Record
-                    </button>
+                    {!isOwnerOrManager && (
+                        <button className="export-record-btn-top" style={{ marginLeft: '4px' }}>
+                            <Download size={16} /> Export Record
+                        </button>
+                    )}
                 </div>
             </div>
 

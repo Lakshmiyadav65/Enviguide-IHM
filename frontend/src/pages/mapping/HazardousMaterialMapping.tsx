@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import {
     LayoutGrid,
     Plus,
@@ -135,6 +136,15 @@ export default function HazardousMaterialMapping() {
     const location = useLocation();
     const navigate = useNavigate();
     const query = useMemo(() => new URLSearchParams(location.search), [location.search]);
+    const { user } = useAuth();
+
+    const isReadOnly = useMemo(() => {
+        if (!user) return false;
+        const role = (user.roleName || user.role || '').toLowerCase();
+        const isOwnerOrManager = role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role.includes('owner') || role.includes('manager');
+        const isReadOnlyQuery = query.get('readOnly') === 'true';
+        return isOwnerOrManager || isReadOnlyQuery;
+    }, [user, query]);
 
     let fileUrl = query.get('url') || '';
     if (fileUrl && fileUrl.includes('ga_plan_')) {
@@ -344,6 +354,7 @@ export default function HazardousMaterialMapping() {
     }, [inventory, sectionName, vesselName, vesselId]);
 
     const handleCanvasClick = (e: React.MouseEvent) => {
+        if (isReadOnly) return;
         if (activeTool === 'pin') {
             const frameRect = e.currentTarget.getBoundingClientRect();
             // Get local coordinates within the crop area
@@ -802,11 +813,12 @@ export default function HazardousMaterialMapping() {
                                                 value={viewingMaterial.ihmPartNumber || ''}
                                                 onChange={e => setViewingMaterial({ ...viewingMaterial, ihmPartNumber: e.target.value })}
                                                 placeholder="e.g. IHM-CAD-P4022"
+                                                readOnly={isReadOnly}
                                             />
                                         </div>
                                         <div className="df-group">
                                             <label>LOCATION ON SHIP</label>
-                                            <div className="df-input deck-selector-field" onClick={() => setDeckSelectorOpen(!deckSelectorOpen)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '38px', position: 'relative', border: '1px solid #E2E8F0', borderRadius: '6px', background: '#F8FAFC', padding: '8px 12px', boxSizing: 'border-box' }}>
+                                            <div className="df-input deck-selector-field" onClick={() => { if (!isReadOnly) setDeckSelectorOpen(!deckSelectorOpen); }} style={{ cursor: isReadOnly ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '38px', position: 'relative', border: '1px solid #E2E8F0', borderRadius: '6px', background: '#F8FAFC', padding: '8px 12px', boxSizing: 'border-box' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                                                     {/* Show target deck if selected, else current */}
                                                     <span>{targetDeckForTransfer || viewingMaterial.deckPlan || sectionName}</span>
@@ -839,20 +851,23 @@ export default function HazardousMaterialMapping() {
                                             value={viewingMaterial.manufacturer || ''}
                                             onChange={e => setViewingMaterial({ ...viewingMaterial, manufacturer: e.target.value })}
                                             placeholder="e.g. Maritime Component Solutions Ltd."
+                                            readOnly={isReadOnly}
                                         />
                                     </div>
 
                                     <div className="df-group full">
                                         <label>LINK DOCUMENT</label>
-                                        <div className="doc-attach-box" onClick={() => {
-                                            // Mock add file
-                                            const newFile = `Document_${Math.floor(Math.random() * 1000)}.pdf`;
-                                            const updatedFiles = [...(viewingMaterial.files || []), newFile];
-                                            setViewingMaterial({ ...viewingMaterial, files: updatedFiles });
-                                        }}>
-                                            <Upload size={16} />
-                                            <span>Attach MSDS or MD Declaration (.pdf)</span>
-                                        </div>
+                                        {!isReadOnly && (
+                                            <div className="doc-attach-box" onClick={() => {
+                                                // Mock add file
+                                                const newFile = `Document_${Math.floor(Math.random() * 1000)}.pdf`;
+                                                const updatedFiles = [...(viewingMaterial.files || []), newFile];
+                                                setViewingMaterial({ ...viewingMaterial, files: updatedFiles });
+                                            }}>
+                                                <Upload size={16} />
+                                                <span>Attach MSDS or MD Declaration (.pdf)</span>
+                                            </div>
+                                        )}
 
                                         <div className="attached-files-list">
                                             {/* Logic for Dropbox if > 2 files */}
@@ -871,11 +886,13 @@ export default function HazardousMaterialMapping() {
                                                                     <span style={{ fontSize: '12px', textOverflow: 'ellipsis', overflow: 'hidden' }}>{file}</span>
                                                                     <div style={{ display: 'flex', gap: '8px' }}>
                                                                         <Eye size={14} className="action-icon-blue" style={{ cursor: 'pointer', color: '#00B0FA' }} />
-                                                                        <X size={14} className="action-icon-red" style={{ cursor: 'pointer', color: '#EF4444' }} onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            const newFiles = viewingMaterial.files.filter((_, i) => i !== idx);
-                                                                            setViewingMaterial({ ...viewingMaterial, files: newFiles });
-                                                                        }} />
+                                                                        {!isReadOnly && (
+                                                                            <X size={14} className="action-icon-red" style={{ cursor: 'pointer', color: '#EF4444' }} onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const newFiles = viewingMaterial.files.filter((_, i) => i !== idx);
+                                                                                setViewingMaterial({ ...viewingMaterial, files: newFiles });
+                                                                            }} />
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             ))}
@@ -890,10 +907,12 @@ export default function HazardousMaterialMapping() {
                                                         <span style={{ flex: 1 }}>{file}</span>
                                                         <div style={{ display: 'flex', gap: '8px' }}>
                                                             <Eye size={16} style={{ cursor: 'pointer', color: '#94A3B8' }} />
-                                                            <X size={16} className="remove-file" onClick={() => {
-                                                                const newFiles = (viewingMaterial.files || []).filter((_, i) => i !== idx);
-                                                                setViewingMaterial({ ...viewingMaterial, files: newFiles });
-                                                            }} />
+                                                            {!isReadOnly && (
+                                                                <X size={16} className="remove-file" onClick={() => {
+                                                                    const newFiles = (viewingMaterial.files || []).filter((_, i) => i !== idx);
+                                                                    setViewingMaterial({ ...viewingMaterial, files: newFiles });
+                                                                }} />
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ))
@@ -902,53 +921,57 @@ export default function HazardousMaterialMapping() {
                                     </div>
 
                                     <div className="detail-actions-footer">
-                                        <button className="hm-mapping-btn cancel" onClick={() => { setViewingMaterial(null); setViewMode('list'); setValidationError(null); }}>CANCEL</button>
-                                        <button className="hm-mapping-btn save" onClick={async () => {
-                                            if (targetDeckForTransfer) {
-                                                const deck = availableDecks.find(d => (d.title || d.sectionName) === targetDeckForTransfer);
-                                                if (deck) {
-                                                    const r = deck.rect || { x: 0, y: 0, width: 2000, height: 1400 };
-                                                    const newInv = inventory.filter(i => i.id !== viewingMaterial.id);
-                                                    setInventory(newInv);
-                                                    if (!vesselId) {
-                                                        // Demo / non-backed vessel — keep localStorage path.
-                                                        localStorage.setItem(`inventory_${vesselName}_${sectionName}`, JSON.stringify(newInv));
+                                        <button className="hm-mapping-btn cancel" onClick={() => { setViewingMaterial(null); setViewMode('list'); setValidationError(null); }}>
+                                            {isReadOnly ? 'CLOSE' : 'CANCEL'}
+                                        </button>
+                                        {!isReadOnly && (
+                                            <button className="hm-mapping-btn save" onClick={async () => {
+                                                if (targetDeckForTransfer) {
+                                                    const deck = availableDecks.find(d => (d.title || d.sectionName) === targetDeckForTransfer);
+                                                    if (deck) {
+                                                        const r = deck.rect || { x: 0, y: 0, width: 2000, height: 1400 };
+                                                        const newInv = inventory.filter(i => i.id !== viewingMaterial.id);
+                                                        setInventory(newInv);
+                                                        if (!vesselId) {
+                                                            // Demo / non-backed vessel — keep localStorage path.
+                                                            localStorage.setItem(`inventory_${vesselName}_${sectionName}`, JSON.stringify(newInv));
+                                                        }
+
+                                                        const params = new URLSearchParams({
+                                                            url: fileUrl,
+                                                            name: deck.title || deck.sectionName,
+                                                            vessel: vesselName,
+                                                            x: (r.x || 0).toString(),
+                                                            y: (r.y || 0).toString(),
+                                                            w: (r.width || r.w || 2000).toString(),
+                                                            h: (r.height || r.h || 1400).toString(),
+                                                        });
+                                                        if (vesselId) params.set('vesselId', vesselId);
+                                                        if (deck.id) params.set('deckAreaId', deck.id);
+
+                                                        navigate(`${location.pathname}?${params.toString()}`, {
+                                                            state: { transferMaterial: { ...viewingMaterial, deckPlan: deck.title || deck.sectionName } }
+                                                        });
+                                                        return;
                                                     }
-
-                                                    const params = new URLSearchParams({
-                                                        url: fileUrl,
-                                                        name: deck.title || deck.sectionName,
-                                                        vessel: vesselName,
-                                                        x: (r.x || 0).toString(),
-                                                        y: (r.y || 0).toString(),
-                                                        w: (r.width || r.w || 2000).toString(),
-                                                        h: (r.height || r.h || 1400).toString(),
-                                                    });
-                                                    if (vesselId) params.set('vesselId', vesselId);
-                                                    if (deck.id) params.set('deckAreaId', deck.id);
-
-                                                    navigate(`${location.pathname}?${params.toString()}`, {
-                                                        state: { transferMaterial: { ...viewingMaterial, deckPlan: deck.title || deck.sectionName } }
-                                                    });
-                                                    return;
                                                 }
-                                            }
-                                            // Normal Save — backed vessels persist via PUT.
-                                            if (vesselId) {
-                                                try {
-                                                    await api.put(
-                                                        ENDPOINTS.MATERIALS.DETAIL(vesselId, viewingMaterial.id),
-                                                        entryToBackendBody(viewingMaterial, viewingMaterial.pin),
-                                                    );
-                                                } catch (err) {
-                                                    console.error('Failed to update material:', err);
-                                                    setValidationError('Could not save changes. Please try again.');
-                                                    return;
+                                                // Normal Save — backed vessels persist via PUT.
+                                                if (vesselId) {
+                                                    try {
+                                                        await api.put(
+                                                            ENDPOINTS.MATERIALS.DETAIL(vesselId, viewingMaterial.id),
+                                                            entryToBackendBody(viewingMaterial, viewingMaterial.pin),
+                                                        );
+                                                    } catch (err) {
+                                                        console.error('Failed to update material:', err);
+                                                        setValidationError('Could not save changes. Please try again.');
+                                                        return;
+                                                    }
                                                 }
-                                            }
-                                            setViewingMaterial(null);
-                                            setViewMode('list');
-                                        }}>SAVE CHANGES</button>
+                                                setViewingMaterial(null);
+                                                setViewMode('list');
+                                            }}>SAVE CHANGES</button>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1383,7 +1406,7 @@ export default function HazardousMaterialMapping() {
                     </div>
 
                     <div className="sidebar-fab-v5">
-                        {viewMode === 'list' && (
+                        {viewMode === 'list' && !isReadOnly && (
                             <button className="fab-blue-v5" onClick={() => { setViewMode('add'); setActiveTool('pin'); }}>
                                 <Plus size={32} />
                             </button>

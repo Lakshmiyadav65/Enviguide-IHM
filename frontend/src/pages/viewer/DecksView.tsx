@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import {
     Upload,
     Plus,
@@ -53,6 +54,13 @@ function resolveBackendFileUrl(filePath: string): string {
 }
 
 export default function DecksView({ vesselName, vesselId }: { vesselName: string; vesselId?: string }) {
+    const { user } = useAuth();
+    const isOwnerOrManager = useMemo(() => {
+        if (!user) return false;
+        const role = (user.roleName || user.role || '').toLowerCase();
+        return role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role.includes('owner') || role.includes('manager');
+    }, [user]);
+
     const [uploadedPlans, setUploadedPlans] = useState<UploadedPlan[]>(() => {
         const saved = localStorage.getItem(`vessel_plans_${vesselName}`);
         let plans = saved ? JSON.parse(saved) : [];
@@ -183,7 +191,7 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
         } catch (err) {
             console.error('Failed to load GA plans from backend:', err);
         }
-    }, [vesselId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [vesselId, activePlanId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!vesselId) return;
@@ -845,23 +853,16 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
         );
     }
 
-    const openMapping = (deck: MappedSection, mode?: string, materialId?: string) => {
-        if (!activePlan) return;
-        const params: any = {
-            url: activePlan.url,
-            name: deck.title,
-            x: deck.rect.x.toString(),
-            y: deck.rect.y.toString(),
-            w: deck.rect.width.toString(),
-            h: deck.rect.height.toString(),
+    const openMapping = (deck: any, action?: string, materialId?: string) => {
+        const params: Record<string, string> = {
             vessel: vesselName,
+            deckId: deck.id,
+            deckTitle: deck.title,
+            planUrl: activePlan?.url || ''
         };
-        // Backend identifiers — when present, the mapping page reads/writes
-        // materials via the API instead of localStorage.
-        if (vesselId) params.vesselId = vesselId;
-        if (deck.id) params.deckAreaId = deck.id;
-        if (mode) params.mode = mode;
-        if (materialId) params.matId = materialId;
+        if (action) params.action = action;
+        if (materialId) params.materialId = materialId;
+        if (isOwnerOrManager) params.readOnly = 'true';
         const urlParams = new URLSearchParams(params);
         window.open(`/mapping?${urlParams.toString()}`, '_blank');
     };
@@ -874,29 +875,31 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
         <div className={`decks-view-container ${uploadedPlans.length === 0 ? 'no-scroll' : ''}`}>
             {/* GA Plans Upload Section */}
             <div className="ga-upload-card-refined">
-                <div className="ga-upload-initial-row">
-                    <div className="ga-upload-label clickable" onClick={() => fileInputRef.current?.click()}>
-                        <Upload size={18} color="#00B0FA" />
-                        <span>GA Plans Upload</span>
-                    </div>
-                    {isUploading ? (
-                        <div className="ga-progress-container">
-                            <div className="ga-progress-bar-bg">
-                                <div className="ga-progress-bar-fill" style={{ width: `${uploadProgress}%` }}></div>
-                                <div className="ga-progress-text-overlay">
-                                    <span>Uploading: <strong>Plan_Section.pdf</strong></span>
+                {!isOwnerOrManager && (
+                    <div className="ga-upload-initial-row">
+                        <div className="ga-upload-label clickable" onClick={() => fileInputRef.current?.click()}>
+                            <Upload size={18} color="#00B0FA" />
+                            <span>GA Plans Upload</span>
+                        </div>
+                        {isUploading ? (
+                            <div className="ga-progress-container">
+                                <div className="ga-progress-bar-bg">
+                                    <div className="ga-progress-bar-fill" style={{ width: `${uploadProgress}%` }}></div>
+                                    <div className="ga-progress-text-overlay">
+                                        <span>Uploading: <strong>Plan_Section.pdf</strong></span>
+                                    </div>
                                 </div>
+                                <span className="ga-progress-percentage">{uploadProgress}%</span>
                             </div>
-                            <span className="ga-progress-percentage">{uploadProgress}%</span>
-                        </div>
-                    ) : (
-                        <div className="ga-upload-dropzone-right" onClick={() => fileInputRef.current?.click()}>
-                            <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".pdf,.png,.jpg,.jpeg" style={{ display: 'none' }} />
-                            <span className="dropzone-text">Choose file or drag & drop GA Plans here (PDF, PNG, JPEG up to 50MB)</span>
-                            <Upload size={16} className="dropzone-icon" />
-                        </div>
-                    )}
-                </div>
+                        ) : (
+                            <div className="ga-upload-dropzone-right" onClick={() => fileInputRef.current?.click()}>
+                                <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept=".pdf,.png,.jpg,.jpeg" style={{ display: 'none' }} />
+                                <span className="dropzone-text">Choose file or drag & drop GA Plans here (PDF, PNG, JPEG up to 50MB)</span>
+                                <Upload size={16} className="dropzone-icon" />
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {(uploadedPlans.length > 0) && (
                     <div className="uploaded-plans-container">
@@ -937,13 +940,15 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                                     <ExternalLink size={14} />
                                                     <span>VIEW PLAN</span>
                                                 </button>
-                                                <button
-                                                    className="plan-action-btn-refined delete"
-                                                    onClick={(e) => { e.stopPropagation(); removePlan(plan.id); }}
-                                                    title="Delete"
-                                                >
-                                                    <Trash2 size={18} />
-                                                </button>
+                                                {!isOwnerOrManager && (
+                                                    <button
+                                                        className="plan-action-btn-refined delete"
+                                                        onClick={(e) => { e.stopPropagation(); removePlan(plan.id); }}
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -961,14 +966,16 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                         <h3>Active Decks</h3>
                         <span className="deck-count-badge">{visibleDecks.length}</span>
                     </div>
-                    <button
-                        className={`add-deck-btn ${(uploadedPlans.length === 0 || isUploading) ? 'disabled' : ''}`}
-                        disabled={uploadedPlans.length === 0 || isUploading}
-                        onClick={handleAddNewDeck}
-                    >
-                        <Plus size={18} />
-                        Add New Deck
-                    </button>
+                    {!isOwnerOrManager && (
+                        <button
+                            className={`add-deck-btn ${(uploadedPlans.length === 0 || isUploading) ? 'disabled' : ''}`}
+                            disabled={uploadedPlans.length === 0 || isUploading}
+                            onClick={handleAddNewDeck}
+                        >
+                            <Plus size={18} />
+                            Add New Deck
+                        </button>
+                    )}
                 </div>
 
                 <div className="decks-list-content">
@@ -1017,12 +1024,17 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                             </div>
                             <h4 className="empty-state-title-large">No Active Decks for {vesselName}</h4>
                             <p className="empty-state-subtitle-large">
-                                Upload a GA Plan for <strong>{vesselName}</strong> to start mapping vessel decks and material logs.
+                                {isOwnerOrManager 
+                                  ? `No GA plans or deck areas have been mapped for ${vesselName} yet.`
+                                  : `Upload a GA Plan for ${vesselName} to start mapping vessel decks and material logs.`
+                                }
                             </p>
-                            <button className="upload-first-plan-btn-premium" onClick={() => fileInputRef.current?.click()}>
-                                <FileText size={18} />
-                                Upload First Plan
-                            </button>
+                            {!isOwnerOrManager && (
+                                <button className="upload-first-plan-btn-premium" onClick={() => fileInputRef.current?.click()}>
+                                    <FileText size={18} />
+                                    Upload First Plan
+                                </button>
+                            )}
                         </div>
                     ) : isUploading && uploadedPlans.length === 0 ? (
                         <div className="no-decks-centered-state">
@@ -1114,12 +1126,16 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                                     </div>
                                                 </div>
                                                 <div className="deck-row-actions-group">
-                                                    <button className="deck-action-icn-btn" onClick={(e) => { e.stopPropagation(); openMapping(deck, 'edit'); }} title="Edit Mapping">
-                                                        <Pencil size={16} />
-                                                    </button>
-                                                    <button className="deck-action-icn-btn" onClick={(e) => { e.stopPropagation(); removeDeck(deck.id, deck.planId || activePlanId || ''); }} title="Delete Deck">
-                                                        <Trash2 size={16} />
-                                                    </button>
+                                                    {!isOwnerOrManager && (
+                                                        <>
+                                                            <button className="deck-action-icn-btn" onClick={(e) => { e.stopPropagation(); openMapping(deck, 'edit'); }} title="Edit Mapping">
+                                                                <Pencil size={16} />
+                                                            </button>
+                                                            <button className="deck-action-icn-btn" onClick={(e) => { e.stopPropagation(); removeDeck(deck.id, deck.planId || activePlanId || ''); }} title="Delete Deck">
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </>
+                                                    )}
                                                     <div className="action-icon-btn" onClick={() => toggleExpand(deck.id)}>
                                                         {expandedDeckId === deck.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                                                     </div>
@@ -1167,9 +1183,11 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                                             if (items.length === 0) return (
                                                                 <div className="no-materials-placeholder-v2">
                                                                     <p>No materials mapped yet.</p>
-                                                                    <button className="add-material-btn-primary" onClick={() => openMapping(deck, 'add')}>
-                                                                        <Plus size={16} /> Add Material
-                                                                    </button>
+                                                                    {!isOwnerOrManager && (
+                                                                        <button className="add-material-btn-primary" onClick={() => openMapping(deck, 'add')}>
+                                                                            <Plus size={16} /> Add Material
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             );
 

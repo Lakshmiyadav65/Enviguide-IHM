@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import {
     Search, Plus, Check, ShieldCheck, BarChart2, ShoppingCart, Layers,
     FolderOpen, Ship as ShipIcon, GripVertical, Book, Paperclip,
@@ -33,6 +34,7 @@ const EMPTY_FORM: Vessel = {
 
 export default function Vessels() {
     const location = useLocation();
+    const { user } = useAuth();
     const [notifCount, setNotifCount] = useState(3);
     const [vesselList, setVesselList] = useState<Vessel[]>([]);
     const [activeVesselName, setActiveVesselName] = useState('');
@@ -43,6 +45,46 @@ export default function Vessels() {
     const [isEditing, setIsEditing] = useState(false);
     const [, setApiLoading] = useState(true);
 
+    const isOwnerOrManager = useMemo(() => {
+        if (!user) return false;
+        const role = (user.roleName || user.role || '').toLowerCase();
+        return role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role.includes('owner') || role.includes('manager');
+    }, [user]);
+
+    const myVesselList = useMemo(() => {
+        if (!user) return vesselList;
+        const role = (user.roleName || user.role || '').toLowerCase();
+        const isOwner = role === 'owner' || role === 'ship_owner' || role.includes('owner');
+        const isManager = role === 'ship_manager' || role.includes('manager');
+
+        if (isOwner) {
+            return vesselList.filter(v => {
+                const ownerStr = String(v.shipOwner || '').toLowerCase();
+                const regOwnerStr = String(v.registeredOwner || '').toLowerCase();
+                const userNameStr = String(user.name || '').toLowerCase();
+                const userEmailStr = String(user.email || '').toLowerCase();
+                
+                return ownerStr.includes(userNameStr) || 
+                       regOwnerStr.includes(userNameStr) || 
+                       userNameStr.includes(ownerStr) || 
+                       userNameStr.includes(regOwnerStr) ||
+                       userEmailStr.includes(ownerStr) ||
+                       userEmailStr.includes(regOwnerStr);
+            });
+        } else if (isManager) {
+            return vesselList.filter(v => {
+                const managerStr = String(v.shipManager || '').toLowerCase();
+                const userNameStr = String(user.name || '').toLowerCase();
+                const userEmailStr = String(user.email || '').toLowerCase();
+                
+                return managerStr.includes(userNameStr) || 
+                       userNameStr.includes(managerStr) ||
+                       userEmailStr.includes(managerStr);
+            });
+        }
+        return vesselList;
+    }, [vesselList, user]);
+
     // Fetch vessels from API on mount
     useEffect(() => {
         setApiLoading(true);
@@ -50,21 +92,69 @@ export default function Vessels() {
             .then((res) => {
                 const vessels = res.data;
                 setVesselList(vessels);
-                if (vessels.length > 0 && !activeVesselName) {
-                    setActiveVesselName(vessels[0].name);
-                    setActiveVesselImo(vessels[0].imoNumber);
+                
+                let filtered = vessels;
+                if (user) {
+                    const role = (user.roleName || user.role || '').toLowerCase();
+                    const isOwner = role === 'owner' || role === 'ship_owner' || role.includes('owner');
+                    const isManager = role === 'ship_manager' || role.includes('manager');
+                    if (isOwner) {
+                        filtered = vessels.filter(v => {
+                            const ownerStr = String(v.shipOwner || '').toLowerCase();
+                            const regOwnerStr = String(v.registeredOwner || '').toLowerCase();
+                            const userNameStr = String(user.name || '').toLowerCase();
+                            const userEmailStr = String(user.email || '').toLowerCase();
+                            return ownerStr.includes(userNameStr) || regOwnerStr.includes(userNameStr) || userNameStr.includes(ownerStr) || userNameStr.includes(regOwnerStr) || userEmailStr.includes(ownerStr) || userEmailStr.includes(regOwnerStr);
+                        });
+                    } else if (isManager) {
+                        filtered = vessels.filter(v => {
+                            const managerStr = String(v.shipManager || '').toLowerCase();
+                            const userNameStr = String(user.name || '').toLowerCase();
+                            const userEmailStr = String(user.email || '').toLowerCase();
+                            return managerStr.includes(userNameStr) || userNameStr.includes(managerStr) || userEmailStr.includes(managerStr);
+                        });
+                    }
+                }
+
+                if (filtered.length > 0 && !activeVesselName) {
+                    setActiveVesselName(filtered[0].name);
+                    setActiveVesselImo(filtered[0].imoNumber);
                 }
             })
             .catch(() => {
                 // Fallback to INITIAL_VESSELS if API fails
                 setVesselList(INITIAL_VESSELS);
-                if (INITIAL_VESSELS.length > 0) {
-                    setActiveVesselName(INITIAL_VESSELS[0].name);
-                    setActiveVesselImo(INITIAL_VESSELS[0].imoNumber);
+                
+                let filtered = INITIAL_VESSELS;
+                if (user) {
+                    const role = (user.roleName || user.role || '').toLowerCase();
+                    const isOwner = role === 'owner' || role === 'ship_owner' || role.includes('owner');
+                    const isManager = role === 'ship_manager' || role.includes('manager');
+                    if (isOwner) {
+                        filtered = INITIAL_VESSELS.filter(v => {
+                            const ownerStr = String(v.shipOwner || '').toLowerCase();
+                            const regOwnerStr = String(v.registeredOwner || '').toLowerCase();
+                            const userNameStr = String(user.name || '').toLowerCase();
+                            const userEmailStr = String(user.email || '').toLowerCase();
+                            return ownerStr.includes(userNameStr) || regOwnerStr.includes(userNameStr) || userNameStr.includes(ownerStr) || userNameStr.includes(regOwnerStr) || userEmailStr.includes(ownerStr) || userEmailStr.includes(regOwnerStr);
+                        });
+                    } else if (isManager) {
+                        filtered = INITIAL_VESSELS.filter(v => {
+                            const managerStr = String(v.shipManager || '').toLowerCase();
+                            const userNameStr = String(user.name || '').toLowerCase();
+                            const userEmailStr = String(user.email || '').toLowerCase();
+                            return managerStr.includes(userNameStr) || userNameStr.includes(managerStr) || userEmailStr.includes(managerStr);
+                        });
+                    }
+                }
+
+                if (filtered.length > 0) {
+                    setActiveVesselName(filtered[0].name);
+                    setActiveVesselImo(filtered[0].imoNumber);
                 }
             })
             .finally(() => setApiLoading(false));
-    }, []);
+    }, [user]);
 
     // Document & Form States
     const [docSearch, setDocSearch] = useState('');
@@ -742,6 +832,16 @@ export default function Vessels() {
     ];
 
     const renderContent = () => {
+        if (myVesselList.length === 0) {
+            return (
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '400px', color: '#64748b', padding: '24px', textAlign: 'center' }}>
+                    <ShipIcon size={48} color="#94a3b8" style={{ marginBottom: '16px' }} />
+                    <h3 style={{ fontSize: '18px', fontWeight: 600, color: '#1e293b', marginBottom: '8px' }}>No Vessels Assigned</h3>
+                    <p style={{ maxWidth: '400px', fontSize: '14px', margin: '0 auto', color: '#64748b' }}>There are no vessels matching your credentials in our database. Please contact the administrator if you believe this is in error.</p>
+                </div>
+            );
+        }
+
         if (activeTab === 'documents') {
             if (docsLoading) {
                 return (
@@ -2053,24 +2153,26 @@ export default function Vessels() {
                             </div>
                         </div>
 
-                        <div className="vessel-form-actions-premium">
-                            {!isEditing ? (
-                                <button type="button" className="edit-btn-premium" onClick={() => setIsEditing(true)}>
-                                    <Edit2 size={18} />
-                                    <span>EDIT DETAILS</span>
-                                </button>
-                            ) : (
-                                <div className="actions-group-premium">
-                                    <button type="button" className="cancel-btn-premium" onClick={() => { setIsEditing(false); setIsAdding(false); setFormData(activeVesselData || INITIAL_VESSELS[0]); }}>
-                                        CANCEL
+                        {!isOwnerOrManager && (
+                            <div className="vessel-form-actions-premium">
+                                {!isEditing ? (
+                                    <button type="button" className="edit-btn-premium" onClick={() => setIsEditing(true)}>
+                                        <Edit2 size={18} />
+                                        <span>EDIT DETAILS</span>
                                     </button>
-                                    <button type="submit" className="save-btn-premium">
-                                        <Check size={18} />
-                                        SAVE CHANGES
-                                    </button>
-                                </div>
-                            )}
-                        </div>
+                                ) : (
+                                    <div className="actions-group-premium">
+                                        <button type="button" className="cancel-btn-premium" onClick={() => { setIsEditing(false); setIsAdding(false); setFormData(activeVesselData || INITIAL_VESSELS[0]); }}>
+                                            CANCEL
+                                        </button>
+                                        <button type="submit" className="save-btn-premium">
+                                            <Check size={18} />
+                                            SAVE CHANGES
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </form>
                 </div>
             </div>
@@ -2121,7 +2223,7 @@ export default function Vessels() {
                                 </div>
 
                                 <div className="vessel-list light-mode" style={{ flex: 1, overflowY: 'auto' }}>
-                                    {vesselList.filter(v =>
+                                    {myVesselList.filter(v =>
                                         v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                         v.imoNumber.includes(searchTerm)
                                     ).map((vessel) => (
@@ -2138,12 +2240,14 @@ export default function Vessels() {
                                         </div>
                                     ))}
                                 </div>
-                                <div className="sidebar-list-footer">
-                                    <button className="add-vessel-btn-refined" onClick={handleAddClick}>
-                                        <Plus size={18} />
-                                        Add Vessel
-                                    </button>
-                                </div>
+                                {!isOwnerOrManager && (
+                                    <div className="sidebar-list-footer">
+                                        <button className="add-vessel-btn-refined" onClick={handleAddClick}>
+                                            <Plus size={18} />
+                                            Add Vessel
+                                        </button>
+                                    </div>
+                                )}
                             </aside>
                         )}
 

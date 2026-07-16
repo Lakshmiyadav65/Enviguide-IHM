@@ -205,6 +205,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasPermission = useCallback((nodeId: string): boolean => {
     if (!user) return false;
     if (user.isAdmin) return true;
+
+    // Auto-grant basic read-only access to owners and managers so they can view these pages
+    const role = (user.roleName || user.role || '').toLowerCase();
+    const isOwnerOrManager = role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role.includes('owner') || role.includes('manager');
+    if (isOwnerOrManager) {
+      if (nodeId === 'vessels_read' || nodeId === 'materials_read' || nodeId === 'purchase_orders_read') {
+        return true;
+      }
+    }
+
     return user.permissions.includes(nodeId);
   }, [user]);
 
