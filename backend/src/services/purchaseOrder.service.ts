@@ -1,6 +1,25 @@
 import crypto from 'crypto';
 import { getDb } from '../config/database.js';
 import { isUserAdmin } from './access.js';
+import { getVesselQueryByUser } from './vessel.service.js';
+
+function prefixQueryKeys(query: any, prefix: string): any {
+  if (!query) return {};
+  if (query.$or) {
+    return {
+      $or: query.$or.map((cond: any) => prefixQueryKeys(cond, prefix))
+    };
+  }
+  const result: any = {};
+  for (const [k, v] of Object.entries(query)) {
+    if (k.startsWith('$')) {
+      result[k] = v;
+    } else {
+      result[`${prefix}${k}`] = v;
+    }
+  }
+  return result;
+}
 
 const PO_FIELD_MAP: Record<string, string> = {
   poNumber: 'po_number',
@@ -64,9 +83,10 @@ export const PurchaseOrderService = {
     });
     pipeline.push({ $unwind: '$vessel' });
 
-    const match: any = {};
+    let match: any = {};
     if (!admin) {
-      match['vessel.created_by_id'] = userId;
+      const vesselQuery = await getVesselQueryByUser(userId);
+      match = { ...match, ...prefixQueryKeys(vesselQuery, 'vessel.') };
     }
     if (filters?.vesselId) {
       match['vessel_id'] = filters.vesselId;
@@ -115,6 +135,7 @@ export const PurchaseOrderService = {
       return doc ? toApi(doc) : null;
     }
 
+    const vesselQuery = await getVesselQueryByUser(userId);
     const pipeline: any[] = [
       { $match: { _id: id } },
       {
@@ -126,7 +147,7 @@ export const PurchaseOrderService = {
         }
       },
       { $unwind: '$vessel' },
-      { $match: { 'vessel.created_by_id': userId } }
+      { $match: prefixQueryKeys(vesselQuery, 'vessel.') }
     ];
     const rows = await db.collection('purchase_orders').aggregate(pipeline).toArray();
     return rows[0] ? toApi(rows[0]) : null;

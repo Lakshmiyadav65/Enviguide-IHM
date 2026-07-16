@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { getDb, getClient } from '../config/database.js';
 import { isUserAdmin } from './access.js';
+import { getVesselQueryByUser } from './vessel.service.js';
 
 const FIELD_MAP: Record<string, string> = {
   imoNumber: 'imo_number',
@@ -53,10 +54,7 @@ export const AuditService = {
    *  themselves onboarded. */
   async getAudits(filters?: { status?: string; userId?: string }) {
     const db = getDb();
-    const vesselQuery: any = {};
-    if (filters?.userId && !(await isUserAdmin(filters.userId))) {
-      vesselQuery.created_by_id = filters.userId;
-    }
+    const vesselQuery = filters?.userId ? await getVesselQueryByUser(filters.userId) : {};
 
     const vessels = await db.collection('vessels').find(vesselQuery, { projection: { _id: 1 } }).toArray();
     const vesselIds = vessels.map((v) => v._id);
@@ -73,11 +71,7 @@ export const AuditService = {
   /** Get audits with status 'In Progress' or 'Pending' (Pending Audits Registry). */
   async getPendingAudits(userId: string) {
     const db = getDb();
-    const isVesselAdmin = await isUserAdmin(userId);
-    const vesselQuery: any = {};
-    if (!isVesselAdmin) {
-      vesselQuery.created_by_id = userId;
-    }
+    const vesselQuery = await getVesselQueryByUser(userId);
 
     const vessels = await db.collection('vessels').find(vesselQuery, { projection: { _id: 1 } }).toArray();
     const vesselIds = vessels.map((v) => v._id);
@@ -93,11 +87,7 @@ export const AuditService = {
   /** Every audit that's still alive. */
   async getActiveAudits(userId: string) {
     const db = getDb();
-    const isVesselAdmin = await isUserAdmin(userId);
-    const vesselQuery: any = {};
-    if (!isVesselAdmin) {
-      vesselQuery.created_by_id = userId;
-    }
+    const vesselQuery = await getVesselQueryByUser(userId);
 
     const vessels = await db.collection('vessels').find(vesselQuery, { projection: { _id: 1 } }).toArray();
     const vesselIds = vessels.map((v) => v._id);
@@ -113,11 +103,7 @@ export const AuditService = {
   /** Get audits with status 'Pending Review' */
   async getPendingReviews(userId: string) {
     const db = getDb();
-    const isVesselAdmin = await isUserAdmin(userId);
-    const vesselQuery: any = {};
-    if (!isVesselAdmin) {
-      vesselQuery.created_by_id = userId;
-    }
+    const vesselQuery = await getVesselQueryByUser(userId);
 
     const vessels = await db.collection('vessels').find(vesselQuery, { projection: { _id: 1 } }).toArray();
     const vesselIds = vessels.map((v) => v._id);
@@ -137,7 +123,8 @@ export const AuditService = {
 
     const query: any = { imo_number: imoNumber };
     if (!isVesselAdmin) {
-      const vessels = await db.collection('vessels').find({ created_by_id: userId }, { projection: { _id: 1 } }).toArray();
+      const vesselQuery = await getVesselQueryByUser(userId);
+      const vessels = await db.collection('vessels').find(vesselQuery, { projection: { _id: 1 } }).toArray();
       query.vessel_id = { $in: vessels.map((v) => v._id) };
     }
 
@@ -152,7 +139,8 @@ export const AuditService = {
 
     const query: any = { _id: id };
     if (!isVesselAdmin) {
-      const vessels = await db.collection('vessels').find({ created_by_id: userId }, { projection: { _id: 1 } }).toArray();
+      const vesselQuery = await getVesselQueryByUser(userId);
+      const vessels = await db.collection('vessels').find(vesselQuery, { projection: { _id: 1 } }).toArray();
       query.vessel_id = { $in: vessels.map((v) => v._id) };
     }
 
@@ -411,11 +399,7 @@ export const AuditService = {
   /** Aggregate rows for the MD SDoC Audit Pending page */
   async getMdsPendingOverview(userId: string) {
     const db = getDb();
-    const admin = await isUserAdmin(userId);
-    const vesselQuery: any = {};
-    if (!admin) {
-      vesselQuery.created_by_id = userId;
-    }
+    const vesselQuery = await getVesselQueryByUser(userId);
     const vessels = await db.collection('vessels').find(vesselQuery, { projection: { _id: 1 } }).toArray();
     const vesselIds = vessels.map((v) => v._id);
 
@@ -514,7 +498,8 @@ export const AuditService = {
   async getVesselPoItems(vesselId: string, userId: string) {
     const db = getDb();
     if (!(await isUserAdmin(userId))) {
-      const ownership = await db.collection('vessels').findOne({ _id: vesselId, created_by_id: userId }, { projection: { _id: 1 } });
+      const baseQuery = await getVesselQueryByUser(userId);
+      const ownership = await db.collection('vessels').findOne({ ...baseQuery, _id: vesselId }, { projection: { _id: 1 } });
       if (!ownership) {
         return { items: [] as Array<Record<string, unknown>>, auditId: null };
       }

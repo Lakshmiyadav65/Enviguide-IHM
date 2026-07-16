@@ -55,10 +55,74 @@ function extractFields(data: Record<string, unknown>): Record<string, unknown> {
   return fields;
 }
 
+function escapeRegex(text: string): string {
+  return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+}
+
+export async function getVesselQueryByUser(userId: string): Promise<any> {
+  if (await isUserAdmin(userId)) {
+    return {};
+  }
+  
+  const userColl = getCollection('users');
+  const userDoc = await userColl.findOne({ _id: userId });
+  if (!userDoc) {
+    return { _id: '__non_existent__' };
+  }
+  
+  const category = (userDoc.category || '').toLowerCase();
+  const roleName = (userDoc.role_name || '').toLowerCase();
+  
+  const isVessel = category === 'vessel' || roleName === 'vessel';
+  const isOwner = category === 'ship owner' || category === 'owner' || roleName === 'owner';
+  const isManager = category === 'ship manager' || category === 'manager' || roleName === 'ship_manager';
+  
+  if (isVessel) {
+    const conditions: any[] = [];
+    if (userDoc.vessel_id) {
+      conditions.push({ _id: userDoc.vessel_id });
+    }
+    if (userDoc.name) {
+      conditions.push({ name: { $regex: new RegExp(`^${escapeRegex(userDoc.name)}$`, 'i') } });
+    }
+    return conditions.length > 0 ? { $or: conditions } : { _id: '__non_existent__' };
+  }
+  
+  if (isOwner) {
+    const userName = userDoc.name || '';
+    const userEmail = userDoc.email || '';
+    const conditions: any[] = [];
+    if (userName) {
+      conditions.push({ ship_owner: { $regex: new RegExp(escapeRegex(userName), 'i') } });
+      conditions.push({ registered_owner: { $regex: new RegExp(escapeRegex(userName), 'i') } });
+    }
+    if (userEmail) {
+      conditions.push({ ship_owner: { $regex: new RegExp(escapeRegex(userEmail), 'i') } });
+      conditions.push({ registered_owner: { $regex: new RegExp(escapeRegex(userEmail), 'i') } });
+    }
+    return conditions.length > 0 ? { $or: conditions } : { _id: '__non_existent__' };
+  }
+  
+  if (isManager) {
+    const userName = userDoc.name || '';
+    const userEmail = userDoc.email || '';
+    const conditions: any[] = [];
+    if (userName) {
+      conditions.push({ ship_manager: { $regex: new RegExp(escapeRegex(userName), 'i') } });
+    }
+    if (userEmail) {
+      conditions.push({ ship_manager: { $regex: new RegExp(escapeRegex(userEmail), 'i') } });
+    }
+    return conditions.length > 0 ? { $or: conditions } : { _id: '__non_existent__' };
+  }
+  
+  return { created_by_id: userId };
+}
+
 export const VesselService = {
   async getVesselsByUser(userId: string) {
     const coll = getCollection('vessels');
-    const query = (await isUserAdmin(userId)) ? {} : { created_by_id: userId };
+    const query = await getVesselQueryByUser(userId);
     const cursor = coll.find(query).sort({ created_at: -1 });
     const rows = await cursor.toArray();
     return rows.map(toApi);
@@ -66,7 +130,8 @@ export const VesselService = {
 
   async getVesselByIdForUser(id: string, userId: string) {
     const coll = getCollection('vessels');
-    const query: any = (await isUserAdmin(userId)) ? { _id: id } : { _id: id, created_by_id: userId };
+    const baseQuery = await getVesselQueryByUser(userId);
+    const query = { ...baseQuery, _id: id };
     const row = await coll.findOne(query);
     return row ? toApi(row) : null;
   },
