@@ -78,12 +78,12 @@ export default function Login() {
 
                     <form onSubmit={handleSubmit} className="premium-form">
                         <div className="form-group-v2">
-                            <label>Portal Email</label>
+                            <label>Portal Email / Username</label>
                             <div className="input-row-v2">
                                 <Mail size={16} className="icon-v2" />
                                 <input
-                                    type="email"
-                                    placeholder="name@enviguide.com"
+                                    type="text"
+                                    placeholder="email@company.com or username"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required

@@ -19,6 +19,9 @@ const FIELD_MAP: Record<string, string> = {
   isLimitedShips: 'is_limited_ships',
   roleName: 'role_name',
   origin: 'origin',
+  vesselId: 'vessel_id',
+  shipManager: 'ship_manager',
+  shipOwner: 'ship_owner',
 };
 
 const REVERSE: Record<string, string> = {};

@@ -25,24 +25,52 @@ interface UserData {
     origin: string;
     lastActivity?: number; // days
     password?: string;
+    vesselId?: string;
+    shipManager?: string;
+    shipOwner?: string;
+    username?: string;
 }
 
-const EMPTY_FORM: Omit<UserData, 'id'> = {
+const EMPTY_FORM = {
     contactPerson: '',
     email: '',
     country: '',
     phone: '',
-    status: 'Active',
-    paymentStatus: 'Unpaid',
+    status: 'Active' as const,
+    paymentStatus: 'Unpaid' as const,
     category: 'Ship Owner',
     origin: 'Direct',
-    password: ''
+    password: '',
+    vesselId: '',
+    shipManager: '',
+    shipOwner: '',
+    username: ''
 };
 
 export default function Users() {
     const { user: me, hasPermission } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [users, setUsers] = useState<UserData[]>([]);
+    const [vesselList, setVesselList] = useState<any[]>([]);
+
+    const fetchVessels = () => {
+        api.get<{ success: boolean; data: any[] }>(ENDPOINTS.VESSELS.LIST)
+            .then((res) => {
+                const list = res.data || [];
+                setVesselList(list);
+            })
+            .catch((err) => console.error('Failed to load vessels:', err));
+    };
+
+    const managerList = useMemo(() => {
+        const managers = vesselList.map(v => v.shipManager).filter(Boolean);
+        return Array.from(new Set(managers));
+    }, [vesselList]);
+
+    const ownerList = useMemo(() => {
+        const owners = vesselList.flatMap(v => [v.shipOwner, v.registeredOwner]).filter(Boolean);
+        return Array.from(new Set(owners));
+    }, [vesselList]);
 
 
     const isSuperAdmin = useMemo(() => {
@@ -123,7 +151,10 @@ export default function Users() {
                         paymentStatus: u.paymentStatus === 'Paid' ? 'Paid' : 'Unpaid',
                         category: u.category || '',
                         origin: u.origin || 'Direct',
-                        lastActivity: u.lastActivity || 0
+                        lastActivity: u.lastActivity || 0,
+                        vesselId: u.vesselId || '',
+                        shipManager: u.shipManager || '',
+                        shipOwner: u.shipOwner || ''
                     }));
                     setUsers(mapped);
                 } else {
@@ -139,13 +170,29 @@ export default function Users() {
 
     useEffect(() => {
         fetchUsers();
+        fetchVessels();
     }, []);
 
     // Create user handler
     const handleCreateUserSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.contactPerson || !formData.email) {
-            setModalError('Name and Email are required fields.');
+        const isVessel = formData.category === 'Vessel';
+        const isManager = formData.category === 'Ship Manager';
+        const isOwner = formData.category === 'Ship Owner';
+        const targetEmailOrUsername = isVessel ? formData.username : formData.email;
+
+        // Auto-calculate name if hidden
+        let nameValue = formData.contactPerson;
+        if (isVessel) {
+            nameValue = vesselList.find(v => v.id === formData.vesselId)?.name || 'Vessel User';
+        } else if (isManager) {
+            nameValue = formData.shipManager || 'Ship Manager';
+        } else if (isOwner) {
+            nameValue = formData.shipOwner || 'Ship Owner';
+        }
+
+        if (!nameValue || !targetEmailOrUsername) {
+            setModalError('Required fields (Vessel/Manager/Owner selection or Username/Email) are missing.');
             return;
         }
 
@@ -154,15 +201,18 @@ export default function Users() {
 
         try {
             const payload = {
-                name: formData.contactPerson,
-                email: formData.email,
+                name: nameValue,
+                email: targetEmailOrUsername,
                 password: formData.password || 'Envi123', // default password fallback
                 country: formData.country,
-                phone: formData.phone,
+                phone: isVessel ? '' : formData.phone,
                 status: formData.status.toLowerCase(),
                 paymentStatus: formData.paymentStatus,
                 category: formData.category,
-                origin: formData.origin
+                origin: formData.origin,
+                vesselId: isVessel ? formData.vesselId : undefined,
+                shipManager: isManager ? formData.shipManager : undefined,
+                shipOwner: isOwner ? formData.shipOwner : undefined
             };
 
             await api.post(ENDPOINTS.USERS.LIST, payload);
@@ -188,8 +238,23 @@ export default function Users() {
     const handleUpdateUserSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedUser) return;
-        if (!formData.contactPerson || !formData.email) {
-            setModalError('Name and Email are required fields.');
+        const isVessel = formData.category === 'Vessel';
+        const isManager = formData.category === 'Ship Manager';
+        const isOwner = formData.category === 'Ship Owner';
+        const targetEmailOrUsername = isVessel ? formData.username : formData.email;
+
+        // Auto-calculate name if hidden
+        let nameValue = formData.contactPerson;
+        if (isVessel) {
+            nameValue = vesselList.find(v => v.id === formData.vesselId)?.name || 'Vessel User';
+        } else if (isManager) {
+            nameValue = formData.shipManager || 'Ship Manager';
+        } else if (isOwner) {
+            nameValue = formData.shipOwner || 'Ship Owner';
+        }
+
+        if (!nameValue || !targetEmailOrUsername) {
+            setModalError('Required fields (Vessel/Manager/Owner selection or Username/Email) are missing.');
             return;
         }
 
@@ -198,14 +263,17 @@ export default function Users() {
 
         try {
             const payload: Record<string, any> = {
-                name: formData.contactPerson,
-                email: formData.email,
+                name: nameValue,
+                email: targetEmailOrUsername,
                 country: formData.country,
-                phone: formData.phone,
+                phone: isVessel ? '' : formData.phone,
                 status: formData.status.toLowerCase(),
                 paymentStatus: formData.paymentStatus,
                 category: formData.category,
-                origin: formData.origin
+                origin: formData.origin,
+                vesselId: isVessel ? formData.vesselId : undefined,
+                shipManager: isManager ? formData.shipManager : undefined,
+                shipOwner: isOwner ? formData.shipOwner : undefined
             };
 
             if (formData.password) {
@@ -344,17 +412,22 @@ export default function Users() {
     };
 
     const openEditModal = (user: UserData) => {
+        const isVessel = user.category === 'Vessel';
         setSelectedUser(user);
         setFormData({
             contactPerson: user.contactPerson,
-            email: user.email,
+            email: isVessel ? '' : user.email,
             country: user.country,
             phone: user.phone,
             status: user.status,
             paymentStatus: user.paymentStatus,
             category: user.category,
             origin: user.origin,
-            password: ''
+            password: '',
+            vesselId: user.vesselId || '',
+            shipManager: user.shipManager || '',
+            shipOwner: user.shipOwner || '',
+            username: isVessel ? user.email : ''
         });
         setModalError(null);
         setShowEditPassword(false);
@@ -593,7 +666,7 @@ export default function Users() {
                                                         <div className="person-info">
                                                             <span className="person-name">{user.contactPerson}</span>
                                                             <div className="person-sub">
-                                                                <Mail size={12} />
+                                                                {user.category === 'Vessel' ? <UsersIcon size={12} /> : <Mail size={12} />}
                                                                 <span>{user.email}</span>
                                                             </div>
                                                         </div>
@@ -607,7 +680,7 @@ export default function Users() {
                                                         </div>
                                                         <div className="meta-item">
                                                             <Phone size={12} />
-                                                            <span>{user.phone || 'N/A'}</span>
+                                                            <span>{user.category === 'Vessel' ? '—' : (user.phone || 'N/A')}</span>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -677,26 +750,110 @@ export default function Users() {
                                 {modalError && <div className="error-banner">{modalError}</div>}
                                 
                                 <div className="form-group">
-                                    <label>Contact Person Name *</label>
+                                    <label>Category (Role) *</label>
+                                    <select
+                                        value={formData.category}
+                                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                        required
+                                    >
+                                        <option value="Super Admin">Super Admin</option>
+                                        <option value="Admin">Admin</option>
+                                        <option value="Ship Owner">Ship Owner</option>
+                                        <option value="Ship Manager">Ship Manager</option>
+                                        <option value="Vessel">Vessel</option>
+                                    </select>
+                                </div>
+
+                                {formData.category === 'Vessel' && (
+                                    <div className="form-group">
+                                        <label>Select Vessel *</label>
+                                        <select
+                                            value={formData.vesselId}
+                                            onChange={(e) => {
+                                                const v = vesselList.find(x => x.id === e.target.value);
+                                                setFormData({ 
+                                                    ...formData, 
+                                                    vesselId: e.target.value,
+                                                    contactPerson: v ? v.name : formData.contactPerson,
+                                                    username: v ? String(v.name).toLowerCase().replace(/\s+/g, '-') : formData.username
+                                                });
+                                            }}
+                                            required
+                                        >
+                                            <option value="">-- Select Vessel --</option>
+                                            {vesselList.map(v => (
+                                                <option key={v.id} value={v.id}>{v.name} (IMO: {v.imoNumber})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {formData.category === 'Ship Manager' && (
+                                    <div className="form-group">
+                                        <label>Select Ship Manager *</label>
+                                        <select
+                                            value={formData.shipManager}
+                                            onChange={(e) => setFormData({ ...formData, shipManager: e.target.value })}
+                                            required
+                                        >
+                                            <option value="">-- Select Ship Manager --</option>
+                                            {managerList.map(m => (
+                                                <option key={m} value={m}>{m}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {formData.category === 'Ship Owner' && (
+                                    <div className="form-group">
+                                        <label>Select Ship Owner *</label>
+                                        <select
+                                            value={formData.shipOwner}
+                                            onChange={(e) => setFormData({ ...formData, shipOwner: e.target.value })}
+                                            required
+                                        >
+                                            <option value="">-- Select Ship Owner --</option>
+                                            {ownerList.map(o => (
+                                                <option key={o} value={o}>{o}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                <div className="form-group">
+                                    <label>{formData.category === 'Vessel' ? 'Vessel User Display Name *' : 'Contact Person Name *'}</label>
                                     <input
                                         type="text"
-                                        placeholder="e.g. John Doe"
+                                        placeholder={formData.category === 'Vessel' ? "e.g. MV Ocean Pioneer" : "e.g. John Doe"}
                                         value={formData.contactPerson}
                                         onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
                                         required
                                     />
                                 </div>
 
-                                <div className="form-group">
-                                    <label>Email Address *</label>
-                                    <input
-                                        type="email"
-                                        placeholder="john.doe@company.com"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        required
-                                    />
-                                </div>
+                                {formData.category === 'Vessel' ? (
+                                    <div className="form-group">
+                                        <label>Username (for login) *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. mv-ocean-pioneer"
+                                            value={formData.username}
+                                            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="form-group">
+                                        <label>Email Address *</label>
+                                        <input
+                                            type="email"
+                                            placeholder="john.doe@company.com"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                )}
 
                                 <div className="form-group">
                                     <label>Password (Default: Envi123)</label>
@@ -739,29 +896,17 @@ export default function Users() {
                                     />
                                 </div>
 
-                                <div className="form-group">
-                                    <label>Phone Number</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. +31 6 12345678"
-                                        value={formData.phone}
-                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label>Category</label>
-                                    <select
-                                        value={formData.category}
-                                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                    >
-                                        <option value="Super Admin">Super Admin</option>
-                                        <option value="Admin">Admin</option>
-                                        <option value="Ship Owner">Ship Owner</option>
-                                        <option value="Ship Manager">Ship Manager</option>
-                                        <option value="Vessel">Vessel</option>
-                                    </select>
-                                </div>
+                                {formData.category !== 'Vessel' && (
+                                    <div className="form-group">
+                                        <label>Phone Number</label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. +31 6 12345678"
+                                            value={formData.phone}
+                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                        />
+                                    </div>
+                                )}
 
                                 <div className="form-group">
                                     <label>Origin</label>
@@ -825,7 +970,78 @@ export default function Users() {
                                 {modalError && <div className="error-banner">{modalError}</div>}
                                 
                                 <div className="form-group">
-                                    <label>Contact Person Name *</label>
+                                    <label>Category (Role) *</label>
+                                    <select
+                                        value={formData.category}
+                                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                        required
+                                    >
+                                        <option value="Super Admin">Super Admin</option>
+                                        <option value="Admin">Admin</option>
+                                        <option value="Ship Owner">Ship Owner</option>
+                                        <option value="Ship Manager">Ship Manager</option>
+                                        <option value="Vessel">Vessel</option>
+                                    </select>
+                                </div>
+
+                                {formData.category === 'Vessel' && (
+                                    <div className="form-group">
+                                        <label>Select Vessel *</label>
+                                        <select
+                                            value={formData.vesselId}
+                                            onChange={(e) => {
+                                                const v = vesselList.find(x => x.id === e.target.value);
+                                                setFormData({ 
+                                                    ...formData, 
+                                                    vesselId: e.target.value,
+                                                    contactPerson: v ? v.name : formData.contactPerson,
+                                                    username: v ? String(v.name).toLowerCase().replace(/\s+/g, '-') : formData.username
+                                                });
+                                            }}
+                                            required
+                                        >
+                                            <option value="">-- Select Vessel --</option>
+                                            {vesselList.map(v => (
+                                                <option key={v.id} value={v.id}>{v.name} (IMO: {v.imoNumber})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {formData.category === 'Ship Manager' && (
+                                    <div className="form-group">
+                                        <label>Select Ship Manager *</label>
+                                        <select
+                                            value={formData.shipManager}
+                                            onChange={(e) => setFormData({ ...formData, shipManager: e.target.value })}
+                                            required
+                                        >
+                                            <option value="">-- Select Ship Manager --</option>
+                                            {managerList.map(m => (
+                                                <option key={m} value={m}>{m}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {formData.category === 'Ship Owner' && (
+                                    <div className="form-group">
+                                        <label>Select Ship Owner *</label>
+                                        <select
+                                            value={formData.shipOwner}
+                                            onChange={(e) => setFormData({ ...formData, shipOwner: e.target.value })}
+                                            required
+                                        >
+                                            <option value="">-- Select Ship Owner --</option>
+                                            {ownerList.map(o => (
+                                                <option key={o} value={o}>{o}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+
+                                <div className="form-group">
+                                    <label>{formData.category === 'Vessel' ? 'Vessel User Display Name *' : 'Contact Person Name *'}</label>
                                     <input
                                         type="text"
                                         value={formData.contactPerson}
@@ -834,16 +1050,29 @@ export default function Users() {
                                     />
                                 </div>
 
-                                <div className="form-group">
-                                    <label>Email Address *</label>
-                                    <input
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        required
-                                        disabled // email typically shouldn't be altered once registered
-                                    />
-                                </div>
+                                {formData.category === 'Vessel' ? (
+                                    <div className="form-group">
+                                        <label>Username (for login) *</label>
+                                        <input
+                                            type="text"
+                                            value={formData.username}
+                                            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                                            required
+                                            disabled // username typically shouldn't be altered once registered
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="form-group">
+                                        <label>Email Address *</label>
+                                        <input
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            required
+                                            disabled // email typically shouldn't be altered once registered
+                                        />
+                                    </div>
+                                )}
 
                                 <div className="form-group">
                                     <label>New Password (Leave blank to keep current)</label>
@@ -885,28 +1114,16 @@ export default function Users() {
                                     />
                                 </div>
 
-                                <div className="form-group">
-                                    <label>Phone Number</label>
-                                    <input
-                                        type="text"
-                                        value={formData.phone}
-                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                    />
-                                </div>
-
-                                <div className="form-group">
-                                    <label>Category</label>
-                                    <select
-                                        value={formData.category}
-                                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                    >
-                                        <option value="Super Admin">Super Admin</option>
-                                        <option value="Admin">Admin</option>
-                                        <option value="Ship Owner">Ship Owner</option>
-                                        <option value="Ship Manager">Ship Manager</option>
-                                        <option value="Vessel">Vessel</option>
-                                    </select>
-                                </div>
+                                {formData.category !== 'Vessel' && (
+                                    <div className="form-group">
+                                        <label>Phone Number</label>
+                                        <input
+                                            type="text"
+                                            value={formData.phone}
+                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                        />
+                                    </div>
+                                )}
 
                                 <div className="form-group">
                                     <label>Origin</label>

@@ -56,8 +56,11 @@ export default function Vessels() {
         const role = (user.roleName || user.role || '').toLowerCase();
         const isOwner = role === 'owner' || role === 'ship_owner' || role.includes('owner');
         const isManager = role === 'ship_manager' || role.includes('manager');
+        const isVessel = role === 'vessel' || role.includes('vessel');
 
-        if (isOwner) {
+        if (isVessel) {
+            return vesselList.filter(v => v.id === user.vesselId);
+        } else if (isOwner) {
             return vesselList.filter(v => {
                 const ownerStr = String(v.shipOwner || '').toLowerCase();
                 const regOwnerStr = String(v.registeredOwner || '').toLowerCase();
@@ -98,7 +101,11 @@ export default function Vessels() {
                     const role = (user.roleName || user.role || '').toLowerCase();
                     const isOwner = role === 'owner' || role === 'ship_owner' || role.includes('owner');
                     const isManager = role === 'ship_manager' || role.includes('manager');
-                    if (isOwner) {
+                    const isVessel = role === 'vessel' || role.includes('vessel');
+                    
+                    if (isVessel) {
+                        filtered = vessels.filter(v => v.id === user.vesselId);
+                    } else if (isOwner) {
                         filtered = vessels.filter(v => {
                             const ownerStr = String(v.shipOwner || '').toLowerCase();
                             const regOwnerStr = String(v.registeredOwner || '').toLowerCase();
@@ -130,7 +137,11 @@ export default function Vessels() {
                     const role = (user.roleName || user.role || '').toLowerCase();
                     const isOwner = role === 'owner' || role === 'ship_owner' || role.includes('owner');
                     const isManager = role === 'ship_manager' || role.includes('manager');
-                    if (isOwner) {
+                    const isVessel = role === 'vessel' || role.includes('vessel');
+                    
+                    if (isVessel) {
+                        filtered = INITIAL_VESSELS.filter(v => v.id === user.vesselId);
+                    } else if (isOwner) {
                         filtered = INITIAL_VESSELS.filter(v => {
                             const ownerStr = String(v.shipOwner || '').toLowerCase();
                             const regOwnerStr = String(v.registeredOwner || '').toLowerCase();

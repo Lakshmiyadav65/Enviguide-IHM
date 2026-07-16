@@ -14,6 +14,9 @@ export interface AuthUser {
    *  for non-admins until an admin grants something via Authorizations. */
   permissions: string[];
   token: string;
+  vesselId?: string;
+  shipManager?: string;
+  shipOwner?: string;
 }
 
 interface AuthContextValue {
@@ -51,16 +54,19 @@ interface MeResponse {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function meToAuthUser(d: MeResponse['data'], token: string): AuthUser {
+function meToAuthUser(d: MeResponse['data'] & Record<string, any>, token: string): AuthUser {
   return {
     id: d.id,
     name: d.name,
     email: d.email,
     role: d.role as AuthUser['role'],
-    roleName: (d as any).roleName ?? null,
+    roleName: d.roleName ?? null,
     isAdmin: !!d.isAdmin,
     permissions: Array.isArray(d.permissions) ? d.permissions : [],
     token,
+    vesselId: d.vesselId,
+    shipManager: d.shipManager,
+    shipOwner: d.shipOwner,
   };
 }
 
