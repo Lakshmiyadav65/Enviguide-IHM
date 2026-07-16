@@ -141,7 +141,7 @@ export default function HazardousMaterialMapping() {
     const isReadOnly = useMemo(() => {
         if (!user) return false;
         const role = (user.roleName || user.role || '').toLowerCase();
-        const isOwnerOrManager = role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role.includes('owner') || role.includes('manager');
+        const isOwnerOrManager = role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role === 'vessel' || role.includes('owner') || role.includes('manager') || role.includes('vessel');
         const isReadOnlyQuery = query.get('readOnly') === 'true';
         return isOwnerOrManager || isReadOnlyQuery;
     }, [user, query]);
