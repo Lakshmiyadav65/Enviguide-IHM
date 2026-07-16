@@ -16,6 +16,9 @@ interface UserRow {
   created_at: Date;
   updated_at: Date;
   role_name?: string | null;
+  vessel_id?: string | null;
+  ship_manager?: string | null;
+  ship_owner?: string | null;
 }
 
 // Convert MongoDB document to UserRow structure expected by Auth routes
@@ -34,6 +37,9 @@ function toUserRow(doc: any): UserRow | null {
     created_at: new Date(doc.created_at),
     updated_at: new Date(doc.updated_at),
     role_name: doc.role_name ?? null,
+    vessel_id: doc.vessel_id ?? null,
+    ship_manager: doc.ship_manager ?? null,
+    ship_owner: doc.ship_owner ?? null,
   };
 }
 

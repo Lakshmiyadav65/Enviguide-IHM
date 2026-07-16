@@ -49,7 +49,15 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       success: true,
       data: {
         token,
-        user: { id: user.id, name: user.name, email: user.email, role: user.category },
+        user: { 
+          id: user.id, 
+          name: user.name, 
+          email: user.email, 
+          role: user.category,
+          vesselId: user.vessel_id ?? null,
+          shipManager: user.ship_manager ?? null,
+          shipOwner: user.ship_owner ?? null,
+        },
       },
     });
   } catch (err) {
