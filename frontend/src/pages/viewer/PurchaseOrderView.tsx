@@ -7,6 +7,7 @@ import {
 import './PurchaseOrderView.css';
 import { api } from '../../lib/apiClient';
 import { ENDPOINTS } from '../../config/api.config';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PurchaseOrderItem {
     id: string;
@@ -72,6 +73,13 @@ interface PurchaseOrderViewProps {
 }
 
 export default function PurchaseOrderView({ imo, vesselId, vesselName }: PurchaseOrderViewProps) {
+    const { user } = useAuth();
+    const isOwnerOrManager = useMemo(() => {
+        if (!user) return false;
+        const role = (user.roleName || user.role || '').toLowerCase();
+        return role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role === 'vessel' || role.includes('owner') || role.includes('manager') || role.includes('vessel');
+    }, [user]);
+
     const [activeFilter, setActiveFilter] = useState('All');
     const [openSuppliers, setOpenSuppliers] = useState<string[]>(['s1']);
     const [allItems, setAllItems] = useState<PurchaseOrderItem[]>(initializeData);
@@ -559,32 +567,36 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
 
                                 {openSuppliers.includes(supplier.id) && (
                                     <div className="po-v4-supplier-details-v4">
-                                        <div className="po-v4-table-toolbar-localized">
-                                            <div className="po-v4-action-icons-localized">
-                                                {selectedCount > 0 && (
-                                                    <div className="po-v4-action-item-local tooltip-p" onClick={handleBulkEmail}>
-                                                        <div className="po-v4-circle-btn-v4 mail-bulk">
-                                                            <Mail size={18} />
+                                        {!isOwnerOrManager && (
+                                            <div className="po-v4-table-toolbar-localized">
+                                                <div className="po-v4-action-icons-localized">
+                                                    {selectedCount > 0 && (
+                                                        <div className="po-v4-action-item-local tooltip-p" onClick={handleBulkEmail}>
+                                                            <div className="po-v4-circle-btn-v4 mail-bulk">
+                                                                <Mail size={18} />
+                                                            </div>
+                                                            <span className="po-v4-tooltip-text">Send Reminders</span>
                                                         </div>
-                                                        <span className="po-v4-tooltip-text">Send Reminders</span>
-                                                    </div>
-                                                )}
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
 
                                         <div className="po-v4-table-master-wrapper">
                                             <table className="po-v4-table-styled-premium">
                                                 <thead>
                                                     <tr>
-                                                        <th className="ch-col">
-                                                            <input
-                                                                type="checkbox"
-                                                                className="po-v4-header-checkbox-v4"
-                                                                checked={supplier.items.length > 0 && supplier.items.every(i => i.selected)}
-                                                                onChange={(e) => toggleAllInSupplier(supplier.items, e.target.checked)}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            />
-                                                        </th>
+                                                        {!isOwnerOrManager && (
+                                                            <th className="ch-col">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="po-v4-header-checkbox-v4"
+                                                                    checked={supplier.items.length > 0 && supplier.items.every(i => i.selected)}
+                                                                    onChange={(e) => toggleAllInSupplier(supplier.items, e.target.checked)}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                />
+                                                            </th>
+                                                        )}
                                                         <th className="ac-col">Options Channel</th>
                                                         <th className="doc-col">Documents</th>
                                                         <th className="em-col">Email Status</th>
@@ -608,7 +620,7 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                 <tbody>
                                                     {supplier.items.length === 0 && (
                                                         <tr>
-                                                            <td colSpan={14} style={{ padding: '24px 16px', textAlign: 'center', color: '#94A3B8', fontSize: '13px', fontStyle: 'italic' }}>
+                                                            <td colSpan={isOwnerOrManager ? 13 : 14} style={{ padding: '24px 16px', textAlign: 'center', color: '#94A3B8', fontSize: '13px', fontStyle: 'italic' }}>
                                                                 {supplier.id === 'placeholder'
                                                                     ? 'Upload a purchase order to see vendors and items here.'
                                                                     : 'No items yet for this supplier.'}
@@ -619,76 +631,80 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                         const isEditing = editingRowId === item.id;
                                                         return (
                                                             <tr key={item.id} className={item.selected ? 'row-is-selected' : ''}>
-                                                                <td className="ch-col">
-                                                                    <div className={`po-v4-row-action-checkbox-styled ${item.selected ? 'checked' : ''}`} onClick={(e) => toggleItemSelection(item.id, e)}>
-                                                                        {item.selected && <Check size={14} strokeWidth={3} className="check-icon-v4" />}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="ac-col">
-                                                                    {isEditing ? (
-                                                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                                                                            <button
-                                                                                type="button"
-                                                                                className="po-v4-action-icon-btn-v4 view"
-                                                                                title="Save changes"
-                                                                                onClick={() => handleInlineSave(item.id)}
-                                                                                style={{ color: '#10B981', borderColor: '#10B981', background: '#ECFDF5' }}
-                                                                            >
-                                                                                <Check size={14} />
-                                                                            </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                className="po-v4-action-icon-btn-v4 delete"
-                                                                                title="Cancel editing"
-                                                                                onClick={() => setEditingRowId(null)}
-                                                                                style={{ color: '#EF4444', borderColor: '#EF4444', background: '#FEF2F2' }}
-                                                                            >
-                                                                                <X size={14} />
-                                                                            </button>
+                                                                {!isOwnerOrManager && (
+                                                                    <td className="ch-col">
+                                                                        <div className={`po-v4-row-action-checkbox-styled ${item.selected ? 'checked' : ''}`} onClick={(e) => toggleItemSelection(item.id, e)}>
+                                                                            {item.selected && <Check size={14} strokeWidth={3} className="check-icon-v4" />}
                                                                         </div>
-                                                                    ) : (
-                                                                        <div className="po-v4-row-action-btns-premium">
-                                                                            <button
-                                                                                type="button"
-                                                                                className="po-v4-action-icon-btn-v4 view"
-                                                                                title={item.reminderCount && item.reminderCount > 0
-                                                                                    ? `Send reminder ${(item.reminderCount ?? 0) + 1}`
-                                                                                    : 'Send reminder'}
-                                                                                onClick={() => handleOpenReminder(item)}
-                                                                                disabled={!item.clarificationId || item.mdsStatus === 'received'}
-                                                                                style={{
-                                                                                    visibility: item.isSuspected && item.clarificationId ? 'visible' : 'hidden',
-                                                                                    opacity: item.mdsStatus === 'received' ? 0.4 : 1,
-                                                                                    cursor: item.mdsStatus === 'received' ? 'not-allowed' : 'pointer',
-                                                                                }}
-                                                                            >
-                                                                                <Mail size={14} />
-                                                                            </button>
-                                                                            {item.reviewedAt && (
-                                                                                <span
-                                                                                    title={item.reviewedBy ? `Reviewed by ${item.reviewedBy}` : 'Reviewed'}
+                                                                    </td>
+                                                                )}
+                                                                <td className="ac-col">
+                                                                    {!isOwnerOrManager && (
+                                                                        isEditing ? (
+                                                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="po-v4-action-icon-btn-v4 view"
+                                                                                    title="Save changes"
+                                                                                    onClick={() => handleInlineSave(item.id)}
+                                                                                    style={{ color: '#10B981', borderColor: '#10B981', background: '#ECFDF5' }}
+                                                                                >
+                                                                                    <Check size={14} />
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="po-v4-action-icon-btn-v4 delete"
+                                                                                    title="Cancel editing"
+                                                                                    onClick={() => setEditingRowId(null)}
+                                                                                    style={{ color: '#EF4444', borderColor: '#EF4444', background: '#FEF2F2' }}
+                                                                                >
+                                                                                    <X size={14} />
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="po-v4-row-action-btns-premium">
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="po-v4-action-icon-btn-v4 view"
+                                                                                    title={item.reminderCount && item.reminderCount > 0
+                                                                                        ? `Send reminder ${(item.reminderCount ?? 0) + 1}`
+                                                                                        : 'Send reminder'}
+                                                                                    onClick={() => handleOpenReminder(item)}
+                                                                                    disabled={!item.clarificationId || item.mdsStatus === 'received'}
                                                                                     style={{
-                                                                                        display: 'inline-flex',
-                                                                                        alignItems: 'center',
-                                                                                        gap: 4,
-                                                                                        padding: '2px 8px',
-                                                                                        background: '#ECFDF5',
-                                                                                        color: '#065F46',
-                                                                                        border: '1px solid #A7F3D0',
-                                                                                        borderRadius: 999,
-                                                                                        fontSize: 10,
-                                                                                        fontWeight: 700,
-                                                                                        letterSpacing: '0.04em',
-                                                                                        textTransform: 'uppercase',
+                                                                                        visibility: item.isSuspected && item.clarificationId ? 'visible' : 'hidden',
+                                                                                        opacity: item.mdsStatus === 'received' ? 0.4 : 1,
+                                                                                        cursor: item.mdsStatus === 'received' ? 'not-allowed' : 'pointer',
                                                                                     }}
                                                                                 >
-                                                                                    <CheckCircle2 size={12} />
-                                                                                    Reviewed
-                                                                                </span>
-                                                                            )}
-                                                                            <button type="button" className="po-v4-action-icon-btn-v4 edit" title="Edit Item" onClick={() => handleEditClick(item)}><Edit2 size={14} /></button>
-                                                                            <button type="button" className="po-v4-action-icon-btn-v4 delete" title="Delete Item" onClick={() => handleDeleteClick(item.id)}><Trash2 size={14} /></button>
-                                                                        </div>
+                                                                                    <Mail size={14} />
+                                                                                </button>
+                                                                                {item.reviewedAt && (
+                                                                                    <span
+                                                                                        title={item.reviewedBy ? `Reviewed by ${item.reviewedBy}` : 'Reviewed'}
+                                                                                        style={{
+                                                                                            display: 'inline-flex',
+                                                                                            alignItems: 'center',
+                                                                                            gap: 4,
+                                                                                            padding: '2px 8px',
+                                                                                            background: '#ECFDF5',
+                                                                                            color: '#065F46',
+                                                                                            border: '1px solid #A7F3D0',
+                                                                                            borderRadius: 999,
+                                                                                            fontSize: 10,
+                                                                                            fontWeight: 700,
+                                                                                            letterSpacing: '0.04em',
+                                                                                            textTransform: 'uppercase',
+                                                                                        }}
+                                                                                    >
+                                                                                        <CheckCircle2 size={12} />
+                                                                                        Reviewed
+                                                                                    </span>
+                                                                                )}
+                                                                                <button type="button" className="po-v4-action-icon-btn-v4 edit" title="Edit Item" onClick={() => handleEditClick(item)}><Edit2 size={14} /></button>
+                                                                                <button type="button" className="po-v4-action-icon-btn-v4 delete" title="Delete Item" onClick={() => handleDeleteClick(item.id)}><Trash2 size={14} /></button>
+                                                                            </div>
+                                                                        )
                                                                     )}
                                                                 </td>
                                                                 <td className="doc-col">

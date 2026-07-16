@@ -878,7 +878,8 @@ export default function Vessels() {
 
             return (
                 <div className="documents-container">
-                    <div className="doc-upload-banner">
+                    {!isOwnerOrManager && (
+                        <div className="doc-upload-banner">
                         <div className="upload-brand">
                             <Upload size={20} color="#00B0FA" />
                             <span className="upload-label">Upload Document</span>
@@ -934,6 +935,7 @@ export default function Vessels() {
                             </button>
                         </div>
                     </div>
+                    )}
 
                     <div className="doc-filters-bar">
                         <div className="doc-search-input">
@@ -1044,8 +1046,12 @@ export default function Vessels() {
                                         <td>
                                             <div className="doc-actions">
                                                 <button className="action-icn-btn" onClick={() => handlePreviewDocClick(doc)}><Eye size={14} /></button>
-                                                <button className="action-icn-btn"><Send size={14} /></button>
-                                                <button className="action-icn-btn" onClick={() => handleDeleteDocClick(doc)}><Trash2 size={14} /></button>
+                                                {!isOwnerOrManager && (
+                                                    <>
+                                                        <button className="action-icn-btn"><Send size={14} /></button>
+                                                        <button className="action-icn-btn" onClick={() => handleDeleteDocClick(doc)}><Trash2 size={14} /></button>
+                                                    </>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
