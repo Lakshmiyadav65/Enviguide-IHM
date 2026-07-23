@@ -214,3 +214,83 @@ export interface AuditSummary {
         avatar: string;
     };
 }
+
+export interface HazmatMaterialCount {
+    key: string;
+    color: string;
+    count: number;
+    redCount: number;
+}
+
+export interface DashboardLineItem {
+    id: string;
+    ship: string;
+    flag: string;
+    vclass: string;
+    supplier: string;
+    desc: string;
+    hm: string;
+    qty: string;
+    part: string;
+    cat: string;
+    status: 'HM Red' | 'HM Green' | 'Non HM' | string;
+    po: string;
+    vs: string;
+    created: string;
+    updated: string;
+    md: boolean;
+    sdoc: boolean;
+    deck: string;
+    equip: string;
+    position: string;
+    component: string;
+    material: string;
+    remarks: string;
+}
+
+export interface DashboardOverviewData {
+    userRole: 'admin' | 'vessel' | 'ship_owner' | 'ship_manager';
+    vessels: Array<{
+        id: string;
+        name: string;
+        imoNumber: string;
+        flagState: string;
+        shipOwner: string;
+        shipManager: string;
+        vesselClass: string;
+        keelLaidDate: string;
+        complianceStatus: string;
+    }>;
+    options: {
+        shipOwners: string[];
+        shipManagers: string[];
+        flagStates: string[];
+        suppliers: string[];
+        vessels: Array<{ id: string; name: string }>;
+    };
+    kpi: {
+        totalVessels: number;
+        totalPOs: number;
+        totalTrackedItems: number;
+        hmRedCount: number;
+        hmGreenCount: number;
+        nonHmCount: number;
+        mdReceived: number;
+        mdPending: number;
+        sdocReceived: number;
+        sdocPending: number;
+    };
+    hazmatBreakdown: HazmatMaterialCount[];
+    poMetrics: Array<{ label: string; a: number; b: number; color: string }>;
+    mdDonut: Array<{ name: string; value: number; color: string }>;
+    supplierDonut: Array<{ name: string; value: number; color: string }>;
+    recentActivity: Array<{
+        id: string;
+        title: string;
+        vesselName: string;
+        description: string;
+        createDate: string;
+        status: string;
+    }>;
+}
+

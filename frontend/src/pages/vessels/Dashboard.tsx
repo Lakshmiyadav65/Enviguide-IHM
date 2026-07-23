@@ -14,14 +14,16 @@ import {
     Download,
     Search,
     X,
-    ChevronDown
+    ChevronDown,
+    RefreshCw,
+    Calendar
 } from 'lucide-react';
 import Sidebar from '../../components/Sidebar';
 import Header from '../../components/Header';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../lib/apiClient';
 import { ENDPOINTS } from '../../config/api.config';
-import type { Vessel, AuditSummary, DashboardFilters } from '../../types';
+import type { Vessel, AuditSummary, DashboardFilters, DashboardOverviewData, DashboardLineItem } from '../../types';
 import './Dashboard.css';
 
 import {
@@ -29,16 +31,12 @@ import {
   PieChart, Pie,
 } from "recharts";
 
-/* ----------------------------------------------------------------------- *
- *  Owner's IHM Dashboard — Varuna Sentinels demo (interactive rebuild)
- * ----------------------------------------------------------------------- */
-
 const TEAL = "#0d9488";
-const CYAN = "#0891b2";
+const CYAN = "#00B0FA";
 const INK = "#0f2c40";
 
 // 16 IHM Table A/B hazardous materials tracked across the fleet
-const MATERIALS = [
+const BASE_MATERIALS = [
   { key: "Asbestos", color: "#2563eb" },
   { key: "Polychlorinated Biphenyls (PCB)", color: "#0891b2" },
   { key: "Ozone Depleting Substance", color: "#14b8a6" },
@@ -58,67 +56,13 @@ const MATERIALS = [
 ];
 
 const QUARTERS = [
-  "Q1-20", "Q2-20", "Q3-20", "Q4-20",
-  "Q1-21", "Q2-21", "Q3-21", "Q4-21",
   "Q1-22", "Q2-22", "Q3-22", "Q4-22",
   "Q1-23", "Q2-23", "Q3-23", "Q4-23",
-  "Q1-24", "Q2-24", "Q3-24",
+  "Q1-24", "Q2-24", "Q3-24", "Q4-24",
+  "Q1-25", "Q2-25", "Q3-25", "Q4-25"
 ];
 
-const SHIPS = ["Demo Vessel 1", "Demo Vessel 2", "Demo Vessel 3", "Demo Vessel 4", "Demo Vessel 5"];
-const FLAGS = ["The Netherlands", "Liberia [LR]", "Hong Kong", "Republic of Liberia"];
 const HM_STATUSES = ["HM Red", "HM Green", "Non HM"];
-
-// Line-item inventory (bottom section of the dashboard)
-const LINE_ITEMS = [
-  { id: 1, ship: "Demo Vessel 2", flag: "The Netherlands", vclass: "DNV GL", supplier: "Fuji Trading (Marine) B.V.", desc: "Battery in Emergency generator room", hm: "Lead (and compounds)", qty: "232 kg", part: "Part I — contained in ship structure or equipment", cat: "I-2 Equipment and machinery", status: "HM Red", po: "—", vs: "VS002070", created: "31/12/2020", updated: "18/03/2022", md: true, sdoc: true, deck: "Main Deck — ALT Igoon, Emergency Generator Room", equip: "BATTERY FOR ALDIS LAMP", position: "Engine Store", component: "Lead Acid Battery", material: "Lead and lead compounds", remarks: "Approx 60kg (acc 232kg, Acid lead battery. No action needed." },
-  { id: 2, ship: "Demo Vessel 5", flag: "Liberia [LR]", vclass: "ABS", supplier: "Adenco Marine Spl", desc: "General Use Batteries", hm: "Lead (and compounds)", qty: "10 Batteries", part: "Part I — contained in ship structure or equipment", cat: "I-3 Structure and hull", status: "HM Red", po: "—", vs: "VS002143", created: "14/07/2021", updated: "24/03/2022", md: true, sdoc: false, deck: "Deck 3 — Battery Locker", equip: "General Use Batteries", position: "Battery Room", component: "Sealed Lead Acid", material: "Lead and lead compounds", remarks: "General use, sealed. Below action threshold." },
-  { id: 3, ship: "Demo Vessel 1", flag: "The Netherlands", vclass: "DNV GL", supplier: "Marine Supply Co.", desc: "DP batteries UPS 2 — 77Ah AGM Gel battery, 12 V, terminal 6DT", hm: "Lead (and compounds)", qty: "2 PCS // 21 kg", part: "Part I — contained in ship structure or equipment", cat: "I-2 Equipment and machinery", status: "HM Red", po: "00000119310", vs: "VS002070", created: "30/09/2021", updated: "30/09/2022", md: true, sdoc: true, deck: "Bridge Deck — UPS Room", equip: "UPS Battery Bank", position: "Bridge", component: "AGM Gel Battery", material: "Lead", remarks: "PO tracked. MD & SDoC on file. Above threshold." },
-  { id: 4, ship: "Demo Vessel 4", flag: "Hong Kong", vclass: "DNV GL", supplier: "Sunrise Safety Solutions Norway AS", desc: "Bridge deck smoke detector (ionisation)", hm: "Radioactive Material", qty: "1 Smoke Detector", part: "Part I — contained in ship structure or equipment", cat: "I-2 Equipment and machinery", status: "HM Red", po: "AQK-0034/2021", vs: "VS002401", created: "15/07/2024", updated: "16/07/2024", md: true, sdoc: false, deck: "2nd Cabin Deck", equip: "Ionisation Smoke Detector", position: "Cabin Deck", component: "Radioactive source cell", material: "Americium-241", remarks: "Ionisation type. Special disposal on recycling." },
-  { id: 5, ship: "Demo Vessel 3", flag: "Republic of Liberia", vclass: "ABS", supplier: "MAN Energy Solutions", desc: "Cylinder head gasket set", hm: "Asbestos", qty: "4 sets", part: "Part I — contained in ship structure or equipment", cat: "I-3 Structure and hull", status: "HM Red", po: "PO-2023-0091", vs: "VS002550", created: "07/03/2023", updated: "12/03/2023", md: true, sdoc: true, deck: "ER 2nd Deck", equip: "Main Engine Gasket", position: "Engine Room", component: "Gasket", material: "Asbestos fibre", remarks: "Legacy stock. Flagged for replacement with asbestos-free." },
-  { id: 6, ship: "Demo Vessel 4", flag: "Hong Kong", vclass: "DNV GL", supplier: "MAN Energy Solutions", desc: "Navigation bridge electrode set", hm: "Chromium (and compounds)", qty: "12 Batteries", part: "Part I — contained in ship structure or equipment", cat: "I-3 Structure and hull", status: "HM Green", po: "PO-2023-0104", vs: "VS002561", created: "07/03/2023", updated: "08/09/2023", md: true, sdoc: true, deck: "NAV. BRI. Deck", equip: "Radio Use Batteries", position: "Radio Room", component: "Electrodes", material: "Chromium alloy", remarks: "Below threshold. No action required." },
-  { id: 7, ship: "Demo Vessel 2", flag: "The Netherlands", vclass: "DNV GL", supplier: "Deckhouse Ship Supply", desc: "Fluorescent tube fittings", hm: "Mercury (and compounds)", qty: "18 pcs", part: "Part I — contained in ship structure or equipment", cat: "I-2 Equipment and machinery", status: "HM Red", po: "PO-2023-0210", vs: "VS002612", created: "02/06/2023", updated: "10/06/2023", md: false, sdoc: false, deck: "Comp. Bri. Deck", equip: "Lighting Fixtures", position: "Accommodation", component: "Fluorescent tube", material: "Mercury vapour", remarks: "MD requested from supplier — pending response." },
-  { id: 8, ship: "Demo Vessel 1", flag: "The Netherlands", vclass: "DNV GL", supplier: "BP Marine Limited", desc: "Anti-corrosion primer coating", hm: "Cadmium (and compounds)", qty: "40 L", part: "Part I — Paints and coating systems", cat: "I-1 Paints and coating systems", status: "HM Green", po: "VS000001", vs: "VS002700", created: "11/09/2023", updated: "20/09/2023", md: true, sdoc: true, deck: "Tank Top", equip: "Ballast Tank Coating", position: "Ballast Tank", component: "Primer", material: "Cadmium pigment", remarks: "Concentration below regulatory threshold." },
-  { id: 9, ship: "Demo Vessel 5", flag: "Liberia [LR]", vclass: "ABS", supplier: "Everlast Maritime LLC", desc: "Bilge pump seal gasket", hm: "Certain Shortchain Chlorinated Paraffins", qty: "6 pcs", part: "Part I — contained in ship structure or equipment", cat: "I-2 Equipment and machinery", status: "HM Red", po: "VS001186", vs: "VS002741", created: "05/01/2024", updated: "22/01/2024", md: true, sdoc: false, deck: "ER 3rd Deck", equip: "Bilge Pump", position: "Engine Room", component: "Seal gasket", material: "SCCP plasticiser", remarks: "Above threshold. Substitution scheduled next dry-dock." },
-  { id: 10, ship: "Demo Vessel 3", flag: "Republic of Liberia", vclass: "ABS", supplier: "National Response Corporation", desc: "Cable insulation harness", hm: "Polybrominated Diphenyl Ethers (PBDE)", qty: "120 m", part: "Part I — contained in ship structure or equipment", cat: "I-3 Structure and hull", status: "HM Green", po: "PO-2024-0033", vs: "VS002803", created: "18/02/2024", updated: "02/03/2024", md: true, sdoc: true, deck: "4th Cabin Deck", equip: "Cable Harness", position: "Accommodation", component: "Insulation sheath", material: "PBDE flame retardant", remarks: "Trace levels. Below threshold." },
-  { id: 11, ship: "Demo Vessel 4", flag: "Hong Kong", vclass: "DNV GL", supplier: "Legend Marine Technology Co. Ltd", desc: "Chinese brand magnetic compass sensor", hm: "Lead (and compounds)", qty: "1 PC", part: "Part I — contained in ship structure or equipment", cat: "I-2 Equipment and machinery", status: "HM Red", po: "AQK-0009/2021", vs: "VS002901", created: "12/11/2021", updated: "13/11/2021", md: true, sdoc: false, deck: "NAV. BRI. Deck", equip: "Magnetic Compass", position: "Bridge", component: "Sensor housing", material: "Lead solder", remarks: "MD received — above threshold. SDoC requested." },
-  { id: 12, ship: "Demo Vessel 2", flag: "The Netherlands", vclass: "DNV GL", supplier: "Hatchtec Marine Service Limited", desc: "Hydraulic hose assembly", hm: "Mercury (and compounds)", qty: "8 pcs", part: "Part I — contained in ship structure or equipment", cat: "I-3 Structure and hull", status: "HM Green", po: "VS002200", vs: "VS002950", created: "04/03/2021", updated: "18/06/2022", md: true, sdoc: true, deck: "1st Cabin Deck", equip: "Hydraulic System", position: "Deck", component: "Hose fitting", material: "Trace mercury", remarks: "Below threshold. Documentation complete." },
-];
-
-// PO tracking metrics (right rail)
-const PO_METRICS = [
-  { label: "PO Tracked vs PO Received", a: 63, b: 618, color: TEAL },
-  { label: "Item Tracked vs Item Purchased", a: 261, b: 3674, color: CYAN },
-  { label: "MDs Pending vs Received", a: 77, b: 184, color: "#f59e0b" },
-];
-
-const MD_DONUT = [
-  { name: "MDs Received", value: 184, color: TEAL },
-  { name: "MDs Pending", value: 77, color: "#f59e0b" },
-  { name: "SDoCs Received", value: 142, color: CYAN },
-  { name: "SDoCs Pending", value: 33, color: "#e2e8f0" },
-];
-
-const SUPPLIER_DONUT = [
-  { name: "Responsive", value: 22, color: TEAL },
-  { name: "Non-Responsive", value: 10, color: "#f59e0b" },
-  { name: "Pending", value: 6, color: "#e2e8f0" },
-];
-
-function getQuarterFromDate(dateStr: string): string {
-  if (!dateStr || !dateStr.includes('/')) return 'Q1-20';
-  const parts = dateStr.split('/');
-  if (parts.length < 3) return 'Q1-20';
-  const month = parseInt(parts[1], 10);
-  const year = parts[2].slice(-2);
-  let q = 'Q1';
-  if (month >= 4 && month <= 6) q = 'Q2';
-  else if (month >= 7 && month <= 9) q = 'Q3';
-  else if (month >= 10 && month <= 12) q = 'Q4';
-  return `${q}-${year}`;
-}
-
-/* ----------------------------- small pieces ---------------------------- */
 
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -133,14 +77,7 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-interface DonutProps {
-  data: Array<{ name: string; value: number; color: string }>;
-  total: string;
-  caption: string;
-  sub: string;
-}
-
-function Donut({ data, total, caption, sub }: DonutProps) {
+function Donut({ data, total, caption, sub }: { data: Array<{ name: string; value: number; color: string }>; total: string; caption: string; sub: string }) {
   return (
     <div className="flex flex-col items-center">
       <div className="relative h-[132px] w-[132px]">
@@ -157,12 +94,12 @@ function Donut({ data, total, caption, sub }: DonutProps) {
           <span className="text-[10px] uppercase tracking-wide text-slate-400">{sub}</span>
         </div>
       </div>
-      <p className="mt-1 text-xs font-semibold text-slate-600">{caption}</p>
+      <p className="mt-1 text-xs font-semibold text-slate-600 m-0">{caption}</p>
       <div className="mt-1.5 flex flex-wrap justify-center gap-x-3 gap-y-1">
         {data.map((d, i) => (
           <span key={i} className="flex items-center gap-1 text-[10px] text-slate-500">
             <span className="h-2 w-2 rounded-full" style={{ background: d.color }} />
-            {d.name}
+            {d.name}: <strong className="text-slate-700">{d.value}</strong>
           </span>
         ))}
       </div>
@@ -170,35 +107,24 @@ function Donut({ data, total, caption, sub }: DonutProps) {
   );
 }
 
-interface FilterGroupProps {
-  title: string;
-  children: React.ReactNode;
-}
-
-function FilterGroup({ title, children }: FilterGroupProps) {
+function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(true);
   return (
     <div className="rounded-lg border border-slate-200 border-solid">
-      <button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between px-3 py-2 text-xs font-bold text-slate-700 bg-transparent border-0 outline-none cursor-pointer">
+      <button onClick={() => setOpen(!open)} className="flex w-full items-center justify-between px-3 py-2 text-xs font-bold text-slate-700 bg-transparent border-0 cursor-pointer">
         {title}
         <ChevronDown size={14} className={`text-slate-400 transition ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && <div className="space-y-1.5 border-t border-slate-100 px-3 py-2.5">{children}</div>}
+      {open && <div className="space-y-1.5 border-0 border-t border-slate-100 border-solid px-3 py-2.5">{children}</div>}
     </div>
   );
 }
 
-interface CheckProps {
-  label: string;
-  checked: boolean;
-  onChange: () => void;
-}
-
-function Check({ label, checked, onChange }: CheckProps) {
+function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
     <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
       <input type="checkbox" checked={checked} onChange={onChange}
-        className="h-3.5 w-3.5 rounded border-slate-300 text-teal-600 focus:ring-teal-500" />
+        className="h-3.5 w-3.5 rounded border-slate-300 text-sky-500 focus:ring-sky-400" />
       {label}
     </label>
   );
@@ -208,68 +134,156 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div className="border-b border-slate-50 pb-2">
       <dt className="text-[10px] uppercase tracking-wide text-slate-400">{label}</dt>
-      <dd className="mt-0.5 text-slate-700">{value}</dd>
+      <dd className="mt-0.5 text-slate-700 font-medium text-xs">{value}</dd>
     </div>
   );
 }
 
-interface OwnerDashboardContentProps {
-}
+/* =========================================================================
+ * 1. VESSEL, SHIP OWNER & SHIP MANAGER DYNAMIC DASHBOARD CONTENT (100% REAL DB)
+ * ========================================================================= */
+function OwnerManagerVesselDashboardContent() {
+  const { user } = useAuth();
+  const firstName = user?.name?.split(' ')[0] || 'there';
 
-function OwnerDashboardContent({}: OwnerDashboardContentProps) {
   const [metric, setMetric] = useState("ships"); // ships | items
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedRow, setSelectedRow] = useState<any>(null);
+  const [selectedRow, setSelectedRow] = useState<DashboardLineItem | null>(null);
   const [activeMaterial, setActiveMaterial] = useState<string | null>(null);
-  const [range, setRange] = useState([0, QUARTERS.length - 1]);
+  
+  // Quarter Selection Logic
+  const [isAllTime, setIsAllTime] = useState<boolean>(false);
+  const [range, setRange] = useState<[number, number]>([0, QUARTERS.length - 1]);
 
-  // filters
+  // Checkbox & Search filters
   const [fShips, setFShips] = useState<string[]>([]);
   const [fFlags, setFFlags] = useState<string[]>([]);
   const [fStatus, setFStatus] = useState<string[]>([]);
   const [colSearch, setColSearch] = useState<Record<string, string>>({});
 
+  // Dynamic API states
+  const [overviewData, setOverviewData] = useState<DashboardOverviewData | null>(null);
+  const [inventoryItems, setInventoryItems] = useState<DashboardLineItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  const startQuarter = isAllTime ? '' : QUARTERS[range[0]];
+  const endQuarter = isAllTime ? '' : QUARTERS[range[1]];
+
+  // Fetch live overview and inventory data from MongoDB backend
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+
+    const params: Record<string, string> = {};
+    if (!isAllTime) {
+      params.startQuarter = startQuarter;
+      params.endQuarter = endQuarter;
+    }
+
+    Promise.all([
+      api.get<{ success: boolean; data: DashboardOverviewData }>(ENDPOINTS.DASHBOARD.OVERVIEW, { params }),
+      api.get<{ success: boolean; data: { items: DashboardLineItem[] } }>(ENDPOINTS.DASHBOARD.INVENTORY, { params: { ...params, limit: 100 } })
+    ]).then(([overviewRes, inventoryRes]) => {
+      if (!isMounted) return;
+      if (overviewRes.data) {
+        setOverviewData(overviewRes.data);
+      }
+      if (inventoryRes.data?.items) {
+        setInventoryItems(inventoryRes.data.items);
+      }
+    }).catch(err => {
+      console.error('Failed to load dynamic dashboard data from DB:', err);
+    }).finally(() => {
+      if (isMounted) setLoading(false);
+    });
+
+    return () => { isMounted = false; };
+  }, [isAllTime, startQuarter, endQuarter]);
+
+  const vesselsList = useMemo(() => {
+    if (overviewData?.options.vessels && overviewData.options.vessels.length > 0) {
+      return overviewData.options.vessels.map(v => v.name);
+    }
+    return Array.from(new Set(inventoryItems.map(i => i.ship).filter(Boolean)));
+  }, [overviewData, inventoryItems]);
+
+  const flagsList = useMemo(() => {
+    if (overviewData?.options.flagStates && overviewData.options.flagStates.length > 0) {
+      return overviewData.options.flagStates;
+    }
+    return Array.from(new Set(inventoryItems.map(i => i.flag).filter(Boolean)));
+  }, [overviewData, inventoryItems]);
+
+  const poMetrics = useMemo(() => {
+    if (overviewData?.poMetrics) return overviewData.poMetrics;
+    return [
+      { label: "PO Tracked vs PO Received", a: 0, b: 0, color: TEAL },
+      { label: "Item Tracked vs Item Purchased", a: 0, b: 0, color: CYAN },
+      { label: "MDs Pending vs Received", a: 0, b: 0, color: "#f59e0b" },
+    ];
+  }, [overviewData]);
+
+  const mdDonut = useMemo(() => {
+    if (overviewData?.mdDonut) return overviewData.mdDonut;
+    return [
+      { name: "MDs Received", value: 0, color: TEAL },
+      { name: "MDs Pending", value: 0, color: "#f59e0b" },
+      { name: "SDoCs Received", value: 0, color: CYAN },
+      { name: "SDoCs Pending", value: 0, color: "#cbd5e1" },
+    ];
+  }, [overviewData]);
+
+  const supplierDonut = useMemo(() => {
+    if (overviewData?.supplierDonut) return overviewData.supplierDonut;
+    return [
+      { name: "Responsive", value: 0, color: TEAL },
+      { name: "Non-Responsive", value: 0, color: "#f59e0b" },
+      { name: "Pending", value: 0, color: "#cbd5e1" },
+    ];
+  }, [overviewData]);
+
   const toggle = (arr: string[], set: React.Dispatch<React.SetStateAction<string[]>>, v: string) =>
     set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
 
+  // Compute 16 Hazmat Bar Data dynamically from backend overview / DB inventory
+  const barData = useMemo(() => {
+    const hazmatMap = new Map((overviewData?.hazmatBreakdown || []).map(h => [h.key, h]));
+
+    return BASE_MATERIALS.map((m) => {
+      const breakdown = hazmatMap.get(m.key);
+      const matchingItems = inventoryItems.filter(item => item.hm === m.key || (m.key.includes("PCB") && item.hm?.includes("PCB")));
+      
+      const itemsCount = breakdown ? breakdown.count : matchingItems.length;
+      const shipsCount = breakdown ? breakdown.shipsCount : new Set(matchingItems.map(item => item.ship)).size;
+
+      return {
+        ...m,
+        ships: shipsCount,
+        items: itemsCount,
+        value: metric === "ships" ? shipsCount : itemsCount
+      };
+    });
+  }, [metric, overviewData, inventoryItems]);
+
   const filtered = useMemo(() => {
-    return LINE_ITEMS.filter((r) => {
-      // 1. Recharts bar material filter
-      if (activeMaterial && r.hm !== activeMaterial && !(activeMaterial === "Polychlorinated Biphenyls (PCB)" && r.hm.includes("PCB"))) return false;
-      // 2. Ships checkbox filter
+    return inventoryItems.filter((r) => {
+      if (activeMaterial && r.hm !== activeMaterial && !(activeMaterial.includes("PCB") && r.hm?.includes("PCB"))) return false;
       if (fShips.length && !fShips.includes(r.ship)) return false;
-      // 3. Flags checkbox filter
       if (fFlags.length && !fFlags.includes(r.flag)) return false;
-      // 4. Status checkbox filter
       if (fStatus.length && !fStatus.includes(r.status)) return false;
-      // 5. Timeline range filter
-      const quarterIndex = QUARTERS.indexOf(getQuarterFromDate(r.created));
-      if (quarterIndex !== -1 && (quarterIndex < range[0] || quarterIndex > range[1])) return false;
-      // 6. Inline column searches
       for (const [k, v] of Object.entries(colSearch)) {
         if (v && !String((r as any)[k] ?? "").toLowerCase().includes(v.toLowerCase())) return false;
       }
       return true;
     });
-  }, [activeMaterial, fShips, fFlags, fStatus, range, colSearch]);
-
-  const barData = useMemo(() => {
-    return MATERIALS.map((m) => {
-      const matchingItems = filtered.filter(item => item.hm === m.key || (m.key === "Polychlorinated Biphenyls (PCB)" && item.hm.includes("PCB")));
-      const itemsCount = matchingItems.length;
-      const uniqueShipsCount = new Set(matchingItems.map(item => item.ship)).size;
-      return {
-        ...m,
-        value: metric === "ships" ? uniqueShipsCount : itemsCount
-      };
-    });
-  }, [metric, filtered]);
+  }, [activeMaterial, fShips, fFlags, fStatus, colSearch, inventoryItems]);
 
   const activeFilterCount =
     fShips.length + fFlags.length + fStatus.length + (activeMaterial ? 1 : 0) +
     Object.values(colSearch).filter(Boolean).length;
 
   function exportCSV() {
+    if (!filtered.length) return;
     const cols = ["ship", "flag", "vclass", "supplier", "desc", "hm", "qty", "cat", "status", "po", "vs", "created", "updated"];
     const head = ["Ship Name", "Flag", "Vessel Class", "Supplier", "Item Description", "Hazardous Material", "Total Qty", "IHM Category", "HM Status", "PO Number", "VS Product Code", "Created", "Updated"];
     const rows = filtered.map((r) => cols.map((c) => `"${String((r as any)[c] ?? "").replace(/"/g, '""')}"`).join(","));
@@ -278,33 +292,45 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "ihm-inventory-export.csv";
+    a.download = `ihm-inventory-export-${isAllTime ? 'all-time' : `${startQuarter}-to-${endQuarter}`}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   const clearAll = () => {
-    setFShips([]); setFFlags([]); setFStatus([]); setColSearch({}); setActiveMaterial(null); setRange([0, QUARTERS.length - 1]);
+    setFShips([]); setFFlags([]); setFStatus([]); setColSearch({}); setActiveMaterial(null);
+  };
+
+  // Quarter Click Selector Logic: single click selects single quarter, shift-click/drag expands range
+  const handleQuarterClick = (index: number, e: React.MouseEvent) => {
+    setIsAllTime(false);
+    if (e.shiftKey) {
+      if (index < range[0]) setRange([index, range[1]]);
+      else setRange([range[0], index]);
+    } else {
+      // Direct click on a specific quarter selects ONLY that quarter
+      setRange([index, index]);
+    }
   };
 
   return (
     <div className="dashboard-wrapper font-sans text-slate-800" style={{ background: '#f8fafc' }}>
       <Sidebar />
 
-      {/* Main Layout Area - Resolves overlap issue */}
+      {/* Main Content Workspace */}
       <main className="main-content flex-1 overflow-hidden" style={{ minWidth: 0, display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <Header />
 
-        {/* Dynamic Timeline Filter - Locked below the header */}
+        {/* Top Header bar: Greeting + Timeline Quarters */}
         <header className="border-0 border-b border-slate-200 border-solid bg-white px-5 py-3 shrink-0">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-lg font-bold text-slate-800 m-0">Owner Dashboard</h1>
-              <p className="text-xs text-slate-500 m-0 mt-0.5">Fleet hazardous-material compliance · EU SRR &amp; HKC</p>
+              <h1 className="text-lg font-bold text-slate-800 m-0">Welcome back, {firstName}</h1>
+              <p className="text-xs text-slate-500 m-0 mt-0.5">Here's what's happening with your IHM operations today.</p>
             </div>
             <button
               onClick={() => setShowFilters(true)}
-              className="relative flex items-center gap-2 rounded-lg bg-teal-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm border-0 cursor-pointer transition hover:bg-teal-700"
+              className="relative flex items-center gap-2 rounded-lg bg-sky-500 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-600 border-0 cursor-pointer"
             >
               <Filter size={15} /> Filters
               {activeFilterCount > 0 && (
@@ -313,51 +339,66 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
             </button>
           </div>
 
-          {/* Timeline range selector */}
+          {/* Quarter Timeline Bar (Q1-22 to Q4-25) */}
           <div className="mt-3">
-            <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-slate-500">
-              <span>From {QUARTERS[range[0]]}</span>
-              <span>to {QUARTERS[range[1]]}</span>
+            <div className="mb-1.5 flex items-center justify-between text-[11px] font-semibold text-slate-500">
+              <span className="flex items-center gap-1.5 text-slate-700">
+                <Calendar size={13} className="text-sky-500" />
+                Selected Period: {isAllTime ? (
+                  <strong className="text-sky-600">All Time (Full Fleet History)</strong>
+                ) : (
+                  <strong className="text-slate-800">{startQuarter === endQuarter ? startQuarter : `${startQuarter} to ${endQuarter}`}</strong>
+                )}
+              </span>
+              <button
+                onClick={() => setIsAllTime(!isAllTime)}
+                className="text-sky-600 bg-transparent border-0 cursor-pointer font-semibold hover:underline"
+              >
+                {isAllTime ? "Filter by Quarter" : "View All Time"}
+              </button>
             </div>
-            <div className="flex items-center gap-1">
-              {QUARTERS.map((q, i) => {
-                const active = i >= range[0] && i <= range[1];
-                return (
-                  <button
-                    key={q}
-                    onClick={() => {
-                      if (i < range[0]) setRange([i, range[1]]);
-                      else if (i > range[1]) setRange([range[0], i]);
-                      else if (i - range[0] <= range[1] - i) setRange([i, range[1]]);
-                      else setRange([range[0], i]);
-                    }}
-                    className={`group flex-1 rounded-md py-1.5 text-[10px] font-semibold border-0 cursor-pointer transition ${
-                      active ? "bg-teal-600 text-white shadow-sm" : "bg-slate-100 text-slate-400 hover:bg-slate-200"
-                    }`}
-                  >
-                    {q}
-                  </button>
-                );
-              })}
-            </div>
+            {!isAllTime && (
+              <div className="flex items-center gap-1 overflow-x-auto pb-1">
+                {QUARTERS.map((q, i) => {
+                  const active = i >= range[0] && i <= range[1];
+                  const isSingle = range[0] === range[1] && range[0] === i;
+                  return (
+                    <button
+                      key={q}
+                      onClick={(e) => handleQuarterClick(i, e)}
+                      title={`Click to filter strictly by ${q} (Shift+Click to set range)`}
+                      className={`group flex-1 min-w-[52px] rounded-md py-1.5 text-[10px] font-semibold border-0 cursor-pointer transition ${
+                        isSingle
+                          ? "bg-sky-600 text-white ring-2 ring-sky-300 shadow-sm"
+                          : active
+                          ? "bg-sky-500 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                      }`}
+                    >
+                      {q}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </header>
 
-        {/* Scrollable Dashboard Workspace */}
+        {/* Scroll area */}
         <div className="flex-1 overflow-y-auto p-4 lg:p-5">
-          {/* Charts Row */}
+          {/* Charts row */}
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            {/* Recharts Bar Chart */}
+            {/* Bar chart */}
             <section className="rounded-xl border border-slate-200 border-solid bg-white p-4 shadow-sm xl:col-span-2">
               <div className="mb-2 flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-bold text-slate-800 m-0">Hazardous Materials Across Fleet</h2>
                   <p className="text-[11px] text-slate-500 m-0 mt-0.5">
                     {metric === "ships"
-                      ? "Number of ships containing each material"
+                      ? "Number of vessels containing each material"
                       : "Number of hazardous line items per material"}
                     {activeMaterial && (
-                      <button onClick={() => setActiveMaterial(null)} className="ml-2 text-teal-600 bg-transparent border-0 cursor-pointer hover:underline">
+                      <button onClick={() => setActiveMaterial(null)} className="ml-2 text-sky-600 bg-transparent border-0 cursor-pointer hover:underline font-semibold">
                         · clear “{activeMaterial}” filter ✕
                       </button>
                     )}
@@ -367,49 +408,55 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
                 <div className="flex items-center rounded-lg bg-slate-100 p-0.5 text-xs font-semibold">
                   <button
                     onClick={() => setMetric("ships")}
-                    className={`rounded-md px-3 py-1 border-0 cursor-pointer transition ${metric === "ships" ? "bg-white text-teal-700 shadow-sm" : "bg-transparent text-slate-500"}`}
+                    className={`rounded-md px-3 py-1 border-0 cursor-pointer transition ${metric === "ships" ? "bg-white text-sky-600 shadow-sm" : "bg-transparent text-slate-500"}`}
                   >Ships</button>
                   <button
                     onClick={() => setMetric("items")}
-                    className={`rounded-md px-3 py-1 border-0 cursor-pointer transition ${metric === "items" ? "bg-white text-teal-700 shadow-sm" : "bg-transparent text-slate-500"}`}
+                    className={`rounded-md px-3 py-1 border-0 cursor-pointer transition ${metric === "items" ? "bg-white text-sky-600 shadow-sm" : "bg-transparent text-slate-500"}`}
                   >HMs</button>
                 </div>
               </div>
 
               <div className="h-[460px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barData} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }} barCategoryGap={3}>
-                    <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                    <YAxis
-                      type="category" dataKey="key" width={220}
-                      tick={{ fontSize: 10, fill: "#475569" }} axisLine={false} tickLine={false}
-                    />
-                    <RTooltip
-                      cursor={{ fill: "#f1f5f9" }}
-                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
-                      formatter={(v) => [v, metric === "ships" ? "Ships" : "Line items"]}
-                    />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]} onClick={(d: any) => setActiveMaterial((d && d.key) === activeMaterial ? null : String(d.key))} cursor="pointer">
-                      {barData.map((m, i) => (
-                        <Cell key={i} fill={m.color} opacity={activeMaterial && activeMaterial !== m.key ? 0.3 : 1} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                {loading ? (
+                  <div className="h-full flex items-center justify-center text-slate-400 text-xs">
+                    <RefreshCw size={18} className="animate-spin text-sky-500 mr-2" /> Querying database for {isAllTime ? 'All Time' : `${startQuarter} - ${endQuarter}`}...
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={barData} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }} barCategoryGap={3}>
+                      <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                      <YAxis
+                        type="category" dataKey="key" width={220}
+                        tick={{ fontSize: 10, fill: "#475569" }} axisLine={false} tickLine={false}
+                      />
+                      <RTooltip
+                        cursor={{ fill: "#f1f5f9" }}
+                        contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
+                        formatter={(v) => [v, metric === "ships" ? "Ships" : "Line items"]}
+                      />
+                      <Bar dataKey="value" radius={[0, 4, 4, 0]} onClick={(d: any) => setActiveMaterial((d && d.key) === activeMaterial ? null : String(d.key))} cursor="pointer">
+                        {barData.map((m, i) => (
+                          <Cell key={i} fill={m.color} opacity={activeMaterial && activeMaterial !== m.key ? 0.3 : 1} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
               <p className="mt-1 text-center text-[10px] text-slate-400 m-0">
-                {metric === "ships" ? "No. of Ships" : "No. of Line Items"} · click a bar to filter the inventory below
+                {metric === "ships" ? "No. of Ships" : "No. of Line Items"} · click a bar to filter the inventory log below
               </p>
             </section>
 
-            {/* Right KPI Sidebar panel */}
+            {/* Right rail: PO metrics + donuts */}
             <section className="space-y-4 m-0">
-              {/* Purchase Order Compliance */}
+              {/* PO metrics */}
               <div className="rounded-xl border border-slate-200 border-solid bg-white p-4 shadow-sm">
                 <h2 className="mb-3 text-sm font-bold text-slate-800 m-0">Purchase Order Tracking</h2>
                 <div className="space-y-3.5">
-                  {PO_METRICS.map((m) => {
-                    const pct = Math.min(100, Math.round((m.a / m.b) * 100));
+                  {poMetrics.map((m) => {
+                    const pct = Math.min(100, Math.round((m.a / Math.max(m.b, 1)) * 100));
                     return (
                       <div key={m.label}>
                         <div className="mb-1 flex items-center justify-between text-[11px]">
@@ -417,7 +464,7 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
                           <span className="font-bold text-slate-800">{m.a} <span className="font-normal text-slate-400">/ {m.b}</span></span>
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: m.color }} />
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: m.color }} />
                         </div>
                       </div>
                     );
@@ -425,31 +472,32 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
                 </div>
               </div>
 
-              {/* Donuts statistics */}
+              {/* Donuts */}
               <div className="rounded-xl border border-slate-200 border-solid bg-white p-4 shadow-sm">
-                <Donut data={MD_DONUT} total="184" sub="MDs" caption="MDs & SDoCs Request Count" />
+                <Donut data={mdDonut} total={String(mdDonut.reduce((acc, d) => acc + d.value, 0))} sub="MDs" caption="MDs & SDoCs Request Count" />
               </div>
               <div className="rounded-xl border border-slate-200 border-solid bg-white p-4 shadow-sm">
-                <Donut data={SUPPLIER_DONUT} total="38" sub="Suppliers" caption="Suppliers Status" />
+                <Donut data={supplierDonut} total={String(supplierDonut.reduce((acc, d) => acc + d.value, 0))} sub="Suppliers" caption="Suppliers Status" />
               </div>
             </section>
           </div>
 
-          {/* Line-item inventory list */}
+          {/* Line-item table */}
           <section className="mt-4 rounded-xl border border-slate-200 border-solid bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-2 border-0 border-b border-slate-100 border-solid px-4 py-3">
               <div>
                 <h2 className="text-sm font-bold text-slate-800 m-0">IHM Inventory — Line Items</h2>
                 <p className="text-[11px] text-slate-500 m-0 mt-0.5">
-                  Showing <span className="font-semibold text-slate-700">{filtered.length}</span> of {LINE_ITEMS.length} items
+                  Showing <span className="font-semibold text-slate-700">{filtered.length}</span> items for period {isAllTime ? 'All Time' : `${startQuarter} - ${endQuarter}`}
                   {activeFilterCount > 0 && (
-                    <button onClick={clearAll} className="ml-2 text-teal-600 bg-transparent border-0 cursor-pointer hover:underline">clear all filters</button>
+                    <button onClick={clearAll} className="ml-2 text-sky-600 bg-transparent border-0 cursor-pointer font-semibold hover:underline">clear all filters</button>
                   )}
                 </p>
               </div>
               <button
                 onClick={exportCSV}
-                className="flex items-center gap-2 rounded-lg border border-emerald-200 border-solid bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 cursor-pointer transition hover:bg-emerald-100"
+                disabled={!filtered.length}
+                className="flex items-center gap-2 rounded-lg border border-emerald-200 border-solid bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 cursor-pointer transition hover:bg-emerald-100 disabled:opacity-40"
               >
                 <Download size={14} /> Export to Excel
               </button>
@@ -470,7 +518,7 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
                       </th>
                     ))}
                   </tr>
-                  {/* Inline Search Input Row */}
+                  {/* search row */}
                   <tr className="border-0 border-b border-slate-100 border-solid bg-white">
                     <th className="px-3 py-1.5 border-0"></th>
                     {["ship", "flag", "vclass", "supplier", "desc", "hm", "qty", "cat", "status", "po", "vs"].map((k) => (
@@ -490,37 +538,45 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r) => (
-                    <tr key={r.id} className="border-0 border-b border-slate-50 border-solid align-top hover:bg-teal-50/40">
-                      <td className="px-3 py-2.5 border-0">
-                        <button
-                          onClick={() => setSelectedRow(r)}
-                          title="Open line-item details"
-                          className="flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 border-solid bg-white text-teal-600 cursor-pointer transition hover:bg-teal-600 hover:text-white"
-                        >
-                          <ExternalLink size={12} />
-                        </button>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={15} className="px-3 py-12 text-center text-slate-400 border-0">
+                        <RefreshCw size={20} className="animate-spin inline-block text-sky-500 mr-2" /> Querying database inventory...
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 font-semibold text-slate-700 border-0">{r.ship}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-500 border-0">{r.flag}</td>
-                      <td className="px-3 py-2.5 text-slate-500 border-0">{r.vclass}</td>
-                      <td className="max-w-[160px] px-3 py-2.5 text-slate-500 border-0">{r.supplier}</td>
-                      <td className="max-w-[200px] px-3 py-2.5 text-slate-600 border-0">{r.desc}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 border-0">{r.hm}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-500 border-0">{r.qty}</td>
-                      <td className="max-w-[140px] px-3 py-2.5 text-slate-500 border-0">{r.cat}</td>
-                      <td className="px-3 py-2.5 border-0"><StatusPill status={r.status} /></td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-500 border-0">{r.po}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-400 border-0">{r.vs}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-400 border-0">{r.created}</td>
-                      <td className="px-3 py-2.5 border-0">{r.md ? <FileText size={14} className="text-red-500" /> : <span className="text-slate-300">—</span>}</td>
-                      <td className="px-3 py-2.5 border-0">{r.sdoc ? <FileText size={14} className="text-teal-600" /> : <span className="text-slate-300">—</span>}</td>
                     </tr>
-                  ))}
-                  {filtered.length === 0 && (
+                  ) : (
+                    filtered.map((r) => (
+                      <tr key={r.id} className="border-0 border-b border-slate-50 border-solid align-top hover:bg-sky-50/40 transition">
+                        <td className="px-3 py-2.5 border-0">
+                          <button
+                            onClick={() => setSelectedRow(r)}
+                            title="Open line-item details"
+                            className="flex h-6 w-6 items-center justify-center rounded-md border border-slate-200 border-solid bg-white text-sky-600 cursor-pointer transition hover:bg-sky-600 hover:text-white"
+                          >
+                            <ExternalLink size={12} />
+                          </button>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 font-semibold text-slate-700 border-0">{r.ship}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-500 border-0">{r.flag}</td>
+                        <td className="px-3 py-2.5 text-slate-500 border-0">{r.vclass}</td>
+                        <td className="max-w-[160px] px-3 py-2.5 text-slate-500 border-0 truncate">{r.supplier}</td>
+                        <td className="max-w-[200px] px-3 py-2.5 text-slate-600 border-0 truncate">{r.desc}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-600 border-0 font-medium">{r.hm}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-500 border-0">{r.qty}</td>
+                        <td className="max-w-[140px] px-3 py-2.5 text-slate-500 border-0 truncate">{r.cat}</td>
+                        <td className="px-3 py-2.5 border-0"><StatusPill status={r.status} /></td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-500 border-0 font-mono text-[11px]">{r.po}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-400 border-0 font-mono text-[11px]">{r.vs}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-slate-400 border-0">{r.created}</td>
+                        <td className="px-3 py-2.5 border-0">{r.md ? <FileText size={14} className="text-red-500" /> : <span className="text-slate-300">—</span>}</td>
+                        <td className="px-3 py-2.5 border-0">{r.sdoc ? <FileText size={14} className="text-sky-500" /> : <span className="text-slate-300">—</span>}</td>
+                      </tr>
+                    ))
+                  )}
+                  {!loading && filtered.length === 0 && (
                     <tr>
                       <td colSpan={15} className="px-3 py-10 text-center text-slate-400 border-0">
-                        No line items match your filters. Adjust the filters or clear them to see the full inventory.
+                        No database inventory records found for period {isAllTime ? 'All Time' : `${startQuarter} - ${endQuarter}`}. Try selecting a different quarter or clearing active filters.
                       </td>
                     </tr>
                   )}
@@ -531,7 +587,7 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
         </div>
       </main>
 
-      {/* Filters slide-in panel */}
+      {/* Filters slide-in */}
       {showFilters && (
         <div className="fixed inset-0 z-[10000] flex">
           <div className="flex-1 bg-black/30" onClick={() => setShowFilters(false)} />
@@ -541,15 +597,23 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
               <button onClick={() => setShowFilters(false)} className="text-slate-400 bg-transparent border-0 cursor-pointer hover:text-slate-700"><X size={18} /></button>
             </div>
             <div className="flex-1 space-y-5 overflow-y-auto p-4">
-              <FilterGroup title="Ship">
-                {SHIPS.map((s) => (
-                  <Check key={s} label={s} checked={fShips.includes(s)} onChange={() => toggle(fShips, setFShips, s)} />
-                ))}
+              <FilterGroup title="Vessel">
+                {vesselsList.length > 0 ? (
+                  vesselsList.map((s) => (
+                    <Check key={s} label={s} checked={fShips.includes(s)} onChange={() => toggle(fShips, setFShips, s)} />
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-400 m-0 py-1">No vessel found in DB</p>
+                )}
               </FilterGroup>
               <FilterGroup title="Flag State">
-                {FLAGS.map((f) => (
-                  <Check key={f} label={f} checked={fFlags.includes(f)} onChange={() => toggle(fFlags, setFFlags, f)} />
-                ))}
+                {flagsList.length > 0 ? (
+                  flagsList.map((f) => (
+                    <Check key={f} label={f} checked={fFlags.includes(f)} onChange={() => toggle(fFlags, setFFlags, f)} />
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-400 m-0 py-1">No flag state found in DB</p>
+                )}
               </FilterGroup>
               <FilterGroup title="HM Status">
                 {HM_STATUSES.map((s) => (
@@ -559,28 +623,28 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
             </div>
             <div className="flex gap-2 border-0 border-t border-slate-100 border-solid p-4">
               <button onClick={clearAll} className="flex-1 rounded-lg border border-slate-200 border-solid py-2 text-sm font-semibold text-slate-600 bg-white cursor-pointer hover:bg-slate-50">Clear all</button>
-              <button onClick={() => setShowFilters(false)} className="flex-1 rounded-lg bg-teal-600 border-0 py-2 text-sm font-semibold text-white cursor-pointer hover:bg-teal-700">Apply</button>
+              <button onClick={() => setShowFilters(false)} className="flex-1 rounded-lg bg-sky-500 border-0 py-2 text-sm font-semibold text-white cursor-pointer hover:bg-sky-600">Apply</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Line-item detail modal drawer */}
+      {/* Line-item detail drawer */}
       {selectedRow && (
         <div className="fixed inset-0 z-[10001] flex">
           <div className="flex-1 bg-black/40" onClick={() => setSelectedRow(null)} />
           <div className="flex w-full max-w-md flex-col bg-white shadow-2xl">
             <div className="flex items-center justify-between px-5 py-4 text-white" style={{ background: INK }}>
               <div>
-                <p className="text-[11px] uppercase tracking-wide text-teal-300 m-0">Line-item detail</p>
-                <h3 className="text-base font-bold m-0 mt-0.5">{selectedRow.equip}</h3>
+                <p className="text-[11px] uppercase tracking-wide text-sky-300 m-0 font-semibold">Line-item detail</p>
+                <h3 className="text-base font-bold m-0 mt-0.5 text-white">{selectedRow.equip || selectedRow.desc}</h3>
               </div>
               <button onClick={() => setSelectedRow(null)} className="text-slate-300 bg-transparent border-0 cursor-pointer hover:text-white"><X size={18} /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 text-sm">
               <div className="mb-4 flex items-center gap-2">
                 <StatusPill status={selectedRow.status} />
-                <span className="flex items-center gap-1 text-xs text-teal-600 font-semibold">
+                <span className="flex items-center gap-1 text-xs text-sky-600 font-semibold">
                   <ArrowRight size={13} /> {selectedRow.deck}
                 </span>
               </div>
@@ -602,7 +666,7 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
                 <span className={`flex items-center gap-1.5 rounded-lg border border-solid px-3 py-2 text-xs font-semibold ${selectedRow.md ? "border-red-200 bg-red-50 text-red-700" : "border-slate-200 bg-slate-50 text-slate-400"}`}>
                   <FileText size={13} /> MD {selectedRow.md ? "attached" : "pending"}
                 </span>
-                <span className={`flex items-center gap-1.5 rounded-lg border border-solid px-3 py-2 text-xs font-semibold ${selectedRow.sdoc ? "border-teal-200 bg-teal-50 text-teal-700" : "border-slate-200 bg-slate-50 text-slate-400"}`}>
+                <span className={`flex items-center gap-1.5 rounded-lg border border-solid px-3 py-2 text-xs font-semibold ${selectedRow.sdoc ? "border-sky-200 bg-sky-50 text-sky-700" : "border-slate-200 bg-slate-50 text-slate-400"}`}>
                   <FileText size={13} /> SDoC {selectedRow.sdoc ? "attached" : "pending"}
                 </span>
               </div>
@@ -614,19 +678,11 @@ function OwnerDashboardContent({}: OwnerDashboardContentProps) {
   );
 }
 
-export default function Dashboard() {
+/* =========================================================================
+ * 2. EXCLUSIVE ADMIN DASHBOARD CONTENT (ORIGINAL UNTOUCHED ADMIN UI/UX)
+ * ========================================================================= */
+function AdminDashboardContent() {
     const { user } = useAuth();
-    
-    const isOwnerOrManager = useMemo(() => {
-        if (!user) return false;
-        const role = (user.roleName || user.role || '').toLowerCase();
-        return role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role === 'vessel' || role.includes('owner') || role.includes('manager') || role.includes('vessel');
-    }, [user]);
-
-    if (isOwnerOrManager) {
-        return <OwnerDashboardContent />;
-    }
-
     const firstName = user?.name?.split(' ')[0] || 'there';
 
     const [activeFilters, setActiveFilters] = useState<DashboardFilters>({
@@ -642,7 +698,7 @@ export default function Dashboard() {
 
     useEffect(() => {
         api.get<{ success: boolean; data: Vessel[] }>(ENDPOINTS.VESSELS.LIST)
-            .then((res) => setVesselList(res.data))
+            .then((res) => setVesselList(res.data || []))
             .catch(() => setVesselList([]));
 
         api.get<{ success: boolean; data: Array<Record<string, unknown>> }>(ENDPOINTS.AUDITS.ACTIVE)
@@ -789,7 +845,7 @@ export default function Dashboard() {
                             </div>
                             {openDropdown === 'supplier' && (
                                 <div className="custom-dropdown-menu">
-                                    {['Supplier', 'Wilhelmsen', 'WÃ¤rtsilÃ¤', 'ABB'].map(option => (
+                                    {['Supplier', 'Wilhelmsen', 'Wärtsilä', 'ABB'].map(option => (
                                         <div
                                             key={option}
                                             className={`custom-dropdown-item ${activeFilters.supplier === option ? 'active' : ''}`}
@@ -1047,4 +1103,24 @@ export default function Dashboard() {
             </main>
         </div>
     );
+}
+
+/* =========================================================================
+ * MAIN DASHBOARD ROUTER
+ * ========================================================================= */
+export default function Dashboard() {
+    const { user } = useAuth();
+    
+    const isOwnerManagerOrVessel = useMemo(() => {
+        if (!user) return false;
+        const role = (user.roleName || user.role || user.category || '').toLowerCase();
+        return role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role === 'vessel' ||
+               role.includes('owner') || role.includes('manager') || role.includes('vessel');
+    }, [user]);
+
+    if (isOwnerManagerOrVessel) {
+        return <OwnerManagerVesselDashboardContent />;
+    }
+
+    return <AdminDashboardContent />;
 }

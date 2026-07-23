@@ -144,6 +144,8 @@ export const ENDPOINTS = {
   // Dashboard
   DASHBOARD: {
     STATS: '/dashboard/stats',
+    OVERVIEW: '/dashboard/overview',
+    INVENTORY: '/dashboard/inventory',
     SOC_ALERTS: '/dashboard/soc-alerts',
   },
 };
