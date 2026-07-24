@@ -31,8 +31,17 @@ app.use(cors({
   origin: (origin, cb) => {
     // Requests without an Origin header (curl, server-to-server) are allowed.
     if (!origin) return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error(`Origin ${origin} not allowed by CORS`));
+    const isAllowed = 
+      allowedOrigins.includes('*') ||
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1') ||
+      origin.includes('duckdns.org');
+
+    if (isAllowed) return cb(null, true);
+    logger.warn(`CORS request blocked for origin: ${origin}`);
+    return cb(null, false);
   },
   credentials: true,
 }));
