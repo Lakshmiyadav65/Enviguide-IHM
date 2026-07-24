@@ -219,6 +219,7 @@ export interface HazmatMaterialCount {
     key: string;
     color: string;
     count: number;
+    shipsCount?: number;
     redCount: number;
 }
 

@@ -181,8 +181,8 @@ function OwnerManagerVesselDashboardContent() {
     }
 
     Promise.all([
-      api.get<{ success: boolean; data: DashboardOverviewData }>(ENDPOINTS.DASHBOARD.OVERVIEW, { params }),
-      api.get<{ success: boolean; data: { items: DashboardLineItem[] } }>(ENDPOINTS.DASHBOARD.INVENTORY, { params: { ...params, limit: 100 } })
+      api.get<{ success: boolean; data: DashboardOverviewData }>(ENDPOINTS.DASHBOARD.OVERVIEW, params),
+      api.get<{ success: boolean; data: { items: DashboardLineItem[] } }>(ENDPOINTS.DASHBOARD.INVENTORY, { ...params, limit: 100 })
     ]).then(([overviewRes, inventoryRes]) => {
       if (!isMounted) return;
       if (overviewRes.data) {

@@ -8,6 +8,7 @@ export interface AuthUser {
   email: string;
   role: 'admin' | 'manager' | 'viewer' | string;
   roleName?: string | null;
+  category?: string;
   /** True for admin / superadmin accounts — bypasses permission checks. */
   isAdmin: boolean;
   /** Effective permission node ids (user grants ∪ role grants). Empty
@@ -61,6 +62,7 @@ function meToAuthUser(d: MeResponse['data'] & Record<string, any>, token: string
     email: d.email,
     role: d.role as AuthUser['role'],
     roleName: d.roleName ?? null,
+    category: d.category,
     isAdmin: !!d.isAdmin,
     permissions: Array.isArray(d.permissions) ? d.permissions : [],
     token,
