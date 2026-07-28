@@ -58,16 +58,18 @@ export default function Vessels() {
     }, [user]);
 
     const myVesselList = useMemo(() => {
-        if (!user) return vesselList;
-        const role = (user.roleName || user.role || '').toLowerCase();
-        const isOwner = role === 'owner' || role === 'ship_owner' || role.includes('owner');
-        const isManager = role === 'ship_manager' || role.includes('manager');
-        const isVessel = role === 'vessel' || role.includes('vessel');
+        let rawList = vesselList;
+        if (!user) rawList = vesselList;
+        else {
+            const role = (user.roleName || user.role || '').toLowerCase();
+            const isOwner = role === 'owner' || role === 'ship_owner' || role.includes('owner');
+            const isManager = role === 'ship_manager' || role.includes('manager');
+            const isVessel = role === 'vessel' || role.includes('vessel');
 
-        if (isVessel) {
-            return vesselList.filter(v => v.id === user.vesselId || (v.name && user.name && String(v.name).toLowerCase() === String(user.name).toLowerCase()));
-        } else if (isOwner) {
-            return vesselList.filter(v => {
+            if (isVessel) {
+                rawList = vesselList.filter(v => v.id === user.vesselId || (v.name && user.name && String(v.name).toLowerCase() === String(user.name).toLowerCase()));
+            } else if (isOwner) {
+                rawList = vesselList.filter(v => {
                 const ownerStr = String(v.shipOwner || '').toLowerCase();
                 const regOwnerStr = String(v.registeredOwner || '').toLowerCase();
                 const userNameStr = String(user.name || '').toLowerCase();
@@ -91,8 +93,18 @@ export default function Vessels() {
                        userEmailStr.includes(managerStr);
             });
         }
-        return vesselList;
-    }, [vesselList, user]);
+        rawList = vesselList;
+    }
+
+    // Deduplicate vessels by IMO number & vessel name
+    const seen = new Set<string>();
+    return rawList.filter(v => {
+        const key = `${(v.imoNumber || '').trim().toLowerCase()}_${(v.name || '').trim().toLowerCase()}`;
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}, [vesselList, user]);
 
     // Fetch vessels from API on mount
     useEffect(() => {

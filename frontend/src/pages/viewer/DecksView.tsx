@@ -858,7 +858,9 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
             vessel: vesselName,
             deckId: deck.id,
             deckTitle: deck.title,
-            planUrl: activePlan?.url || ''
+            url: activePlan?.url || '',
+            planUrl: activePlan?.url || '',
+            vesselId: vesselId || ''
         };
         if (action) params.action = action;
         if (materialId) params.materialId = materialId;

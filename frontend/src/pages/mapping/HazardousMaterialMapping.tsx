@@ -57,7 +57,7 @@ import type { Material } from '../../types/index';
 
 import { PLAN_GENERIC } from '../../assets/ship_plans';
 import { api } from '../../lib/apiClient';
-import { ENDPOINTS } from '../../config/api.config';
+import { ENDPOINTS, API_CONFIG } from '../../config/api.config';
 
 /** Backend → MaterialEntry shape used by this page. Backend stores
  *  hazard_type as a single string; the form keeps an array, so we wrap. */
@@ -146,9 +146,13 @@ export default function HazardousMaterialMapping() {
         return isOwnerOrManager || isReadOnlyQuery;
     }, [user, query]);
 
-    let fileUrl = query.get('url') || '';
-    if (fileUrl && fileUrl.includes('ga_plan_')) {
+    let rawUrl = (query.get('url') || query.get('planUrl') || '').trim();
+    let fileUrl = rawUrl;
+    if (!fileUrl || fileUrl === 'undefined' || fileUrl === 'null' || fileUrl.includes('ga_plan_')) {
         fileUrl = PLAN_GENERIC;
+    } else if (fileUrl.startsWith('/uploads/') || fileUrl.startsWith('uploads/')) {
+        const cleanPath = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
+        fileUrl = `${API_CONFIG.BASE_URL.replace(/\/+$/, '')}${cleanPath}`;
     }
     const sectionName = query.get('name') || 'A-DECK 01';
     const rect = {
@@ -635,14 +639,20 @@ export default function HazardousMaterialMapping() {
                                 onClick={handleCanvasClick}>
 
 
-                                <img src={fileUrl} alt="Ship Section"
+                                <img
+                                    src={fileUrl}
+                                    alt="Ship Section"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = PLAN_GENERIC;
+                                    }}
                                     style={{
                                         position: 'absolute',
                                         left: -rect.x,
                                         top: -rect.y,
                                         width: CROPPER_WIDTH,
                                         maxWidth: 'none'
-                                    }} />
+                                    }}
+                                />
 
                                 {inventory.map(item => {
                                     // If we are viewing a specific material detail, only show its pin

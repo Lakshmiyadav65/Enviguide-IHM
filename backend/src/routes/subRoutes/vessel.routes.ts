@@ -25,6 +25,7 @@ import deckRouter from './deck.routes.js';
 import materialRouter from './material.routes.js';
 import documentRouter from './document.routes.js';
 import mdsdocRouter from './mdsdoc.routes.js';
+import reportRouter from './report.routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.resolve(__dirname, '..', '..', '..', 'uploads', 'vessels');
@@ -82,5 +83,8 @@ router.use('/:vesselId/md-sdoc', mdsdocRouter);
 
 // GA Plan routes (nested: /vessels/:vesselId/ga-plans/...)
 router.use('/:vesselId/ga-plans', gaPlanRouter);
+
+// Report routes (nested: /vessels/:vesselId/reports/...)
+router.use('/:vesselId/reports', reportRouter);
 
 export default router;
