@@ -680,7 +680,7 @@ export default function HazardousMaterialMapping() {
                                     );
                                 })}
 
-                                {tempPin && (
+                                {tempPin && viewMode === 'add' && (
                                     <div className="pin-marker-v5 ghost"
                                         style={{
                                             left: tempPin.x - rect.x,
@@ -781,7 +781,7 @@ export default function HazardousMaterialMapping() {
                             <div className="material-detail-panel-v5" style={{ padding: '0', background: '#F8FAFC' }}>
                                 <div style={{ padding: '16px 16px 0 16px' }}>
                                     <button
-                                        onClick={() => { setViewingMaterial(null); setViewMode('list'); setValidationError(null); }}
+                                        onClick={() => { setViewingMaterial(null); setViewMode('list'); setValidationError(null); setTempPin(null); setActiveTool('none'); }}
                                         className="back-btn-v5"
                                         style={{ width: 'auto', padding: '6px 12px', fontSize: '12px', height: '32px' }}
                                     >
@@ -931,7 +931,7 @@ export default function HazardousMaterialMapping() {
                                     </div>
 
                                     <div className="detail-actions-footer">
-                                        <button className="hm-mapping-btn cancel" onClick={() => { setViewingMaterial(null); setViewMode('list'); setValidationError(null); }}>
+                                         <button className="hm-mapping-btn cancel" onClick={() => { setViewingMaterial(null); setViewMode('list'); setValidationError(null); setTempPin(null); setActiveTool('none'); }}>
                                             {isReadOnly ? 'CLOSE' : 'CANCEL'}
                                         </button>
                                         {!isReadOnly && (
@@ -1408,7 +1408,7 @@ export default function HazardousMaterialMapping() {
                                 </div>
 
                                 <div className="form-footer-v5">
-                                    <button className="discard-btn-v5" onClick={() => setViewMode('list')}>DISCARD</button>
+                                    <button className="discard-btn-v5" onClick={resetFormAfterCreate}>DISCARD</button>
                                     <button className="create-btn-v5" onClick={handleAddMaterial}>CREATE ENTRY</button>
                                 </div>
                             </div>
@@ -1417,7 +1417,7 @@ export default function HazardousMaterialMapping() {
 
                     <div className="sidebar-fab-v5">
                         {viewMode === 'list' && !isReadOnly && (
-                            <button className="fab-blue-v5" onClick={() => { setViewMode('add'); setActiveTool('pin'); }}>
+                            <button className="fab-blue-v5" onClick={() => { resetFormAfterCreate(); setViewMode('add'); setActiveTool('pin'); }}>
                                 <Plus size={32} />
                             </button>
                         )}
