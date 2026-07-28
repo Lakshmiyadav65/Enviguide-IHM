@@ -424,8 +424,8 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
     // its clarification_requests row to 'sent' or 'failed'. Verbose logs
     // so the operator can confirm in the host logs that the dispatch
     // actually ran.
-    console.log(
-      `[clarification-email] queued ${persisted.length} batch(es) for IMO ${imo} — dispatching in background`,
+    console.info(
+      `[Clarification Email] Queued ${persisted.length} batch(es) for IMO ${imo}`,
     );
 
     const attachments = Array.isArray(req.files)
@@ -437,10 +437,9 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
 
     void Promise.allSettled(
       persisted.map(async (p) => {
-        const label = `[clarification-email] ${p.clarificationId} → ${p.to.join(', ')}`;
+        const label = `[Clarification Email] ${p.clarificationId} -> ${p.to.join(', ')}`;
         const t0 = Date.now();
         try {
-          console.log(`${label}: sending`);
           const result = await sendMail({
             to: p.to,
             cc,
@@ -451,8 +450,8 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
             attachments,
           });
           const elapsed = Date.now() - t0;
-          console.log(
-            `${label}: OK (${elapsed}ms) messageId=${(result as { messageId?: string })?.messageId ?? '?'}`,
+          console.info(
+            `${label}: Sent OK (${elapsed}ms) messageId=${(result as { messageId?: string })?.messageId ?? '?'}`,
           );
           await db.collection('clarification_requests').updateOne(
             { _id: p.clarificationId },
@@ -461,20 +460,19 @@ export async function sendClarificationEmail(req: Request, res: Response, next: 
         } catch (mailErr) {
           const errorMessage = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
           const elapsed = Date.now() - t0;
-          console.error(`${label}: FAILED after ${elapsed}ms — ${errorMessage}`);
+          console.error(`${label}: Failed after ${elapsed}ms - ${errorMessage}`);
           await db.collection('clarification_requests').updateOne(
             { _id: p.clarificationId },
             { $set: { status: 'failed', error_message: errorMessage, updated_at: new Date() } }
           ).catch((dbErr: any) => {
-            console.error(`${label}: also failed to record failure:`, dbErr);
+            console.error(`${label}: Failed to update status in DB:`, dbErr);
           });
         }
       }),
     ).then(() => {
-      console.log(`[clarification-email] all batches finished for IMO ${imo}. Cleaning up attachments.`);
       for (const f of attachments) {
         fs.unlink(f.path, (err: NodeJS.ErrnoException | null) => {
-          if (err) console.error(`[clarification-email] failed to delete temp file ${f.path}:`, err);
+          if (err) console.error(`[Clarification Email] Failed to delete temp file ${f.path}:`, err);
         });
       }
     });
