@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/apiClient';
 import { ENDPOINTS, API_CONFIG } from '../../config/api.config';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ClarificationItemRow {
     clarification_id: string;
@@ -75,6 +76,7 @@ interface FlatItem {
     dateReceived: string;
     reviewedAt: string | null;
     reviewedBy: string | null;
+    classificationChoice?: string | null;
     /** 'reviewed' wins over 'received' wins over 'pending'. */
     status: 'pending' | 'received' | 'reviewed';
     /** Original subject — used to prefill the clarification mail. */
@@ -91,6 +93,7 @@ function formatDate(iso: string | null): string {
 }
 
 export default function DocumentAudit() {
+    const { user } = useAuth();
     const { imo } = useParams();
     const [searchQuery, setSearchQuery] = useState('');
     const [clarifications, setClarifications] = useState<ClarificationRow[]>([]);
@@ -99,6 +102,10 @@ export default function DocumentAudit() {
     const [acceptingKey, setAcceptingKey] = useState<string | null>(null);
     const [showToast, setShowToast] = useState(false);
     const [toastData, setToastData] = useState({ title: '', message: '', tone: 'success' as 'success' | 'error' });
+
+    // Accept & Push Modal State
+    const [acceptModalItem, setAcceptModalItem] = useState<FlatItem | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<'Below Threshold' | 'Contain HM' | 'Non CHM'>('Below Threshold');
 
     // Clarification mail modal state
     const [mailItem, setMailItem] = useState<FlatItem | null>(null);
@@ -280,20 +287,28 @@ export default function DocumentAudit() {
         return { total: flatItems.length, pending, received, reviewed };
     }, [flatItems]);
 
-    const handleAccept = async (item: FlatItem) => {
+    const handleAcceptClick = (item: FlatItem) => {
         if (item.status === 'reviewed' || item.status === 'pending') return;
-        setAcceptingKey(item.key);
+        setAcceptModalItem(item);
+        setSelectedCategory('Below Threshold');
+    };
+
+    const handlePushAccept = async () => {
+        if (!acceptModalItem) return;
+        setAcceptingKey(acceptModalItem.key);
+        const consultantName = user?.name || user?.email?.split('@')[0] || 'Consultant';
         try {
             await api.post(
-                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_REVIEW(item.clarificationId, item.itemIndex),
-                {},
+                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_REVIEW(acceptModalItem.clarificationId, acceptModalItem.itemIndex),
+                { classification: selectedCategory, reviewedBy: consultantName },
             );
             setToastData({
-                title: 'Item Accepted',
-                message: `${item.poNumber} marked as reviewed. It now appears in Reviewed Mds.`,
+                title: 'Accepted & Pushed',
+                message: `Item PO ${acceptModalItem.poNumber} accepted by ${consultantName} as "${selectedCategory}" and pushed to records.`,
                 tone: 'success',
             });
             setShowToast(true);
+            setAcceptModalItem(null);
             loadClarifications();
         } catch (err) {
             setToastData({
@@ -449,21 +464,22 @@ IHM Audit Team`,
                                             <th>SDOC</th>
                                             <th>RECEIVED</th>
                                             <th>STATUS</th>
+                                            <th>ACCEPTED BY</th>
                                             <th style={{ textAlign: 'center' }}>ACTION</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {loading && (
-                                            <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
+                                            <tr><td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
                                                 <Loader2 size={20} className="spin" style={{ marginRight: 8, verticalAlign: 'middle' }} />
                                                 Loading clarifications…
                                             </td></tr>
                                         )}
                                         {!loading && error && (
-                                            <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#DC2626' }}>{error}</td></tr>
+                                            <tr><td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#DC2626' }}>{error}</td></tr>
                                         )}
                                         {!loading && !error && filteredItems.length === 0 && (
-                                            <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
+                                            <tr><td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
                                                 No clarification items yet. Send a clarification email from the Pending Reviews step to populate this queue.
                                             </td></tr>
                                         )}
@@ -518,33 +534,40 @@ IHM Audit Team`,
                                                         {item.status === 'reviewed' ? 'REVIEWED' : item.status === 'received' ? 'RECEIVED' : 'PENDING'}
                                                     </span>
                                                 </td>
+                                                <td style={{ whiteSpace: 'nowrap', fontSize: '12px', fontWeight: 600, color: '#334155' }}>
+                                                    {item.status === 'reviewed' ? (
+                                                        <span style={{ color: '#059669', background: '#ECFDF5', padding: '4px 8px', borderRadius: '4px' }}>
+                                                            Accepted by {item.reviewedBy || user?.name || 'Consultant'}
+                                                        </span>
+                                                    ) : (
+                                                        <span style={{ color: '#94A3B8' }}>—</span>
+                                                    )}
+                                                </td>
                                                 <td>
                                                     <div className="da-action-cell">
                                                         {item.status === 'reviewed' ? (
                                                             <span
                                                                 className="da-reviewed-badge"
-                                                                title={item.reviewedBy ? `Reviewed by ${item.reviewedBy}` : 'Reviewed'}
+                                                                title={item.reviewedBy ? `Accepted by ${item.reviewedBy}` : 'Accepted'}
                                                             >
-                                                                <CheckCircle2 size={12} /> Reviewed
+                                                                <CheckCircle2 size={12} /> Accepted &amp; Pushed
                                                             </span>
                                                         ) : (
                                                             <button
                                                                 type="button"
                                                                 className="da-accept-btn"
-                                                                onClick={() => handleAccept(item)}
+                                                                onClick={() => handleAcceptClick(item)}
                                                                 disabled={item.status !== 'received' || acceptingKey === item.key}
-                                                                title={item.status !== 'received' ? 'Both MD and SDoC must be uploaded before this can be accepted.' : 'Accept — mark this item reviewed'}
+                                                                title={item.status !== 'received' ? 'Both MD and SDoC must be uploaded before this can be accepted.' : 'Accept & Push — review and classify this item'}
                                                                 style={{ opacity: acceptingKey === item.key ? 0.7 : 1 }}
                                                             >
                                                                 {acceptingKey === item.key ? (
-                                                                    <><Loader2 size={12} className="spin" /> Accepting…</>
+                                                                    <><Loader2 size={12} className="spin" /> Processing…</>
                                                                 ) : (
                                                                     <><CheckCircle2 size={12} /> Accept</>
                                                                 )}
                                                             </button>
                                                         )}
-                                                        {/* Once an item is reviewed, the audit decision is locked
-                                                            in — no follow-up clarification needed. Hide the button. */}
                                                         {item.status !== 'reviewed' && (
                                                             <button
                                                                 type="button"
@@ -612,10 +635,10 @@ IHM Audit Team`,
                                                     ? 'Both MD and SDoC must be uploaded before this item can be approved.'
                                                     : 'Approve — mark this item reviewed'
                                         }
-                                        onClick={async () => {
+                                        onClick={() => {
                                             const item = viewingDoc.item;
-                                            await handleAccept(item);
                                             setViewingDoc(null);
+                                            handleAcceptClick(item);
                                         }}
                                         style={{
                                             opacity: viewingDoc.item.status !== 'received' || acceptingKey === viewingDoc.item.key ? 0.6 : 1,
@@ -706,6 +729,91 @@ IHM Audit Team`,
                                         )}
                                     </button>
                                     <button className="btn-discard" onClick={() => setMailItem(null)}>
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Accept & Push Categorization Modal */}
+                {acceptModalItem && (
+                    <div className="doc-modal-overlay">
+                        <div className="clarification-modal-container" style={{ maxWidth: '520px' }}>
+                            <div className="doc-modal-header">
+                                <div className="header-doc-info">
+                                    <div className="pdf-icon-box" style={{ background: '#ECFDF5', color: '#10B981' }}>
+                                        <CheckCircle2 size={20} color="#10B981" />
+                                    </div>
+                                    <div className="doc-meta">
+                                        <h3>Accept &amp; Classify Material Record</h3>
+                                        <p>PO {acceptModalItem.poNumber} — {acceptModalItem.itemDescription}</p>
+                                    </div>
+                                </div>
+                                <button className="close-modal-btn" onClick={() => setAcceptModalItem(null)}>
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="clarification-body" style={{ padding: '20px' }}>
+                                <div style={{ marginBottom: '16px', fontSize: '13px', color: '#475569', fontWeight: 500 }}>
+                                    Consultant selection based on reviewing MD &amp; SDoC documents:
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    {[
+                                        { id: 'Below Threshold', title: 'Below Threshold', desc: 'Material present but below regulatory reporting threshold.' },
+                                        { id: 'Contain HM', title: 'Contain HM', desc: 'Contains Hazardous Material requiring active inventory tracking.' },
+                                        { id: 'Non CHM', title: 'Non CHM', desc: 'Non-Hazardous Material — compliant with safety limits.' }
+                                    ].map((opt) => (
+                                        <label
+                                            key={opt.id}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'flex-start',
+                                                gap: '12px',
+                                                padding: '12px 14px',
+                                                borderRadius: '8px',
+                                                border: selectedCategory === opt.id ? '2px solid #00A3FF' : '1px solid #E2E8F0',
+                                                background: selectedCategory === opt.id ? '#F0F9FF' : '#FFFFFF',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                            onClick={() => setSelectedCategory(opt.id as any)}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="materialClassification"
+                                                checked={selectedCategory === opt.id}
+                                                onChange={() => setSelectedCategory(opt.id as any)}
+                                                style={{ marginTop: '2px' }}
+                                            />
+                                            <div>
+                                                <strong style={{ fontSize: '14px', color: '#1E293B', display: 'block' }}>{opt.title}</strong>
+                                                <span style={{ fontSize: '12px', color: '#64748B' }}>{opt.desc}</span>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="doc-modal-footer">
+                                <div className="footer-left">
+                                    <button
+                                        type="button"
+                                        className="btn-send-request"
+                                        onClick={handlePushAccept}
+                                        disabled={acceptingKey === acceptModalItem.key}
+                                        style={{ background: '#10B981', opacity: acceptingKey === acceptModalItem.key ? 0.7 : 1 }}
+                                    >
+                                        {acceptingKey === acceptModalItem.key ? (
+                                            <><Loader2 size={18} className="spin" /> Pushing…</>
+                                        ) : (
+                                            <><CheckCircle2 size={18} /> Push Record</>
+                                        )}
+                                    </button>
+                                    <button type="button" className="btn-discard" onClick={() => setAcceptModalItem(null)}>
                                         Cancel
                                     </button>
                                 </div>

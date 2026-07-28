@@ -76,10 +76,9 @@ const menuItems: MenuItem[] = [
         label: 'Menu',
         children: [
             { path: '/menu/registered', label: 'Registered', requires: 'vessels_read' },
-            { path: '/menu/ownership', label: 'Ownership', requires: 'vessels_read' },
-            { path: '/menu/ownership-manager', label: 'Ownership Manager', requires: 'vessels_read' },
+            { path: '/menu/ownership', label: 'Registered Owner', requires: 'vessels_read' },
+            { path: '/menu/ownership-manager', label: 'Ship Manager', requires: 'vessels_read' },
             { path: '/menu/supplier', label: 'Supplier', requires: 'settings_read' },
-            { path: '/menu/equipment', label: 'Equipment', requires: 'settings_read' },
             { path: '/menu/suspended', label: 'Suspended', requires: 'audits_read' },
             { path: '/menu/suspected-keyword', label: 'Suspected Keyword', requires: 'settings_read' },
         ]

@@ -1,9 +1,8 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
-    Search, Plus, Filter, ChevronRight, ChevronLeft, ChevronDown, AlertCircle,
-    Database, Package, Download, X, CheckCircle, MoreVertical
+    Search, Plus, ChevronRight, ChevronLeft, ChevronDown, AlertCircle,
+    Database, Package, X, CheckCircle, MoreVertical
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import './MaterialsRecord.css';
 
@@ -65,25 +64,13 @@ function backendToMaterial(m: Record<string, unknown>): Material {
 
 export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecordProps) {
     const navigate = useNavigate();
-    const { user } = useAuth();
-    const isOwnerOrManager = useMemo(() => {
-        if (!user) return false;
-        const role = (user.roleName || user.role || '').toLowerCase();
-        return role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role === 'vessel' || role.includes('owner') || role.includes('manager') || role.includes('vessel');
-    }, [user]);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTag, setActiveTag] = useState('All');
-    const [riskFilter, setRiskFilter] = useState('Risk Level');
-    const [complianceFilter, setComplianceFilter] = useState('Compliance Status');
     const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
     const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
     const [visibleCount, setVisibleCount] = useState(12);
-    const [isRiskDropdownOpen, setIsRiskDropdownOpen] = useState(false);
-    const [isComplianceDropdownOpen, setIsComplianceDropdownOpen] = useState(false);
 
-    const riskRef = useRef<HTMLDivElement>(null);
-    const complianceRef = useRef<HTMLDivElement>(null);
     const topScrollRef = useRef<HTMLDivElement>(null);
     const tableContainerRef = useRef<HTMLDivElement>(null);
 
@@ -126,18 +113,7 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
         };
     }, [vesselId, loadFromBackend]);
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (riskRef.current && !riskRef.current.contains(event.target as Node)) {
-                setIsRiskDropdownOpen(false);
-            }
-            if (complianceRef.current && !complianceRef.current.contains(event.target as Node)) {
-                setIsComplianceDropdownOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+
 
     // Filter Panel State
     // Filter Panel State
@@ -346,19 +322,7 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
             else if (activeTag === 'Archived') matchesTag = false;
         }
 
-        let matchesRisk = true;
-        if (riskFilter !== 'Risk Level') {
-            if (riskFilter === 'High') matchesRisk = m.category === 'hazard';
-            else if (riskFilter === 'Medium') matchesRisk = m.category === 'warning';
-            else if (riskFilter === 'Low') matchesRisk = m.category === 'safe';
-        }
 
-        let matchesCompliance = true;
-        if (complianceFilter !== 'Compliance Status') {
-            const isCompliant = m.status === 'Certified' || m.status === 'Verified';
-            if (complianceFilter === 'Compliant') matchesCompliance = isCompliant;
-            else if (complianceFilter === 'Non-Compliant') matchesCompliance = !isCompliant;
-        }
 
         // Side Panel Filters
         let matchesPartFilter = true;
@@ -379,7 +343,7 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
             matchesThreshold = m.thresholdValue >= thresholdMin && m.thresholdValue <= thresholdMax;
         }
 
-        return matchesSearch && matchesTag && matchesRisk && matchesCompliance && matchesPartFilter && matchesZone && matchesThreshold;
+        return matchesSearch && matchesTag && matchesPartFilter && matchesZone && matchesThreshold;
     });
 
     const displayedMaterials = filteredMaterials.slice(0, visibleCount);
@@ -419,7 +383,7 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
 
             <div className="materials-header">
                 <div className="materials-filters">
-                    <div className="search-field">
+                    <div className="search-field" style={{ maxWidth: '400px' }}>
                         <Search size={18} color="#94a3b8" />
                         <input
                             type="text"
@@ -428,73 +392,6 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-
-                    <div className="custom-select-wrapper" style={{ position: 'relative' }} ref={riskRef}>
-                        <div
-                            className={`filter-dropdown ${isRiskDropdownOpen ? 'active' : ''}`}
-                            onClick={() => setIsRiskDropdownOpen(!isRiskDropdownOpen)}
-                        >
-                            {riskFilter}
-                        </div>
-                        {isRiskDropdownOpen && (
-                            <div className="custom-dropdown-menu">
-                                {['Risk Level', 'High', 'Medium', 'Low'].map(option => (
-                                    <div
-                                        key={option}
-                                        className={`custom-dropdown-item ${riskFilter === option ? 'active' : ''}`}
-                                        onClick={() => {
-                                            setRiskFilter(option);
-                                            setIsRiskDropdownOpen(false);
-                                        }}
-                                    >
-                                        {option}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="custom-select-wrapper" style={{ position: 'relative' }} ref={complianceRef}>
-                        <div
-                            className={`filter-dropdown ${isComplianceDropdownOpen ? 'active' : ''}`}
-                            onClick={() => setIsComplianceDropdownOpen(!isComplianceDropdownOpen)}
-                        >
-                            {complianceFilter}
-                        </div>
-                        {isComplianceDropdownOpen && (
-                            <div className="custom-dropdown-menu">
-                                {['Compliance Status', 'Compliant', 'Non-Compliant'].map(option => (
-                                    <div
-                                        key={option}
-                                        className={`custom-dropdown-item ${complianceFilter === option ? 'active' : ''}`}
-                                        onClick={() => {
-                                            setComplianceFilter(option);
-                                            setIsComplianceDropdownOpen(false);
-                                        }}
-                                    >
-                                        {option}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <button
-                        className={`filter-btn-icon ${isFilterPanelOpen ? 'active' : ''}`}
-                        onClick={() => {
-                            const newState = !isFilterPanelOpen;
-                            setIsFilterPanelOpen(newState);
-                            if (newState) setSelectedMaterialId(null);
-                        }}
-                    >
-                        <Filter size={18} />
-                    </button>
-
-                    {!isOwnerOrManager && (
-                        <button className="export-record-btn-top" style={{ marginLeft: '4px' }}>
-                            <Download size={16} /> Export Record
-                        </button>
-                    )}
                 </div>
             </div>
 

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './MDSdocAudit.css';
 import Sidebar from '../../components/Sidebar';
@@ -83,7 +83,7 @@ export default function MDSdocAudit() {
                                         <th>TOTAL POS</th>
                                         <th style={{ whiteSpace: 'nowrap' }}>PENDING MDS</th>
                                         <th style={{ whiteSpace: 'nowrap' }}>PENDING SDOCS</th>
-                                        <th>CLARIFICATION STATUS</th>
+                                        <th>STATUS</th>
                                         <th>LAST SUBMISSION DATE</th>
                                         <th style={{ textAlign: 'center', minWidth: 130, whiteSpace: 'nowrap' }}>ACTION</th>
                                     </tr>
@@ -122,10 +122,10 @@ export default function MDSdocAudit() {
                                                     type="button"
                                                     className="md-review-cta"
                                                     onClick={() => navigate(`/administration/document-audit/${record.imoNumber}`)}
-                                                    title="Review uploaded MD / SDoC documents"
+                                                    title="View uploaded MD / SDoC documents"
                                                 >
                                                     <Eye size={14} />
-                                                    Review
+                                                    View MD / SDoC
                                                 </button>
                                             </td>
                                         </tr>

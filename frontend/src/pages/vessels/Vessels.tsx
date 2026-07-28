@@ -174,9 +174,6 @@ export default function Vessels() {
     }, [user]);
 
     // Document & Form States
-    const [docSearch, setDocSearch] = useState('');
-    const [docCategory, setDocCategory] = useState('All');
-    const [docStatus, setDocStatus] = useState('All');
     const [docPage, setDocPage] = useState(1);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [newDocType, setNewDocType] = useState('Select Document Type');
@@ -204,6 +201,13 @@ export default function Vessels() {
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     // New Reports landing — tabs for Standard / Quarterly / Custom
     const [activeReportTab, setActiveReportTab] = useState<'standard' | 'quarterly' | 'custom'>('standard');
+    const [reportInclusions, setReportInclusions] = useState<Record<string, { inventory: boolean; positive: boolean; previous: boolean }>>({
+        q1: { inventory: true, positive: true, previous: false },
+        q2: { inventory: true, positive: true, previous: false },
+        q3: { inventory: true, positive: true, previous: false },
+        q4: { inventory: true, positive: true, previous: false },
+        adhoc: { inventory: true, positive: true, previous: true },
+    });
 
     // Quarterly Archive timeline. Pulled from /reports/quarterly/timeline
     // when the tab opens. One entry per calendar quarter from vessel
@@ -245,18 +249,12 @@ export default function Vessels() {
 
     // Custom Dropdown States & Refs
     const [isDocTypeDropdownOpen, setIsDocTypeDropdownOpen] = useState(false);
-    const [isDocCategoryDropdownOpen, setIsDocCategoryDropdownOpen] = useState(false);
-    const [isDocStatusDropdownOpen, setIsDocStatusDropdownOpen] = useState(false);
 
     const docTypeRef = useRef<HTMLDivElement>(null);
-    const docCategoryRef = useRef<HTMLDivElement>(null);
-    const docStatusRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (docTypeRef.current && !docTypeRef.current.contains(event.target as Node)) setIsDocTypeDropdownOpen(false);
-            if (docCategoryRef.current && !docCategoryRef.current.contains(event.target as Node)) setIsDocCategoryDropdownOpen(false);
-            if (docStatusRef.current && !docStatusRef.current.contains(event.target as Node)) setIsDocStatusDropdownOpen(false);
         };
         document.addEventListener('mousedown', handleClickOutside);
 
@@ -868,11 +866,7 @@ export default function Vessels() {
                 );
             }
             const currentDocs = vesselDocuments[activeVesselName] || [];
-            const filteredDocs = currentDocs.filter(doc =>
-                doc.name.toLowerCase().includes(docSearch.toLowerCase()) &&
-                (docCategory === 'All' || doc.type === docCategory) &&
-                (docStatus === 'All' || doc.status === docStatus)
-            );
+            const filteredDocs = currentDocs;
 
             const paginatedDocs = filteredDocs.slice((docPage - 1) * docsPerPage, docPage * docsPerPage);
 
@@ -915,7 +909,7 @@ export default function Vessels() {
                                 </div>
                                 {isDocTypeDropdownOpen && (
                                     <div className="custom-dropdown-menu">
-                                        {['Select Document Type', 'Certificate', 'Manual', 'Drawing', 'Declaration'].map(option => (
+                                        {['Select Document Type', 'Initial IHM Report', 'SOC', 'Ship Particulars', 'Others'].map(option => (
                                             <div
                                                 key={option}
                                                 className={`custom-dropdown-item ${newDocType === option ? 'active' : ''}`}
@@ -936,77 +930,6 @@ export default function Vessels() {
                         </div>
                     </div>
                     )}
-
-                    <div className="doc-filters-bar">
-                        <div className="doc-search-input">
-                            <Search size={18} />
-                            <input
-                                type="text"
-                                placeholder="Search by filename..."
-                                value={docSearch}
-                                onChange={(e) => setDocSearch(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="custom-select-wrapper" style={{ position: 'relative' }} ref={docCategoryRef}>
-                            <div
-                                className={`doc-filter-select ${isDocCategoryDropdownOpen ? 'active' : ''}`}
-                                onClick={() => setIsDocCategoryDropdownOpen(!isDocCategoryDropdownOpen)}
-                            >
-                                {docCategory === 'All' ? 'Category' : docCategory}
-                            </div>
-                            {isDocCategoryDropdownOpen && (
-                                <div className="custom-dropdown-menu">
-                                    {['All', 'Certificate', 'Manual', 'Drawing', 'Declaration'].map(option => (
-                                        <div
-                                            key={option}
-                                            className={`custom-dropdown-item ${docCategory === option ? 'active' : ''}`}
-                                            onClick={() => {
-                                                setDocCategory(option);
-                                                setIsDocCategoryDropdownOpen(false);
-                                            }}
-                                        >
-                                            {option === 'All' ? 'Category' : option}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="custom-select-wrapper" style={{ position: 'relative' }} ref={docStatusRef}>
-                            <div
-                                className={`doc-filter-select ${isDocStatusDropdownOpen ? 'active' : ''}`}
-                                onClick={() => setIsDocStatusDropdownOpen(!isDocStatusDropdownOpen)}
-                            >
-                                {docStatus === 'All' ? 'Status' : docStatus}
-                            </div>
-                            {isDocStatusDropdownOpen && (
-                                <div className="custom-dropdown-menu">
-                                    {['All', 'Active', 'Expiring'].map(option => (
-                                        <div
-                                            key={option}
-                                            className={`custom-dropdown-item ${docStatus === option ? 'active' : ''}`}
-                                            onClick={() => {
-                                                setDocStatus(option);
-                                                setIsDocStatusDropdownOpen(false);
-                                            }}
-                                        >
-                                            {option === 'All' ? 'Status' : option}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        <div className="doc-date-range">
-                            <Calendar size={18} />
-                            <span>Select Date Range (From - To)</span>
-                        </div>
-                        {(docSearch || docCategory !== 'All' || docStatus !== 'All') && (
-                            <button className="clear-filters-link" onClick={() => { setDocSearch(''); setDocCategory('All'); setDocStatus('All'); }}>
-                                Clear Filters
-                            </button>
-                        )}
-                    </div>
 
                     <div className="doc-table-wrapper">
                         <table className="doc-table">
@@ -1279,13 +1202,7 @@ export default function Vessels() {
                     .sort((a, b) => Number(b) - Number(a))
                     .map((year) => ({ year, quarters: quarterlyGrouped[year] }));
 
-                // Brief description for each Ad Hoc report.
-                const standardDescriptions: Record<string, string> = {
-                    overall: 'Comprehensive snapshot of the vessel — specs, IHM movement, hazmat overview, full materials inventory, and HM-marked decks in one document.',
-                    summary: 'High-level snapshot of regulatory compliance, certification status, and outstanding action items.',
-                    inventory: 'Full breakdown of every mapped material across all decks, with IHM Part classification and quantities.',
-                    hazmat: 'Vessel-wide hazardous materials overview — totals by category, threshold flags, and risk hot-spots.',
-                };
+
 
                 // Map a UI report (Ad Hoc item or Quarterly entry) to the
                 // backend report type the generator understands.
@@ -1489,41 +1406,87 @@ export default function Vessels() {
                             </button>
                         </div>
 
-                        {/* Standard Reports — card grid */}
+                        {/* Standard Reports — card grid (Q1, Q2, Q3, Q4, and Ad Hoc) */}
                         {activeReportTab === 'standard' && (
                             <div className="report-cards-grid">
-                                {standardItems.map((item) => {
+                                {[
+                                    { id: 'q1', name: 'Q1 Report', desc: 'Quarter 1 compliance & inventory audit report.' },
+                                    { id: 'q2', name: 'Q2 Report', desc: 'Quarter 2 compliance & inventory audit report.' },
+                                    { id: 'q3', name: 'Q3 Report', desc: 'Quarter 3 compliance & inventory audit report.' },
+                                    { id: 'q4', name: 'Q4 Report', desc: 'Quarter 4 compliance & inventory audit report.' },
+                                    { id: 'adhoc', name: 'Ad Hoc Report', desc: 'Custom ad-hoc material & audit status report.' },
+                                ].map((item) => {
                                     const isGenerating = generatingStandard === item.id;
                                     const isDisabled = generatingStandard !== null && !isGenerating;
-                                    // Look up the latest persisted run for this card
-                                    // by mapping the UI item id to its backend type.
                                     const latest = standardLatestByType[backendType('adhoc', item.id)];
                                     const hasGenerated = Boolean(latest);
                                     const generatedOnLabel = latest
                                         ? new Date(latest.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                                         : null;
+                                    const opts = reportInclusions[item.id] || { inventory: true, positive: true, previous: false };
+
                                     return (
                                         <div
                                             className={`report-card-v2${isGenerating ? ' is-generating' : ''}${hasGenerated ? ' is-ready' : ''}`}
                                             key={item.id}
+                                            style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
                                         >
                                             <div className="report-card-icon">
                                                 <FileText size={22} />
                                             </div>
                                             <div className="report-card-body">
                                                 <h3>{item.name}</h3>
-                                                <p>{standardDescriptions[item.id] ?? 'Standard compliance report.'}</p>
+                                                <p>{item.desc}</p>
+
+                                                {/* Selectable Inclusion Options */}
+                                                <div className="report-inclusion-options" style={{ marginTop: '12px', padding: '10px 12px', background: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                                                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Include in Report:</span>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#1E293B', marginBottom: '6px', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={opts.inventory}
+                                                            onChange={(e) => setReportInclusions(prev => ({
+                                                                ...prev,
+                                                                [item.id]: { ...opts, inventory: e.target.checked }
+                                                            }))}
+                                                        />
+                                                        IHM Inventory Materials
+                                                    </label>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#1E293B', marginBottom: '6px', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={opts.positive}
+                                                            onChange={(e) => setReportInclusions(prev => ({
+                                                                ...prev,
+                                                                [item.id]: { ...opts, positive: e.target.checked }
+                                                            }))}
+                                                        />
+                                                        Positive Materials (MD &amp; SDoC)
+                                                    </label>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#1E293B', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={opts.previous}
+                                                            onChange={(e) => setReportInclusions(prev => ({
+                                                                ...prev,
+                                                                [item.id]: { ...opts, previous: e.target.checked }
+                                                            }))}
+                                                        />
+                                                        Previous reports (SoC, historical IHM reports, and other relevant reports)
+                                                    </label>
+                                                </div>
+
                                                 {isGenerating ? (
-                                                    <span className="report-card-meta muted">Generating PDF…</span>
+                                                    <span className="report-card-meta muted" style={{ marginTop: '8px', display: 'block' }}>Generating PDF…</span>
                                                 ) : hasGenerated ? (
-                                                    <span className="report-card-meta ready">
+                                                    <span className="report-card-meta ready" style={{ marginTop: '8px', display: 'block' }}>
                                                         Generated {generatedOnLabel}
                                                     </span>
                                                 ) : (
-                                                    <span className="report-card-meta muted">Not yet generated</span>
+                                                    <span className="report-card-meta muted" style={{ marginTop: '8px', display: 'block' }}>Not yet generated</span>
                                                 )}
                                             </div>
-                                            <div className="report-card-actions">
+                                            <div className="report-card-actions" style={{ marginTop: '16px' }}>
                                                 {isGenerating ? (
                                                     <button
                                                         type="button"

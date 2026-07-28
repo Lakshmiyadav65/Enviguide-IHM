@@ -182,9 +182,9 @@ export default function Ownership() {
                 <div className="registered-content">
                     <div className="page-header-standard">
                         <div className="header-title-area">
-                            <div className="breadcrumb-mini">MENU / OWNERSHIP</div>
-                            <h1>Vessel Ownership</h1>
-                            <p>Manage and track shipping companies and vessel owners.</p>
+                            <div className="breadcrumb-mini">MENU / REGISTERED OWNER</div>
+                            <h1>Registered Owner</h1>
+                            <p>Manage and track shipping companies and registered vessel owners.</p>
                         </div>
                         <div className="header-actions">
                             <button className="btn-secondary-standard" onClick={handleExport} disabled={filteredOwners.length === 0}>

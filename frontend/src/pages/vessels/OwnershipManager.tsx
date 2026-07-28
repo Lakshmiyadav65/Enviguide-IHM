@@ -182,8 +182,8 @@ export default function OwnershipManager() {
                 <div className="registered-content">
                     <div className="page-header-standard">
                         <div className="header-title-area">
-                            <div className="breadcrumb-mini">MENU / OWNERSHIP MANAGER</div>
-                            <h1>Ownership Managers</h1>
+                            <div className="breadcrumb-mini">MENU / SHIP MANAGER</div>
+                            <h1>Ship Manager</h1>
                             <p>Manage and track technical and commercial vessel management entities.</p>
                         </div>
                         <div className="header-actions">

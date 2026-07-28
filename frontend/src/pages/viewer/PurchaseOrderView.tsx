@@ -293,6 +293,8 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
         };
 
         const filteredItems = allItems.filter(item => {
+            // Supplier list displays only suspected items; all PO items retained internally in allItems
+            if (item.isSuspected !== true) return false;
             if (!matchesFilter(item)) return false;
             if (searchTerm && !item.itemDescription.toLowerCase().includes(searchTerm.toLowerCase()) && !item.poNumber.toLowerCase().includes(searchTerm.toLowerCase())) return false;
             return true;
