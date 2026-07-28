@@ -19,7 +19,8 @@ import {
     Ship,
     Calendar,
     ChevronLeft,
-    Check
+    Check,
+    AlertTriangle
 } from 'lucide-react';
 import './HazardousMaterialMapping.css';
 
@@ -269,6 +270,15 @@ export default function HazardousMaterialMapping() {
     const [bannerMessage, setBannerMessage] = useState<{ title: string; body: string; type: 'info' | 'error' } | null>(null);
     const [transferringMaterialId, setTransferringMaterialId] = useState<string | null>(null);
 
+    const validationTimerRef = useRef<any>(null);
+    const triggerValidationError = (msg: string) => {
+        if (validationTimerRef.current) clearTimeout(validationTimerRef.current);
+        setValidationError(msg);
+        validationTimerRef.current = setTimeout(() => {
+            setValidationError(null);
+        }, 3000);
+    };
+
     // Initial mode check and focus on crop
     useEffect(() => {
         // 1. Sync inventory when deck or vessel changes. Backed vessels
@@ -451,12 +461,12 @@ export default function HazardousMaterialMapping() {
 
     const handleAddMaterial = async () => {
         if (!tempPin) {
-            setValidationError("Please drop a pin on the deck plan first.");
+            triggerValidationError("Please drop a pin on the deck plan first.");
             return;
         }
 
         if (!formData.name || !formData.ihmPart || formData.hazMaterials.length === 0) {
-            setValidationError("Please fill in all required fields (Name, IHM Part, and Hazardous Materials).");
+            triggerValidationError("Please fill in all required fields (Name, IHM Part, and Hazardous Materials).");
             return;
         }
 
@@ -494,7 +504,7 @@ export default function HazardousMaterialMapping() {
                 resetFormAfterCreate();
             } catch (err) {
                 console.error('Failed to create material:', err);
-                setValidationError('Could not save the material. Please try again.');
+                triggerValidationError('Could not save the material. Please try again.');
             }
             return;
         }
@@ -789,15 +799,6 @@ export default function HazardousMaterialMapping() {
                                     </button>
                                 </div>
                                 <div className="detail-card-premium">
-                                    {validationError && (
-                                        <div className="form-validation-error-card" style={{ marginBottom: '16px' }}>
-                                            <span className="error-card-icon">⚠️</span>
-                                            <div className="error-card-content">
-                                                <p>{validationError}</p>
-                                            </div>
-                                            <button className="error-card-close" onClick={() => setValidationError(null)}>×</button>
-                                        </div>
-                                    )}
                                     <div className="detail-header-row">
                                         <div className="dh-left">
                                             <div className="dh-icon-box">
@@ -992,15 +993,6 @@ export default function HazardousMaterialMapping() {
                                 </div>
 
                                 <div className="form-content-v5">
-                                    {validationError && (
-                                        <div className="form-validation-error-card">
-                                            <span className="error-card-icon">⚠️</span>
-                                            <div className="error-card-content">
-                                                <p>{validationError}</p>
-                                            </div>
-                                            <button className="error-card-close" onClick={() => setValidationError(null)}>×</button>
-                                        </div>
-                                    )}
 
                                     {activeTool === 'pin' && !tempPin && (
                                         <div className="drop-pin-alert">
@@ -1304,63 +1296,7 @@ export default function HazardousMaterialMapping() {
                                         </div>
                                     </div>
 
-                                    {/* New File Upload Design */}
-                                    <div className="form-group-technical">
-                                        <label>Documents Attachment</label>
-                                        <div className="upload-box-v5" style={{ position: 'relative' }}>
-                                            <Upload size={20} color="#00B0FA" />
-                                            <p>Choose File or Drag-and-Drop</p>
-                                            <span className="file-hint">**PDF, PNG and JPEG allowed up to 10MB.</span>
-                                            <input
-                                                type="file"
-                                                multiple
-                                                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
-                                                onChange={(e) => {
-                                                    if (e.target.files) {
-                                                        const newFiles = Array.from(e.target.files).map(f => f.name);
-                                                        setFormData({ ...formData, files: [...formData.files, ...newFiles] });
-                                                    }
-                                                }}
-                                            />
-                                        </div>
 
-                                        {/* File List Logic */}
-                                        <div className="file-status-rail" style={{ marginTop: '10px' }}>
-                                            {formData.files.length === 1 ? (
-                                                <div className="neat-file-row">
-                                                    <FileText size={16} color="#00B0FA" />
-                                                    <span>{formData.files[0]}</span>
-                                                    <X size={18} className="remove-f" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, files: [] }); }} />
-                                                </div>
-                                            ) : formData.files.length > 1 ? (
-                                                <div className="multi-file-dropdown-hover"
-                                                    onMouseEnter={() => setOpenDropdown('files_hover')}
-                                                    onMouseLeave={() => setOpenDropdown(null)}>
-                                                    <div className="hover-trigger-box">
-                                                        <FileText size={16} color="#00B0FA" />
-                                                        <span>{formData.files.length} Documents Selected</span>
-                                                        <ChevronDown size={14} />
-                                                    </div>
-
-                                                    {openDropdown === 'files_hover' && (
-                                                        <div className="hover-dropdown-list">
-                                                            <div className="hover-list-content">
-                                                                {formData.files.map((f, i) => (
-                                                                    <div key={i} className="hover-file-item">
-                                                                        <div className="file-name-group">
-                                                                            <FileText size={16} color="#64748B" />
-                                                                            <span>{f}</span>
-                                                                        </div>
-                                                                        <X size={18} className="remove-f-mini" onClick={(e) => { e.stopPropagation(); setFormData({ ...formData, files: formData.files.filter((_, idx) => idx !== i) }); }} />
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    </div>
 
                                     {/* HM Status - Changed Gold to Blue */}
                                     <div className="hm-status-section" style={{ marginTop: '15px' }}>
@@ -1450,6 +1386,43 @@ export default function HazardousMaterialMapping() {
                         </div>
                         <button className="custom-banner-close" onClick={() => setBannerMessage(null)}>×</button>
                     </div>
+                </div>
+            )}
+            {validationError && (
+                <div style={{
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 999999,
+                    background: '#0F172A',
+                    color: '#FFFFFF',
+                    padding: '16px 24px',
+                    borderRadius: '12px',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    maxWidth: '460px',
+                    width: '90%'
+                }}>
+                    <AlertTriangle size={24} color="#F59E0B" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500, lineHeight: 1.4, flex: 1, color: '#F8FAFC' }}>{validationError}</span>
+                    <button
+                        onClick={() => setValidationError(null)}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#94A3B8',
+                            cursor: 'pointer',
+                            fontSize: '18px',
+                            lineHeight: 1,
+                            padding: '4px',
+                            borderRadius: '4px'
+                        }}
+                    >
+                        ✕
+                    </button>
                 </div>
             )}
         </div >
