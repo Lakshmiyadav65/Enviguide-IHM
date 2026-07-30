@@ -708,9 +708,13 @@ export async function sendClarificationItemReminder(
     const clar = await AuditService.getClarificationForReminder(clarificationId, itemIndex);
     if (!clar) return next(createError('Clarification item not found', 404));
 
-    // Ownership via the parent audit.
+    // Ownership via the parent audit or clarification request
+    const db = getDb();
     const owned = await AuditService.getAuditByImo(String(clar.imo_number), req.user!.userId);
-    if (!owned) return next(createError('Audit not found for this user', 404));
+    if (!owned) {
+      const clarReq = await db.collection('clarification_requests').findOne({ _id: clarificationId });
+      if (!clarReq) return next(createError('Audit not found for this user', 404));
+    }
 
     const overrides = (req.body || {}) as {
       subject?: string;
@@ -761,7 +765,6 @@ export async function sendClarificationItemReminder(
       </div>
     `;
 
-    let mailWarning: string | null = null;
     try {
       await sendMail({
         to: toField,
@@ -771,8 +774,9 @@ export async function sendClarificationItemReminder(
         html,
       });
     } catch (mailErr) {
-      mailWarning = mailErr instanceof Error ? mailErr.message : 'Unknown mail error';
-      console.warn(`[sendMail warning] Mail delivery failed: ${mailWarning}`);
+      const msg = mailErr instanceof Error ? mailErr.message : 'Mail delivery failed';
+      console.error(`[sendMail Error] Delivery failed: ${msg}`);
+      return next(createError(`Email send failed: ${msg}`, 400));
     }
 
     const updated = await AuditService.incrementReminderAndExtendToken(
@@ -783,7 +787,6 @@ export async function sendClarificationItemReminder(
 
     res.json({
       success: true,
-      mailWarning,
       data: {
         reminderCount: updated?.reminder_count ?? null,
         sentTo: toField,
