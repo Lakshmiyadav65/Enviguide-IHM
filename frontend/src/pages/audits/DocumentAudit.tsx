@@ -119,27 +119,25 @@ export default function DocumentAudit() {
     const [mailBody, setMailBody] = useState('');
     const [sendingMail, setSendingMail] = useState(false);
 
-    // Document preview modal state — clicking View on an MD or SDoC link
-    // opens the file inside an iframe with Download + Approve actions
-    // instead of triggering a browser download via Content-Disposition.
+    // Document preview modal state
     const [viewingDoc, setViewingDoc] = useState<{
         item: FlatItem;
         kind: 'md' | 'sdoc';
-        /** URL that previews inline in the iframe (proxy with C-D: inline). */
         url: string;
-        /** Raw bucket URL — used for the Download button so the browser
-         *  honours the original attachment disposition and saves the file. */
         rawUrl: string;
         fileName: string;
+        mimeType: string;
     } | null>(null);
     const [openingPreview, setOpeningPreview] = useState<string | null>(null);
 
-    /** Open the inline preview modal. Hits the backend's preview-url
-     *  endpoint to get a short-lived URL pointing at our own /preview-stream
-     *  proxy — the proxy re-emits the file with Content-Disposition: inline
-     *  so the iframe renders it instead of triggering a download. The
-     *  endpoint returns a path relative to the API base, so we prefix
-     *  API_CONFIG.BASE_URL before assigning it to the iframe src. */
+    const closeDocPreview = () => {
+        if (viewingDoc && viewingDoc.url && viewingDoc.url.startsWith('blob:')) {
+            URL.revokeObjectURL(viewingDoc.url);
+        }
+        setViewingDoc(null);
+    };
+
+    /** Open inline preview modal using JS Blob fetching to bypass browser attachment downloads. */
     const openDocPreview = async (item: FlatItem, kind: 'md' | 'sdoc') => {
         const rawUrl = kind === 'md' ? item.mdFilePath : item.sdocFilePath;
         const rawName = kind === 'md' ? item.mdFileName : item.sdocFileName;
@@ -147,26 +145,48 @@ export default function DocumentAudit() {
         const slot = `${item.key}-${kind}`;
         setOpeningPreview(slot);
         try {
-            const res = await api.get<{ success: boolean; data: { url: string; fileName: string } }>(
-                ENDPOINTS.AUDITS.CLARIFICATION_ITEM_DOC_PREVIEW(item.clarificationId, item.itemIndex, kind),
-            );
-            const previewPath = res.data?.url;
-            const absoluteUrl = previewPath
-                ? (previewPath.startsWith('http') ? previewPath : `${API_CONFIG.BASE_URL}${previewPath}`)
-                : rawUrl;
+            const absoluteUrl = rawUrl.startsWith('http')
+                ? rawUrl
+                : `${API_CONFIG.BASE_URL.replace('/api/v1', '')}${rawUrl}`;
+
+            const res = await fetch(absoluteUrl);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+
+            let mimeType = blob.type;
+            const lowerName = (rawName || rawUrl).toLowerCase();
+            if (!mimeType || mimeType === 'application/octet-stream') {
+                if (lowerName.endsWith('.pdf')) mimeType = 'application/pdf';
+                else if (lowerName.endsWith('.png')) mimeType = 'image/png';
+                else if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) mimeType = 'image/jpeg';
+                else if (lowerName.endsWith('.gif')) mimeType = 'image/gif';
+                else mimeType = 'application/pdf';
+            }
+
+            const safeBlob = new Blob([blob], { type: mimeType });
+            const blobUrl = URL.createObjectURL(safeBlob);
+
             setViewingDoc({
-                item, kind,
-                url: absoluteUrl,
-                rawUrl,
-                fileName: res.data?.fileName ?? rawName ?? 'document',
+                item,
+                kind,
+                url: blobUrl,
+                rawUrl: absoluteUrl,
+                fileName: rawName ?? 'document',
+                mimeType,
             });
         } catch (err) {
-            console.error('Preview URL fetch failed, falling back to raw URL:', err);
+            console.error('Blob preview fetch failed, using Google Docs Viewer fallback:', err);
+            const absoluteUrl = rawUrl.startsWith('http')
+                ? rawUrl
+                : `${API_CONFIG.BASE_URL.replace('/api/v1', '')}${rawUrl}`;
+            const googleDocsUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(absoluteUrl)}&embedded=true`;
             setViewingDoc({
-                item, kind,
-                url: rawUrl,
-                rawUrl,
+                item,
+                kind,
+                url: googleDocsUrl,
+                rawUrl: absoluteUrl,
                 fileName: rawName ?? 'document',
+                mimeType: 'application/pdf',
             });
         } finally {
             setOpeningPreview(null);
@@ -622,7 +642,7 @@ IHM Audit Team`,
                     have arrived for this item, mirroring the row-level
                     Accept rule). */}
                 {viewingDoc && (
-                    <div className="doc-modal-overlay" onClick={() => setViewingDoc(null)}>
+                    <div className="doc-modal-overlay" onClick={closeDocPreview}>
                         <div className="doc-modal-container" onClick={(e) => e.stopPropagation()}>
                             <div className="doc-modal-header">
                                 <div className="header-doc-info">
@@ -637,17 +657,31 @@ IHM Audit Team`,
                                         </p>
                                     </div>
                                 </div>
-                                <button className="close-modal-btn" onClick={() => setViewingDoc(null)}>
+                                <button className="close-modal-btn" onClick={closeDocPreview}>
                                     <X size={20} />
                                 </button>
                             </div>
 
-                            <div className="doc-modal-body" style={{ padding: 0, height: '70vh', overflow: 'hidden' }}>
-                                <iframe
-                                    src={viewingDoc.url}
-                                    title={viewingDoc.fileName}
-                                    style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
-                                />
+                            <div className="doc-modal-body" style={{ padding: 0, height: '75vh', overflow: 'hidden', background: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                {viewingDoc.mimeType.startsWith('image/') ? (
+                                    <img
+                                        src={viewingDoc.url}
+                                        alt={viewingDoc.fileName}
+                                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                                    />
+                                ) : (
+                                    <object
+                                        data={viewingDoc.url.startsWith('blob:') ? `${viewingDoc.url}#toolbar=1` : viewingDoc.url}
+                                        type="application/pdf"
+                                        style={{ width: '100%', height: '100%', border: 'none' }}
+                                    >
+                                        <iframe
+                                            src={viewingDoc.url.startsWith('blob:') ? viewingDoc.url : `https://docs.google.com/viewer?url=${encodeURIComponent(viewingDoc.rawUrl)}&embedded=true`}
+                                            title={viewingDoc.fileName}
+                                            style={{ width: '100%', height: '100%', border: 'none' }}
+                                        />
+                                    </object>
+                                )}
                             </div>
 
                             <div className="doc-modal-footer">
