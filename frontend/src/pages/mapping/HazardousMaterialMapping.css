@@ -135,48 +135,74 @@
 }
 
 .detail-form-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 16px;
     margin-bottom: 20px;
+    width: 100%;
 }
 
 .df-group {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    width: 100%;
 }
 
 .df-group.full {
-    grid-column: 1 / -1;
+    width: 100%;
     margin-bottom: 20px;
 }
 
 .df-group label {
     font-size: 11px;
     font-weight: 700;
-    color: #64748B;
+    letter-spacing: 0.05em;
+    color: #475569;
     text-transform: uppercase;
-    min-height: 28px;
-    display: flex;
-    align-items: flex-end;
+    display: block;
+    margin-bottom: 4px;
 }
 
 .df-input,
 .df-textarea {
-    border: 1px solid #E2E8F0;
-    border-radius: 6px;
-    padding: 8px 12px;
+    width: 100%;
+    box-sizing: border-box;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 10px 14px;
     font-size: 13px;
-    color: #334155;
-    background: #F8FAFC;
+    font-weight: 500;
+    color: #1E293B;
+    background: #FFFFFF;
+    transition: all 0.15s ease-in-out;
 }
 
 .df-input:focus,
 .df-textarea:focus {
     border-color: #2563EB;
-    background: white;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    background: #FFFFFF;
     outline: none;
+}
+
+.deck-selector-field {
+    width: 100%;
+    min-height: 42px;
+    border: 1.5px solid #CBD5E1 !important;
+    border-radius: 8px !important;
+    background: #FFFFFF !important;
+    padding: 8px 14px !important;
+    box-sizing: border-box !important;
+}
+
+.deck-selector-field span {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #1E293B !important;
 }
 
 .df-textarea {

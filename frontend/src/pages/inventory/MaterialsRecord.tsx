@@ -47,13 +47,14 @@ function backendToMaterial(m: Record<string, unknown>): Material {
         category,
         status: 'Mapped',
         completion: 100,
-        poNo: (m.shipPO as string) || '',
-        zone: (m.deckAreaName as string) || (m.deckName as string) || '',
-        materialName: (m.materialName as string) || '',
+        poNo: (m.shipPO as string) || 'PO-2026-0891',
+        zone: (m.deckAreaName as string) || (m.deckName as string) || (m.deckPlan as string) || (m.compartment as string) || 'Main Deck',
+        materialName: (m.materialName as string) || (m.name as string) || '',
         equipment: (m.equipment as string) || '',
         compartment: (m.compartment as string) || '',
-        hazardType: (m.hazardType as string) || '',
+        hazardType: (m.hazardType as string) || (m.material as string) || '',
         component: (m.component as string) || '',
+        hmStatus: (m.hmStatus as string) || 'CHM',
         // Extra fields used by the detail panel — kept on the object even
         // though they're not in the Material interface (it's permissive).
         ...(m.manufacturer ? { manufacturer: m.manufacturer } : {}),
@@ -122,6 +123,7 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
     const [selectedParts, setSelectedParts] = useState<string[]>([]);
     const [selectedZones, setSelectedZones] = useState<string[]>([]);
     const [selectedChemicalGroup, setSelectedChemicalGroup] = useState('All Chemical Groups');
+    const [hazardFilter, setHazardFilter] = useState<'ALL' | 'CHM' | 'PCHM' | 'Non-CHM'>('ALL');
     const [isEditing, setIsEditing] = useState(false);
     const [showToast, setShowToast] = useState(false);
 
@@ -185,15 +187,61 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
     // Backend-backed vessels show only what the API returned. Demo vessels
     // (no vesselId) fall back to the static mock list.
     const vesselSpecificMaterials = useMemo<Material[]>(() => {
-        if (vesselId) return backendMaterials;
-        const demoId = DEMO_VESSEL_ID_MAP[vesselName];
-        if (!demoId) return [];
-        return mockMaterials
-            .map((m) => ({
-                ...m,
-                vesselId: m.vesselId || (m.zone?.includes('Deck') ? '1' : '2'),
-            }))
-            .filter((m) => m.vesselId === demoId);
+        let base: Material[] = [];
+        if (vesselId) {
+            base = [...backendMaterials];
+        } else {
+            const demoId = DEMO_VESSEL_ID_MAP[vesselName];
+            if (demoId) {
+                base = mockMaterials
+                    .map((m) => ({
+                        ...m,
+                        vesselId: m.vesselId || (m.zone?.includes('Deck') ? '1' : '2'),
+                    }))
+                    .filter((m) => m.vesselId === demoId);
+            }
+        }
+
+        // Also merge local storage materials added from deck mapping
+        try {
+            const prefix = `inventory_${vesselName}_`;
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith(prefix)) {
+                    const stored = localStorage.getItem(k);
+                    if (stored) {
+                        const items = JSON.parse(stored) as any[];
+                        if (Array.isArray(items)) {
+                            for (const item of items) {
+                                const deckName = item.deckPlan || item.deckAreaName || k.replace(prefix, '') || 'Main Deck';
+                                const mappedMat: Material = {
+                                    id: item.id || `LOCAL-${Date.now()}`,
+                                    vesselId,
+                                    name: item.name || 'Mapped Material',
+                                    ihmPart: normalizeIhmPart(item.ihmPart),
+                                    category: item.hmStatus === 'CHM' ? 'hazard' : item.hmStatus === 'PCHM' ? 'warning' : 'safe',
+                                    status: 'Mapped',
+                                    completion: 100,
+                                    poNo: item.shipPO || 'PO-2026-0891',
+                                    zone: deckName,
+                                    materialName: item.material || item.name,
+                                    equipment: item.equipment || '-',
+                                    compartment: item.compartment || '-',
+                                    hazardType: (item.hazMaterials && item.hazMaterials[0]) || item.material || 'HazMat',
+                                    component: item.component || '-',
+                                    hmStatus: item.hmStatus || 'CHM',
+                                } as any;
+                                if (!base.some(existing => existing.id === mappedMat.id)) {
+                                    base.unshift(mappedMat);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch {}
+
+        return base;
     }, [vesselId, vesselName, backendMaterials]);
 
     const counts = useMemo(() => {
@@ -343,7 +391,16 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
             matchesThreshold = m.thresholdValue >= thresholdMin && m.thresholdValue <= thresholdMax;
         }
 
-        return matchesSearch && matchesTag && matchesPartFilter && matchesZone && matchesThreshold;
+        let matchesHazard = true;
+        if (hazardFilter !== 'ALL') {
+            const status = ((m as any).hmStatus || '').toUpperCase();
+            const cat = (m.category || '').toLowerCase();
+            if (hazardFilter === 'CHM') matchesHazard = status === 'CHM' || cat === 'hazard';
+            else if (hazardFilter === 'PCHM') matchesHazard = status === 'PCHM' || cat === 'warning';
+            else if (hazardFilter === 'Non-CHM') matchesHazard = status === 'NON-CHM' || cat === 'safe';
+        }
+
+        return matchesSearch && matchesTag && matchesPartFilter && matchesZone && matchesThreshold && matchesHazard;
     });
 
     const displayedMaterials = filteredMaterials.slice(0, visibleCount);
@@ -433,22 +490,91 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
                 )
             }
 
-            {/* Category Pills Row (Static Selection) */}
-            <div className="category-tabs-row">
-                {[
-                    { label: 'All Materials', count: counts.all, key: 'All' },
-                    { label: 'Part I', count: counts.part1, key: 'Part I' },
-                    { label: 'Part II', count: counts.part2, key: 'Part II' },
-                    { label: 'Part III', count: counts.part3, key: 'Part III' }
-                ].map(tab => (
-                    <div
-                        key={tab.key}
-                        className={`category-tab ${activeTag === tab.key ? 'active' : ''}`}
-                        onClick={() => setActiveTag(tab.key)}
+            {/* Category Pills & Hazard Filter Row */}
+            <div className="category-tabs-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {[
+                        { label: 'All Materials', count: counts.all, key: 'All' },
+                        { label: 'Part I', count: counts.part1, key: 'Part I' },
+                        { label: 'Part II', count: counts.part2, key: 'Part II' },
+                        { label: 'Part III', count: counts.part3, key: 'Part III' }
+                    ].map(tab => (
+                        <div
+                            key={tab.key}
+                            className={`category-tab ${activeTag === tab.key ? 'active' : ''}`}
+                            onClick={() => setActiveTag(tab.key)}
+                        >
+                            {tab.label} ({tab.count})
+                        </div>
+                    ))}
+                </div>
+
+                <div className="hazard-filter-pills" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <button
+                        onClick={() => setHazardFilter('ALL')}
+                        style={{
+                            padding: '5px 12px',
+                            borderRadius: '16px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            border: hazardFilter === 'ALL' ? '2px solid #0284C7' : '1px solid #E2E8F0',
+                            background: hazardFilter === 'ALL' ? '#E0F2FE' : '#FFFFFF',
+                            color: hazardFilter === 'ALL' ? '#0369A1' : '#64748B',
+                            transition: 'all 0.15s ease'
+                        }}
                     >
-                        {tab.label} ({tab.count})
-                    </div>
-                ))}
+                        All Hazards
+                    </button>
+                    <button
+                        onClick={() => setHazardFilter('CHM')}
+                        style={{
+                            padding: '5px 12px',
+                            borderRadius: '16px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: hazardFilter === 'CHM' ? '2px solid #EF4444' : '1px solid #FECACA',
+                            background: hazardFilter === 'CHM' ? '#FEF2F2' : '#FFFFFF',
+                            color: '#DC2626',
+                            transition: 'all 0.15s ease'
+                        }}
+                    >
+                        🔴 CHM
+                    </button>
+                    <button
+                        onClick={() => setHazardFilter('PCHM')}
+                        style={{
+                            padding: '5px 12px',
+                            borderRadius: '16px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: hazardFilter === 'PCHM' ? '2px solid #F59E0B' : '1px solid #FDE68A',
+                            background: hazardFilter === 'PCHM' ? '#FFFBEB' : '#FFFFFF',
+                            color: '#D97706',
+                            transition: 'all 0.15s ease'
+                        }}
+                    >
+                        🟠 PCHM
+                    </button>
+                    <button
+                        onClick={() => setHazardFilter('Non-CHM')}
+                        style={{
+                            padding: '5px 12px',
+                            borderRadius: '16px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: hazardFilter === 'Non-CHM' ? '2px solid #10B981' : '1px solid #A7F3D0',
+                            background: hazardFilter === 'Non-CHM' ? '#ECFDF5' : '#FFFFFF',
+                            color: '#059669',
+                            transition: 'all 0.15s ease'
+                        }}
+                    >
+                        🟢 Non-CHM
+                    </button>
+                </div>
             </div>
 
             <div className={`materials-list-container ${selectedMaterialId ? '' : ''}`}>

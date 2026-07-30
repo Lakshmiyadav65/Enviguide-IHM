@@ -571,13 +571,44 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
     }, []);
 
     // Resolve the materials for a deck row. Merges backend-fetched materials
-    // with local storage items to ensure all mapped materials display reliably.
+    // with local storage items across all matching deck keys to ensure all mapped materials display reliably.
     const materialsForDeck = (deck: MappedSection): DeckMaterial[] => {
         const backendList = (vesselId && materialsByDeck[deck.id]) ? materialsByDeck[deck.id] : [];
         let localList: DeckMaterial[] = [];
+
         try {
-            const stored = localStorage.getItem(`inventory_${vesselName}_${deck.title}`);
-            if (stored) localList = JSON.parse(stored) as DeckMaterial[];
+            const keysToTry = [
+                `inventory_${vesselName}_${deck.title}`,
+                `inventory_${vesselName}_${deck.sectionId}`,
+                `inventory_${vesselName}_${deck.id}`,
+            ];
+
+            for (const k of keysToTry) {
+                const stored = localStorage.getItem(k);
+                if (stored) {
+                    const parsed = JSON.parse(stored) as DeckMaterial[];
+                    if (Array.isArray(parsed)) localList.push(...parsed);
+                }
+            }
+
+            // Also check all inventory keys in localStorage matching vesselName
+            const prefix = `inventory_${vesselName}_`;
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith(prefix) && !keysToTry.includes(k)) {
+                    const stored = localStorage.getItem(k);
+                    if (stored) {
+                        const items = JSON.parse(stored) as any[];
+                        if (Array.isArray(items)) {
+                            const matching = items.filter((m) => {
+                                const p = (m.deckPlan || m.deckAreaName || m.compartment || '').toLowerCase();
+                                return p.includes(deck.title.toLowerCase()) || p.includes(deck.sectionId.toLowerCase());
+                            });
+                            localList.push(...matching);
+                        }
+                    }
+                }
+            }
         } catch {}
 
         const map = new Map<string, DeckMaterial>();
