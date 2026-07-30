@@ -371,13 +371,12 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
     // re-sends the email via the existing public link and increments
     // reminder_count on the item.
     const handleOpenReminder = (item: PurchaseOrderItem) => {
-        if (!item.clarificationId || item.itemIndex === undefined) return;
         const nextReminder = (item.reminderCount ?? 0) + 1;
         setReminderItem(item);
         setSelectedMail({
             to: item.vendorEmail || '',
-            subject: `Reminder ${nextReminder}: Documentation required for PO ${item.poNumber}`,
-            body: `Dear ${item.vendorName || 'Supplier'},\n\nThis is reminder ${nextReminder} regarding the MDs/SDoCs we need for ${item.itemDescription || 'the item below'} under PO ${item.poNumber}.\n\nPlease use the secure upload link from the original email to submit the required documents at your earliest convenience.\n\nBest regards,\nIHM Platform Team`,
+            subject: `Clarification Request (Reminder ${nextReminder}): MD & SDoC required for PO ${item.poNumber || 'Order'}`,
+            body: `Dear ${item.vendorName || 'Supplier'},\n\nWe require MD (Material Declaration) and SDoC (Supplier's Declaration of Conformity) documentation for the following item under PO ${item.poNumber || 'N/A'}:\n\n- Description: ${item.itemDescription || 'Material'}\n- Quantity: ${item.quantityTotal || '1'} ${item.unit || 'PCS'}\n\nPlease submit the required documents at your earliest convenience.\n\nBest regards,\nIHM Platform Team`,
         });
         setShowMailView(true);
     };
@@ -388,12 +387,18 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
             return;
         }
 
+        if (!selectedMail.to || !selectedMail.to.includes('@')) {
+            setToastMessage({
+                title: 'Invalid Email Address',
+                body: 'Please enter a valid supplier email address before sending.',
+            });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+            return;
+        }
+
         // ── Single-row reminder (per-row mail icon) ────────────────
-        if (reminderItem) {
-            if (!reminderItem.clarificationId || reminderItem.itemIndex === undefined) {
-                setShowMailView(false);
-                return;
-            }
+        if (reminderItem && reminderItem.clarificationId && reminderItem.itemIndex !== undefined) {
             setSendingReminder(true);
             try {
                 await api.post(
@@ -408,8 +413,8 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                     },
                 );
                 setToastMessage({
-                    title: 'Reminder Sent',
-                    body: `Reminder email delivered to ${selectedMail.to || 'the supplier'}.`,
+                    title: 'Email Sent Successfully',
+                    body: `Clarification request delivered to ${selectedMail.to}.`,
                 });
                 setShowMailView(false);
                 setReminderItem(null);
@@ -418,16 +423,60 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                 setTimeout(() => setShowToast(false), 3000);
             } catch (err) {
                 console.error('Reminder send failed:', err);
-                setToastMessage({
-                    title: 'Reminder Failed',
-                    body: err instanceof Error ? err.message : 'Could not send reminder. Please try again.',
-                });
-                setShowToast(true);
-                setTimeout(() => setShowToast(false), 4000);
+                try {
+                    await api.post('/emails/send', {
+                        to: selectedMail.to,
+                        subject: selectedMail.subject,
+                        body: selectedMail.body
+                    });
+                    setToastMessage({
+                        title: 'Email Sent Successfully',
+                        body: `Email delivered to ${selectedMail.to}.`,
+                    });
+                    setShowMailView(false);
+                    setReminderItem(null);
+                    setShowToast(true);
+                    setTimeout(() => setShowToast(false), 3000);
+                } catch {
+                    setToastMessage({
+                        title: 'Sending Failed',
+                        body: err instanceof Error ? err.message : 'Could not send email to supplier.',
+                    });
+                    setShowToast(true);
+                    setTimeout(() => setShowToast(false), 4000);
+                }
             } finally {
                 setSendingReminder(false);
             }
             return;
+        }
+
+        // ── Direct Email fallback if no clarification batch ID ──────
+        setSendingReminder(true);
+        try {
+            await api.post('/emails/send', {
+                to: selectedMail.to,
+                subject: selectedMail.subject,
+                body: selectedMail.body
+            });
+            setToastMessage({
+                title: 'Email Request Sent',
+                body: `Clarification request email sent to ${selectedMail.to}.`,
+            });
+            setShowMailView(false);
+            setReminderItem(null);
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 3000);
+        } catch (err) {
+            console.error('Direct email failed:', err);
+            setToastMessage({
+                title: 'Email Failed',
+                body: err instanceof Error ? err.message : 'Could not send email to supplier. Please check recipient address.',
+            });
+            setShowToast(true);
+            setTimeout(() => setShowToast(false), 4000);
+        } finally {
+            setSendingReminder(false);
         }
 
         // ── Bulk reminder (toolbar mail icon, multiple rows) ───────
@@ -668,13 +717,11 @@ export default function PurchaseOrderView({ imo, vesselId, vesselName }: Purchas
                                                                                 <button
                                                                                     type="button"
                                                                                     className="po-v4-action-icon-btn-v4 view"
-                                                                                    title={item.reminderCount && item.reminderCount > 0
-                                                                                        ? `Send reminder ${(item.reminderCount ?? 0) + 1}`
-                                                                                        : 'Send reminder'}
+                                                                                    title="Send clarification email to supplier"
                                                                                     onClick={() => handleOpenReminder(item)}
-                                                                                    disabled={!item.clarificationId || item.mdsStatus === 'received'}
+                                                                                    disabled={item.mdsStatus === 'received'}
                                                                                     style={{
-                                                                                        visibility: item.isSuspected && item.clarificationId ? 'visible' : 'hidden',
+                                                                                        visibility: 'visible',
                                                                                         opacity: item.mdsStatus === 'received' ? 0.4 : 1,
                                                                                         cursor: item.mdsStatus === 'received' ? 'not-allowed' : 'pointer',
                                                                                     }}

@@ -166,7 +166,7 @@ export default function HazardousMaterialMapping() {
     const vesselId = query.get('vesselId') || '';
     const deckAreaId = query.get('deckAreaId') || query.get('deckId') || '';
 
-
+    const [effectiveVesselId, setEffectiveVesselId] = useState<string>(vesselId);
 
     const [zoom, setZoom] = useState(100);
     const [viewMode, setViewMode] = useState<'list' | 'add' | 'detail'>('list');
@@ -183,6 +183,20 @@ export default function HazardousMaterialMapping() {
     const [availableDecks, setAvailableDecks] = useState<any[]>([]);
     const [deckSelectorOpen, setDeckSelectorOpen] = useState(false);
     const [targetDeckForTransfer, setTargetDeckForTransfer] = useState<string | null>(null); // New state for pending transfer
+
+    useEffect(() => {
+        if (!effectiveVesselId && vesselName) {
+            api.get<{ success: boolean; data: any[] }>(ENDPOINTS.VESSELS.LIST)
+                .then(res => {
+                    const list = res.data || [];
+                    const found = list.find((v: any) => v.name?.toLowerCase() === vesselName.toLowerCase());
+                    if (found && (found.id || found.vesselId)) {
+                        setEffectiveVesselId(String(found.id || found.vesselId));
+                    }
+                })
+                .catch(() => {});
+        }
+    }, [vesselName, effectiveVesselId]);
 
     useEffect(() => {
         const sections = localStorage.getItem(`vessel_sections_${vesselName}`);
