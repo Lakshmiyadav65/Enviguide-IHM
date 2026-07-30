@@ -366,16 +366,15 @@ export default function HazardousMaterialMapping() {
         };
     }, [rect.w, rect.h, query, vesselName, sectionName, vesselId, deckAreaId]);
 
-    // Save to localStorage whenever inventory changes — only for non-backed
-    // (demo) vessels. Backed vessels persist via the API on each create.
+    // Save to localStorage whenever inventory changes — both for backed and
+    // non-backed vessels so the deck material log view always stays synced.
     useEffect(() => {
-        if (vesselId) return;
         const key = `inventory_${vesselName}_${sectionName}`;
-        if (lastLoadedKeyRef.current === key && inventory.length > 0) {
+        if (inventory.length > 0) {
             localStorage.setItem(key, JSON.stringify(inventory));
             window.dispatchEvent(new Event('storage'));
         }
-    }, [inventory, sectionName, vesselName, vesselId]);
+    }, [inventory, sectionName, vesselName]);
 
     const handleCanvasClick = (e: React.MouseEvent) => {
         if (isReadOnly) return;
@@ -1313,57 +1312,81 @@ export default function HazardousMaterialMapping() {
                                         <label style={{ fontSize: '12px', fontWeight: '700', color: '#1E293B', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
                                             HAZARD LEVEL & STATUS *
                                         </label>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', width: '100%', boxSizing: 'border-box' }}>
                                             {/* CHM - High Risk (Red) */}
-                                            <div
+                                            <button
+                                                type="button"
                                                 onClick={() => setFormData({ ...formData, hmStatus: 'CHM' })}
                                                 style={{
-                                                    border: formData.hmStatus === 'CHM' ? '2px solid #EF4444' : '1px solid #E2E8F0',
-                                                    background: formData.hmStatus === 'CHM' ? '#FEF2F2' : '#F8FAFC',
-                                                    padding: '10px 6px',
+                                                    boxSizing: 'border-box',
+                                                    height: '58px',
+                                                    border: formData.hmStatus === 'CHM' ? '2px solid #EF4444' : '2px solid #E2E8F0',
+                                                    background: formData.hmStatus === 'CHM' ? '#FEF2F2' : '#FFFFFF',
                                                     borderRadius: '8px',
                                                     cursor: 'pointer',
-                                                    textAlign: 'center',
-                                                    transition: 'all 0.2s ease'
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '4px',
+                                                    boxShadow: formData.hmStatus === 'CHM' ? '0 0 0 3px rgba(239, 68, 68, 0.2)' : 'none',
+                                                    transition: 'all 0.15s ease-in-out',
+                                                    outline: 'none'
                                                 }}
                                             >
-                                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626' }}>🔴 CHM</div>
-                                                <div style={{ fontSize: '10px', color: '#991B1B', marginTop: '2px', fontWeight: '600' }}>Contains HM</div>
-                                            </div>
+                                                <span style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626', lineHeight: '1.2' }}>🔴 CHM</span>
+                                                <span style={{ fontSize: '10px', color: '#991B1B', marginTop: '2px', fontWeight: '600', lineHeight: '1.1' }}>Contains HM</span>
+                                            </button>
 
                                             {/* PCHM - Potential Risk (Amber/Orange) */}
-                                            <div
+                                            <button
+                                                type="button"
                                                 onClick={() => setFormData({ ...formData, hmStatus: 'PCHM' })}
                                                 style={{
-                                                    border: formData.hmStatus === 'PCHM' ? '2px solid #F59E0B' : '1px solid #E2E8F0',
-                                                    background: formData.hmStatus === 'PCHM' ? '#FFFBEB' : '#F8FAFC',
-                                                    padding: '10px 6px',
+                                                    boxSizing: 'border-box',
+                                                    height: '58px',
+                                                    border: formData.hmStatus === 'PCHM' ? '2px solid #F59E0B' : '2px solid #E2E8F0',
+                                                    background: formData.hmStatus === 'PCHM' ? '#FFFBEB' : '#FFFFFF',
                                                     borderRadius: '8px',
                                                     cursor: 'pointer',
-                                                    textAlign: 'center',
-                                                    transition: 'all 0.2s ease'
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '4px',
+                                                    boxShadow: formData.hmStatus === 'PCHM' ? '0 0 0 3px rgba(245, 158, 11, 0.2)' : 'none',
+                                                    transition: 'all 0.15s ease-in-out',
+                                                    outline: 'none'
                                                 }}
                                             >
-                                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#D97706' }}>🟠 PCHM</div>
-                                                <div style={{ fontSize: '10px', color: '#92400E', marginTop: '2px', fontWeight: '600' }}>Potential HM</div>
-                                            </div>
+                                                <span style={{ fontSize: '13px', fontWeight: '700', color: '#D97706', lineHeight: '1.2' }}>🟠 PCHM</span>
+                                                <span style={{ fontSize: '10px', color: '#92400E', marginTop: '2px', fontWeight: '600', lineHeight: '1.1' }}>Potential HM</span>
+                                            </button>
 
                                             {/* Non-CHM - Safe / Below Threshold (Green) */}
-                                            <div
+                                            <button
+                                                type="button"
                                                 onClick={() => setFormData({ ...formData, hmStatus: 'Non-CHM' })}
                                                 style={{
-                                                    border: formData.hmStatus === 'Non-CHM' ? '2px solid #10B981' : '1px solid #E2E8F0',
-                                                    background: formData.hmStatus === 'Non-CHM' ? '#ECFDF5' : '#F8FAFC',
-                                                    padding: '10px 6px',
+                                                    boxSizing: 'border-box',
+                                                    height: '58px',
+                                                    border: formData.hmStatus === 'Non-CHM' ? '2px solid #10B981' : '2px solid #E2E8F0',
+                                                    background: formData.hmStatus === 'Non-CHM' ? '#ECFDF5' : '#FFFFFF',
                                                     borderRadius: '8px',
                                                     cursor: 'pointer',
-                                                    textAlign: 'center',
-                                                    transition: 'all 0.2s ease'
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    padding: '4px',
+                                                    boxShadow: formData.hmStatus === 'Non-CHM' ? '0 0 0 3px rgba(16, 185, 129, 0.2)' : 'none',
+                                                    transition: 'all 0.15s ease-in-out',
+                                                    outline: 'none'
                                                 }}
                                             >
-                                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#059669' }}>🟢 Non-CHM</div>
-                                                <div style={{ fontSize: '10px', color: '#065F46', marginTop: '2px', fontWeight: '600' }}>Below Threshold</div>
-                                            </div>
+                                                <span style={{ fontSize: '13px', fontWeight: '700', color: '#059669', lineHeight: '1.2' }}>🟢 Non-CHM</span>
+                                                <span style={{ fontSize: '10px', color: '#065F46', marginTop: '2px', fontWeight: '600', lineHeight: '1.1' }}>Below Threshold</span>
+                                            </button>
                                         </div>
                                     </div>
 

@@ -563,18 +563,31 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
         };
     }, [vesselId, mappedSections, loadDeckMaterialsFromBackend]);
 
-    // Resolve the materials for a deck row. Backed vessels read from
-    // materialsByDeck (populated by the backend fetch above); demo
-    // vessels still read from the legacy localStorage key so they
-    // continue to work without a server.
+    // Listen to storage events to auto-refresh deck materials in real time
+    useEffect(() => {
+        const onStorage = () => setMaterialsByDeck((prev) => ({ ...prev }));
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, []);
+
+    // Resolve the materials for a deck row. Merges backend-fetched materials
+    // with local storage items to ensure all mapped materials display reliably.
     const materialsForDeck = (deck: MappedSection): DeckMaterial[] => {
-        if (vesselId) return materialsByDeck[deck.id] ?? [];
+        const backendList = (vesselId && materialsByDeck[deck.id]) ? materialsByDeck[deck.id] : [];
+        let localList: DeckMaterial[] = [];
         try {
             const stored = localStorage.getItem(`inventory_${vesselName}_${deck.title}`);
-            return stored ? (JSON.parse(stored) as DeckMaterial[]) : [];
-        } catch {
-            return [];
+            if (stored) localList = JSON.parse(stored) as DeckMaterial[];
+        } catch {}
+
+        const map = new Map<string, DeckMaterial>();
+        for (const item of [...localList, ...backendList]) {
+            const key = item.id || `${item.name}_${item.ihmPart || ''}_${item.material || ''}`;
+            if (!map.has(key) || backendList.includes(item)) {
+                map.set(key, item);
+            }
         }
+        return Array.from(map.values());
     };
 
     // Mapped item count helper. Used by the deck row header. Returns
