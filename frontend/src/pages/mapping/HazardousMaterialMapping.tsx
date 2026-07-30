@@ -156,7 +156,7 @@ export default function HazardousMaterialMapping() {
         const cleanPath = fileUrl.startsWith('/') ? fileUrl : `/${fileUrl}`;
         fileUrl = `${API_CONFIG.BASE_URL.replace(/\/+$/, '')}${cleanPath}`;
     }
-    const sectionName = query.get('name') || 'A-DECK 01';
+    const sectionName = (query.get('name') || query.get('deckTitle') || query.get('deckName') || 'A-DECK 01').trim();
     const rect = {
         x: parseFloat(query.get('x') || '0'),
         y: parseFloat(query.get('y') || '0'),
@@ -164,7 +164,7 @@ export default function HazardousMaterialMapping() {
         h: parseFloat(query.get('h') || '700')
     };
     const vesselId = query.get('vesselId') || '';
-    const deckAreaId = query.get('deckAreaId') || '';
+    const deckAreaId = query.get('deckAreaId') || query.get('deckId') || '';
 
 
 

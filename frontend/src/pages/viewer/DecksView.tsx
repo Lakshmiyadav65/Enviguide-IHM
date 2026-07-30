@@ -898,10 +898,14 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
     }
 
     const openMapping = (deck: any, action?: string, materialId?: string) => {
+        const title = deck.title || deck.name || 'Deck Area';
+        const deckId = deck.id || '';
         const params: Record<string, string> = {
             vessel: vesselName,
-            deckId: deck.id,
-            deckTitle: deck.title,
+            name: title,
+            deckTitle: title,
+            deckId: deckId,
+            deckAreaId: deckId,
             url: activePlan?.url || '',
             planUrl: activePlan?.url || '',
             vesselId: vesselId || ''
