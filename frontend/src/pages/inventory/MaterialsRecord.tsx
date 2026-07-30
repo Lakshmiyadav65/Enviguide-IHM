@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
-    Search, Plus, ChevronRight, ChevronLeft, ChevronDown, AlertCircle,
+    Search, ChevronRight, ChevronDown, AlertCircle,
     Database, Package, X, CheckCircle, MoreVertical
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -131,19 +131,6 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
     const [editName, setEditName] = useState('');
     const [editPO, setEditPO] = useState('PO-12345');
     const [editRisk] = useState('High Risk');
-    const [isEmptyCategoryDropdownOpen, setIsEmptyCategoryDropdownOpen] = useState(false);
-    const [emptyStateCategory, setEmptyStateCategory] = useState('Select Material Category');
-    const emptyCategoryRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (emptyCategoryRef.current && !emptyCategoryRef.current.contains(event.target as Node)) {
-                setIsEmptyCategoryDropdownOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
 
     // Sync Horizontal Scroll
     useEffect(() => {
@@ -264,91 +251,17 @@ export default function MaterialsRecord({ vesselName, vesselId }: MaterialsRecor
         );
     }
 
-    if (!hasAnyMaterials) {
+    if (!hasAnyMaterials || vesselSpecificMaterials.length === 0) {
         return (
-            <div className="empty-state-card-full">
-                {/* Header Section */}
-                <div className="empty-state-header">
-                    <div className="header-left">
-                        <div className="cloud-icon-wrapper">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M17.5 19C19.9853 19 22 16.9853 22 14.5C22 12.132 20.177 10.244 17.819 10.037C17.469 6.355 14.391 3.5 10.5 3.5C6.981 3.5 4.095 5.922 3.239 9.323C1.291 9.927 0 11.97 0 14C0 16.761 2.239 19 5 19H17.5Z" stroke="#00B0FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M12 11V15M12 11L14 13M12 11L10 13" stroke="#00B0FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M10 15H14" stroke="#00B0FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                        </div>
-                        <span className="header-title">Add Material Record</span>
+            <div className="empty-state-card-full" style={{ padding: '60px 20px', textAlign: 'center', background: '#FFFFFF', borderRadius: '12px', border: '1px solid #E2E8F0', margin: '20px 0' }}>
+                <div className="empty-state-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="empty-icon-large" style={{ background: '#F1F5F9', padding: '16px', borderRadius: '50%', marginBottom: '16px', color: '#64748B' }}>
+                        <Package size={44} strokeWidth={1.5} />
                     </div>
-
-                    <div className="header-right-actions">
-                        <div className="file-drop-area-small">
-                            <span className="drop-text">Choose file or drag and drop...</span>
-                        </div>
-
-                        <div className="custom-select-wrapper" style={{ position: 'relative' }} ref={emptyCategoryRef}>
-                            <div
-                                className={`category-select-wrapper ${isEmptyCategoryDropdownOpen ? 'active' : ''}`}
-                                onClick={() => setIsEmptyCategoryDropdownOpen(!isEmptyCategoryDropdownOpen)}
-                            >
-                                <span>{emptyStateCategory}</span>
-                            </div>
-                            {isEmptyCategoryDropdownOpen && (
-                                <div className="custom-dropdown-menu" style={{ top: 'calc(100% + 4px)', minWidth: '220px' }}>
-                                    {['Structure/Equipment', 'Operationally Generated', 'Stores', 'Non-Hazardous'].map(option => (
-                                        <div
-                                            key={option}
-                                            className={`custom-dropdown-item ${emptyStateCategory === option ? 'active' : ''}`}
-                                            onClick={() => {
-                                                setEmptyStateCategory(option);
-                                                setIsEmptyCategoryDropdownOpen(false);
-                                            }}
-                                        >
-                                            {option}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        <button className="add-material-btn-small">
-                            <div className="upload-icon-small">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                                    <path d="M12 19V5M12 5L5 12M12 5L19 12" />
-                                </svg>
-                            </div>
-                            Add Material
-                        </button>
-                    </div>
-                </div>
-
-                {/* Main Empty Content */}
-                <div className="empty-state-body">
-                    <div className="empty-icon-large">
-                        <Package size={48} strokeWidth={1} />
-                    </div>
-                    <h2>No Material Records Found</h2>
-                    <p>
-                        Start building your inventory by uploading your first<br />
-                        material record. All entries will be displayed here once<br />
-                        added.
+                    <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#0F172A', margin: '0 0 8px 0' }}>No Material Record Found</h2>
+                    <p style={{ fontSize: '14px', color: '#64748B', margin: 0, maxWidth: '400px' }}>
+                        No material records are available for this vessel.
                     </p>
-                    <div className="empty-actions-center">
-                        <button className="btn-create-large">
-                            <Plus size={18} strokeWidth={3} /> Create First Record
-                        </button>
-                        <button className="btn-import-large">
-                            Import CSV
-                        </button>
-                    </div>
-                </div>
-
-                {/* Footer */}
-                <div className="empty-state-footer">
-                    <span className="footer-text">SHOWING 0 OF 0 RECORDS</span>
-                    <div className="footer-pagination">
-                        <button className="page-arrow disabled"><ChevronLeft size={14} /></button>
-                        <button className="page-arrow disabled"><ChevronRight size={14} /></button>
-                    </div>
                 </div>
             </div>
         );

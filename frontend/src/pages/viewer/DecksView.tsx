@@ -1252,22 +1252,53 @@ export default function DecksView({ vesselName, vesselId }: { vesselName: string
                                                                             onClick={() => openMapping(deck, undefined, item.id)}
                                                                             onMouseEnter={() => setHoveredMaterial({ id: item.id, pin: item.pin, deckId: deck.id })}
                                                                             onMouseLeave={() => setHoveredMaterial(null)}
+                                                                            style={{ cursor: 'pointer', position: 'relative' }}
                                                                         >
-                                                                            <div className="mat-card-header">
-                                                                                <div className="mat-dot-indicator"></div>
-                                                                                <h5>{item.name}</h5>
+                                                                            <div className="mat-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                                    <div className="mat-dot-indicator" style={{
+                                                                                        background: (item.hmStatus || '').toUpperCase() === 'CHM' ? '#DC2626' : (item.hmStatus || '').toUpperCase() === 'PCHM' ? '#D97706' : '#059669'
+                                                                                    }} />
+                                                                                    <h5 style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#0F172A' }}>{item.name}</h5>
+                                                                                </div>
+                                                                                <span style={{
+                                                                                    fontSize: '10px',
+                                                                                    fontWeight: 'bold',
+                                                                                    padding: '2px 8px',
+                                                                                    borderRadius: '12px',
+                                                                                    background: (item.hmStatus || '').toUpperCase() === 'CHM' ? '#FEF2F2' : (item.hmStatus || '').toUpperCase() === 'PCHM' ? '#FFFBEB' : '#ECFDF5',
+                                                                                    color: (item.hmStatus || '').toUpperCase() === 'CHM' ? '#DC2626' : (item.hmStatus || '').toUpperCase() === 'PCHM' ? '#D97706' : '#059669',
+                                                                                    border: `1px solid ${(item.hmStatus || '').toUpperCase() === 'CHM' ? '#FECACA' : (item.hmStatus || '').toUpperCase() === 'PCHM' ? '#FDE68A' : '#A7F3D0'}`
+                                                                                }}>
+                                                                                    {(item.hmStatus || 'CHM').toUpperCase()}
+                                                                                </span>
                                                                             </div>
-                                                                            <p className="mat-card-desc">{item.description || 'Material contained in ship structure or equipment.'}</p>
 
-                                                                            <div className="mat-card-meta">
-                                                                                <div className="meta-row">
-                                                                                    <span className="meta-label">Location:</span>
-                                                                                    <span className="meta-val">{item.compartment || 'Ship Structure'}</span>
+                                                                            <p className="mat-card-desc" style={{ fontSize: '12px', color: '#64748B', margin: '6px 0 10px 0' }}>
+                                                                                {item.description || item.material || (item.hazMaterials && item.hazMaterials[0]) || 'Mapped onboard material.'}
+                                                                            </p>
+
+                                                                            <div className="mat-card-meta" style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px' }}>
+                                                                                <div className="meta-row" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                                    <span className="meta-label" style={{ color: '#64748B', fontWeight: '500' }}>Compartment / Loc:</span>
+                                                                                    <span className="meta-val" style={{ color: '#1E293B', fontWeight: '600' }}>{item.compartment || item.position || 'Deck Area'}</span>
                                                                                 </div>
-                                                                                <div className="meta-row">
-                                                                                    <span className="meta-label">Classification:</span>
-                                                                                    <span className="meta-val">{item.ihmPart} Hazardous Materials</span>
+                                                                                <div className="meta-row" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                                    <span className="meta-label" style={{ color: '#64748B', fontWeight: '500' }}>IHM Part:</span>
+                                                                                    <span className="meta-val" style={{ color: '#1E293B', fontWeight: '600' }}>{item.ihmPart || 'Part I'}</span>
                                                                                 </div>
+                                                                                {item.shipPO && (
+                                                                                    <div className="meta-row" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                                        <span className="meta-label" style={{ color: '#64748B', fontWeight: '500' }}>PO Number:</span>
+                                                                                        <span className="meta-val" style={{ color: '#0284C7', fontWeight: '600' }}>{item.shipPO}</span>
+                                                                                    </div>
+                                                                                )}
+                                                                                {item.quantity && (
+                                                                                    <div className="meta-row" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                                        <span className="meta-label" style={{ color: '#64748B', fontWeight: '500' }}>Quantity:</span>
+                                                                                        <span className="meta-val" style={{ color: '#1E293B', fontWeight: '600' }}>{item.quantity} {item.unit || 'kg'} {item.noOfPieces ? `(${item.noOfPieces} PCS)` : ''}</span>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                         </div>
                                                                     ))}
