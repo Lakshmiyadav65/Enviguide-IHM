@@ -221,6 +221,28 @@ export default function SupplierUpload() {
         0,
     );
 
+    if (formSubmitted || data.submittedAt) {
+        return (
+            <Center>
+                <div style={{ background: '#FFFFFF', padding: 40, borderRadius: 16, maxWidth: 520, textAlign: 'center', border: '1px solid #E2E8F0', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.05)' }}>
+                    <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+                        <CheckCircle2 size={36} color="#16A34A" />
+                    </div>
+                    <h2 style={{ margin: '0 0 8px', color: '#0F172A', fontSize: 22, fontWeight: 700 }}>Thank You for Uploading!</h2>
+                    <p style={{ color: '#475569', fontSize: 14, lineHeight: 1.6, margin: '0 0 20px' }}>
+                        Your Material Declaration (MD) and SDoC documents for vessel <strong>{data.vesselName || data.imoNumber}</strong> have been successfully received and submitted to the IHM Compliance Team.
+                    </p>
+                    <div style={{ background: '#F8FAFC', padding: 16, borderRadius: 8, fontSize: 13, color: '#64748B', border: '1px solid #F1F5F9' }}>
+                        Submission ID: <strong style={{ color: '#334155' }}>{data.imoNumber}</strong> · Status: <span style={{ color: '#16A34A', fontWeight: 600 }}>SUBMITTED</span>
+                    </div>
+                    <p style={{ marginTop: 24, fontSize: 13, color: '#94A3B8' }}>
+                        You can safely close this browser window.
+                    </p>
+                </div>
+            </Center>
+        );
+    }
+
     return (
         <div style={{ minHeight: '100vh', background: '#F8FAFC', padding: '32px 16px' }}>
             <div style={{ maxWidth: 960, margin: '0 auto' }}>

@@ -27,6 +27,7 @@ import {
     Send,
     Loader2,
     Download,
+    AlertTriangle,
 } from 'lucide-react';
 import { api } from '../../lib/apiClient';
 import { ENDPOINTS, API_CONFIG } from '../../config/api.config';
@@ -106,6 +107,10 @@ export default function DocumentAudit() {
     // Accept & Push Modal State
     const [acceptModalItem, setAcceptModalItem] = useState<FlatItem | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<'Below Threshold' | 'Contain HM' | 'Non CHM'>('Below Threshold');
+
+    // Rejection state & Modal
+    const [rejectedKeys, setRejectedKeys] = useState<Set<string>>(new Set());
+    const [rejectModalItem, setRejectModalItem] = useState<FlatItem | null>(null);
 
     // Clarification mail modal state
     const [mailItem, setMailItem] = useState<FlatItem | null>(null);
@@ -552,23 +557,45 @@ IHM Audit Team`,
                                                             >
                                                                 <CheckCircle2 size={12} /> Accepted &amp; Pushed
                                                             </span>
+                                                        ) : item.status === 'received' && !rejectedKeys.has(item.key) ? (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    className="da-accept-btn"
+                                                                    onClick={() => handleAcceptClick(item)}
+                                                                    disabled={acceptingKey === item.key}
+                                                                    title="Accept & Push — review and classify this item"
+                                                                    style={{ opacity: acceptingKey === item.key ? 0.7 : 1 }}
+                                                                >
+                                                                    {acceptingKey === item.key ? (
+                                                                        <><Loader2 size={12} className="spin" /> Processing…</>
+                                                                    ) : (
+                                                                        <><CheckCircle2 size={12} /> Accept</>
+                                                                    )}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    className="da-reject-btn"
+                                                                    onClick={() => setRejectModalItem(item)}
+                                                                    title="Reject submitted documents and request clarification"
+                                                                    style={{
+                                                                        padding: '6px 12px',
+                                                                        border: '1px solid #FECACA',
+                                                                        background: '#FEF2F2',
+                                                                        color: '#DC2626',
+                                                                        borderRadius: 6,
+                                                                        fontWeight: 600,
+                                                                        fontSize: 12,
+                                                                        cursor: 'pointer',
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 4
+                                                                    }}
+                                                                >
+                                                                    <X size={12} /> Reject
+                                                                </button>
+                                                            </>
                                                         ) : (
-                                                            <button
-                                                                type="button"
-                                                                className="da-accept-btn"
-                                                                onClick={() => handleAcceptClick(item)}
-                                                                disabled={item.status !== 'received' || acceptingKey === item.key}
-                                                                title={item.status !== 'received' ? 'Upload MD or SDoC document before accepting.' : 'Accept & Push — review and classify this item'}
-                                                                style={{ opacity: acceptingKey === item.key ? 0.7 : 1 }}
-                                                            >
-                                                                {acceptingKey === item.key ? (
-                                                                    <><Loader2 size={12} className="spin" /> Processing…</>
-                                                                ) : (
-                                                                    <><CheckCircle2 size={12} /> Accept</>
-                                                                )}
-                                                            </button>
-                                                        )}
-                                                        {item.status !== 'reviewed' && (
                                                             <button
                                                                 type="button"
                                                                 className="da-clarify-btn"
@@ -817,6 +844,42 @@ IHM Audit Team`,
                                         Cancel
                                     </button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Reject Confirmation Modal */}
+                {rejectModalItem && (
+                    <div className="doc-modal-overlay" onClick={() => setRejectModalItem(null)}>
+                        <div className="doc-modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440, padding: 24, textAlign: 'center' }}>
+                            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                                <AlertTriangle size={24} color="#DC2626" />
+                            </div>
+                            <h3 style={{ margin: '0 0 8px', fontSize: 18, color: '#0F172A', fontWeight: 700 }}>Reject Submission?</h3>
+                            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#475569', lineHeight: 1.5 }}>
+                                Are you sure you want to reject the submitted documents for PO <strong>{rejectModalItem.poNumber}</strong> ({rejectModalItem.itemDescription})?
+                            </p>
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setRejectModalItem(null)}
+                                    style={{ padding: '8px 16px', borderRadius: 6, border: '1px solid #CBD5E1', background: 'white', color: '#475569', fontWeight: 600, cursor: 'pointer' }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const item = rejectModalItem;
+                                        setRejectedKeys(prev => new Set(prev).add(item.key));
+                                        setRejectModalItem(null);
+                                        openClarificationMail(item);
+                                    }}
+                                    style={{ padding: '8px 16px', borderRadius: 6, border: 'none', background: '#DC2626', color: 'white', fontWeight: 600, cursor: 'pointer' }}
+                                >
+                                    Yes, Reject &amp; Request Clarification
+                                </button>
                             </div>
                         </div>
                     </div>
