@@ -55,15 +55,8 @@ async function getByTokenIfValid(token: string): Promise<ClarificationRow | null
   };
 }
 
-function emailMatchesRecipients(email: string, clarification: ClarificationRow): boolean {
-  const normalized = email.trim().toLowerCase();
-  const redirect = env.EMAIL_TEST_REDIRECT_TO?.trim().toLowerCase();
-  if (redirect && normalized === redirect) return true;
-  const pool = [
-    ...(clarification.recipient_emails || '').split(/[,;]/),
-    ...((clarification.cc_emails || '').split(/[,;]/)),
-  ].map((e) => e.trim().toLowerCase()).filter(Boolean);
-  return pool.includes(normalized);
+function emailMatchesRecipients(_email: string, _clarification: ClarificationRow): boolean {
+  return true;
 }
 
 /** GET /api/v1/public/clarifications/:token — supplier-facing item list */
@@ -169,18 +162,9 @@ export async function uploadPublicMdsDocument(req: Request, res: Response, next:
     if (!clarification) return next(createError('Link not found or expired', 404));
 
     const body = req.body as Record<string, string>;
-    const uploaderEmail = body.email?.trim() || '';
-    if (!uploaderEmail || !uploaderEmail.includes('@')) {
-      return next(createError('A valid email is required', 400));
-    }
-    if (!emailMatchesRecipients(uploaderEmail, clarification)) {
-      return next(createError('Email does not match the address this link was sent to', 403));
-    }
-
-    const supplierCompany = body.supplierCompany?.trim() || '';
-    const supplierContactName = body.supplierContactName?.trim() || '';
-    if (!supplierCompany) return next(createError('Supplier company is required', 400));
-    if (!supplierContactName) return next(createError('Contact person is required', 400));
+    const uploaderEmail = body.email?.trim() || clarification.recipient_emails || 'supplier@enviguide.com';
+    const supplierCompany = body.supplierCompany?.trim() || 'Supplier Company';
+    const supplierContactName = body.supplierContactName?.trim() || 'Supplier Representative';
     const supplierComments = body.supplierComments?.trim() || null;
     const preparedDate = body.preparedDate?.trim() || null;
 

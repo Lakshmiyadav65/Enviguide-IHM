@@ -238,7 +238,7 @@ export default function DocumentAudit() {
 
                 const status: FlatItem['status'] = it.reviewed_at
                     ? 'reviewed'
-                    : (it.mds_status === 'received' && it.sdoc_status === 'received')
+                    : (it.mds_status === 'received' || it.sdoc_status === 'received' || Boolean(it.mds_file_path) || Boolean(it.sdoc_file_path))
                         ? 'received'
                         : 'pending';
 
@@ -558,7 +558,7 @@ IHM Audit Team`,
                                                                 className="da-accept-btn"
                                                                 onClick={() => handleAcceptClick(item)}
                                                                 disabled={item.status !== 'received' || acceptingKey === item.key}
-                                                                title={item.status !== 'received' ? 'Both MD and SDoC must be uploaded before this can be accepted.' : 'Accept & Push — review and classify this item'}
+                                                                title={item.status !== 'received' ? 'Upload MD or SDoC document before accepting.' : 'Accept & Push — review and classify this item'}
                                                                 style={{ opacity: acceptingKey === item.key ? 0.7 : 1 }}
                                                             >
                                                                 {acceptingKey === item.key ? (

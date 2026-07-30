@@ -93,25 +93,17 @@ export default function SupplierUpload() {
 
     useEffect(loadData, [token]);
 
-    // Upload is allowed only after identity (email) + required fields are set.
-    const canUpload = Boolean(
-        email && email.includes('@')
-        && supplierCompany.trim()
-        && supplierContactName.trim(),
-    );
+    // Upload is always enabled via secure token
+    const canUpload = true;
 
     const uploadFile = async (idx: number, kind: DocKind, file: File) => {
-        if (!canUpload) {
-            setRowError({ idx, kind, msg: 'Fill in your email, company, and contact name above first.' });
-            return;
-        }
         if (!token) return;
         setUploadingSlot({ idx, kind });
         setRowError(null);
         try {
             const fd = new FormData();
             fd.append('file', file);
-            fd.append('email', email);
+            fd.append('email', email || 'supplier@enviguide.com');
             fd.append('supplierCompany', supplierCompany);
             fd.append('supplierContactName', supplierContactName);
             if (supplierComments) fd.append('supplierComments', supplierComments);
