@@ -40,9 +40,10 @@ interface MaterialEntry {
     material: string;
     quantity: string;
     unit: string;
-    hmStatus: 'CHM' | 'PCHM';
+    hmStatus: 'CHM' | 'PCHM' | 'Non-CHM';
     files: string[];
     pin: { x: number; y: number } | null;
+    category?: string;
     description?: string;
     manufacturer?: string;
     ihmPartNumber?: string;
@@ -277,6 +278,15 @@ export default function HazardousMaterialMapping() {
         validationTimerRef.current = setTimeout(() => {
             setValidationError(null);
         }, 3000);
+    };
+
+    const getHazardColor = (item: MaterialEntry) => {
+        const status = (item.hmStatus || '').toUpperCase();
+        const category = (item.category || '').toLowerCase();
+        if (status === 'CHM' || category === 'hazard' || category === 'high') return '#EF4444'; // Red
+        if (status === 'PCHM' || category === 'warning' || category === 'medium') return '#F59E0B'; // Amber/Orange
+        if (status === 'NON-CHM' || status === 'SAFE' || category === 'safe' || category === 'low') return '#10B981'; // Green
+        return '#EF4444';
     };
 
     // Initial mode check and focus on crop
@@ -679,7 +689,7 @@ export default function HazardousMaterialMapping() {
                                                 left: item.pin.x - rect.x,
                                                 top: item.pin.y - rect.y,
                                                 transform: `translate(-50%, -50%) scale(${100 / zoom})`,
-                                                color: isHovered ? '#EF4444' : '#00B0FA', // Change directly via inline style or class
+                                                color: isHovered ? '#DC2626' : getHazardColor(item),
                                                 zIndex: isHovered ? 100 : 10,
                                                 cursor: 'pointer'
                                             }}>
@@ -1298,18 +1308,62 @@ export default function HazardousMaterialMapping() {
 
 
 
-                                    {/* HM Status - Changed Gold to Blue */}
-                                    <div className="hm-status-section" style={{ marginTop: '15px' }}>
-                                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#1E293B', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>HM Status</label>
-                                        <div style={{ display: 'flex', gap: '40px' }}>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                                                <input type="radio" name="hmStatus" checked={formData.hmStatus === 'CHM'} onChange={() => setFormData({ ...formData, hmStatus: 'CHM' })} />
-                                                <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#00B0FA' }}>CHM</span>
-                                            </label>
-                                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
-                                                <input type="radio" name="hmStatus" checked={formData.hmStatus === 'PCHM'} onChange={() => setFormData({ ...formData, hmStatus: 'PCHM' })} />
-                                                <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#64748B' }}>PCHM</span>
-                                            </label>
+                                    {/* Hazard Level & Status Selection */}
+                                    <div className="hm-status-section" style={{ marginTop: '20px' }}>
+                                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#1E293B', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
+                                            HAZARD LEVEL & STATUS *
+                                        </label>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                                            {/* CHM - High Risk (Red) */}
+                                            <div
+                                                onClick={() => setFormData({ ...formData, hmStatus: 'CHM' })}
+                                                style={{
+                                                    border: formData.hmStatus === 'CHM' ? '2px solid #EF4444' : '1px solid #E2E8F0',
+                                                    background: formData.hmStatus === 'CHM' ? '#FEF2F2' : '#F8FAFC',
+                                                    padding: '10px 6px',
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    textAlign: 'center',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                            >
+                                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626' }}>🔴 CHM</div>
+                                                <div style={{ fontSize: '10px', color: '#991B1B', marginTop: '2px', fontWeight: '600' }}>Contains HM</div>
+                                            </div>
+
+                                            {/* PCHM - Potential Risk (Amber/Orange) */}
+                                            <div
+                                                onClick={() => setFormData({ ...formData, hmStatus: 'PCHM' })}
+                                                style={{
+                                                    border: formData.hmStatus === 'PCHM' ? '2px solid #F59E0B' : '1px solid #E2E8F0',
+                                                    background: formData.hmStatus === 'PCHM' ? '#FFFBEB' : '#F8FAFC',
+                                                    padding: '10px 6px',
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    textAlign: 'center',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                            >
+                                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#D97706' }}>🟠 PCHM</div>
+                                                <div style={{ fontSize: '10px', color: '#92400E', marginTop: '2px', fontWeight: '600' }}>Potential HM</div>
+                                            </div>
+
+                                            {/* Non-CHM - Safe / Below Threshold (Green) */}
+                                            <div
+                                                onClick={() => setFormData({ ...formData, hmStatus: 'Non-CHM' })}
+                                                style={{
+                                                    border: formData.hmStatus === 'Non-CHM' ? '2px solid #10B981' : '1px solid #E2E8F0',
+                                                    background: formData.hmStatus === 'Non-CHM' ? '#ECFDF5' : '#F8FAFC',
+                                                    padding: '10px 6px',
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer',
+                                                    textAlign: 'center',
+                                                    transition: 'all 0.2s ease'
+                                                }}
+                                            >
+                                                <div style={{ fontSize: '13px', fontWeight: '700', color: '#059669' }}>🟢 Non-CHM</div>
+                                                <div style={{ fontSize: '10px', color: '#065F46', marginTop: '2px', fontWeight: '600' }}>Below Threshold</div>
+                                            </div>
                                         </div>
                                     </div>
 

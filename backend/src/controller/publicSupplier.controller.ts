@@ -8,6 +8,7 @@ import { getDb } from '../config/database.js';
 import { persistUploadedFile, deleteStoredFile } from '../services/storage.service.js';
 import { createError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
+import { sendMail } from '../services/email.service.js';
 
 interface ClarificationRow {
   id: string;
@@ -222,6 +223,30 @@ export async function uploadPublicMdsDocument(req: Request, res: Response, next:
     const updatedItem = await db.collection('clarification_items').findOne({ clarification_id: clarification.id, item_index: itemIndex });
     if (!updatedItem) return next(createError('Item not found for this link', 404));
 
+    // Fire-and-forget email notification to vessel / consultant team
+    const recipients = clarification.recipient_emails || env.EMAIL_FROM || env.SMTP_USER;
+    if (recipients) {
+      void sendMail({
+        to: recipients,
+        cc: clarification.cc_emails || undefined,
+        subject: `[IHM Notification] MD/SDoC Uploaded - ${clarification.vessel_name || 'Vessel'} (IMO ${clarification.imo_number})`,
+        html: `
+          <div style="font-family: system-ui, sans-serif; padding: 20px; color: #1E293B; max-width: 600px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 8px;">
+            <h2 style="color: #0284C7; margin-top: 0;">MD / SDoC Document Upload Received</h2>
+            <p>A new <strong>${kind.toUpperCase()}</strong> document has been uploaded by <strong>${supplierCompany}</strong>.</p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px; background: #F8FAFC; border-radius: 6px; padding: 10px;">
+              <tr><td style="padding: 8px; font-weight: bold; width: 160px; color: #64748B;">Vessel:</td><td>${clarification.vessel_name || 'N/A'} (IMO: ${clarification.imo_number})</td></tr>
+              <tr><td style="padding: 8px; font-weight: bold; color: #64748B;">Supplier:</td><td>${supplierCompany}</td></tr>
+              <tr><td style="padding: 8px; font-weight: bold; color: #64748B;">Contact Person:</td><td>${supplierContactName} (${uploaderEmail})</td></tr>
+              <tr><td style="padding: 8px; font-weight: bold; color: #64748B;">Document Type:</td><td><span style="background: #E0F2FE; color: #0369A1; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${kind.toUpperCase()}</span></td></tr>
+              <tr><td style="padding: 8px; font-weight: bold; color: #64748B;">File Name:</td><td>${stored.name}</td></tr>
+            </table>
+            <p style="margin-top: 20px; font-size: 13px; color: #64748B;">Log into the IHM Platform to review and audit this document.</p>
+          </div>
+        `
+      }).catch(err => console.error('[MD/SDoC Email Upload Notification Error]:', err));
+    }
+
     res.json({
       success: true,
       data: {
@@ -327,6 +352,24 @@ export async function submitPublicClarification(req: Request, res: Response, nex
         }
       }
     );
+
+    // Fire-and-forget email notification on full clarification submission
+    const recipients = clarification.recipient_emails || env.EMAIL_FROM || env.SMTP_USER;
+    if (recipients) {
+      void sendMail({
+        to: recipients,
+        cc: clarification.cc_emails || undefined,
+        subject: `[IHM Notification] MD/SDoC Clarification Submitted - ${clarification.vessel_name || 'Vessel'} (IMO ${clarification.imo_number})`,
+        html: `
+          <div style="font-family: system-ui, sans-serif; padding: 20px; color: #1E293B; max-width: 600px; margin: 0 auto; border: 1px solid #E2E8F0; border-radius: 8px;">
+            <h2 style="color: #16A34A; margin-top: 0;">Supplier Documentation Submitted</h2>
+            <p>The supplier <strong>${supplierCompany || clarification.supplier_company || 'Supplier'}</strong> has finalized and submitted MD/SDoC documentation for vessel <strong>${clarification.vessel_name || clarification.imo_number}</strong>.</p>
+            <p>Submitted by: <strong>${supplierContactName || 'N/A'}</strong> (${email})</p>
+            <p style="margin-top: 20px; font-size: 13px; color: #64748B;">Log into the IHM Platform to review the Document Audit Queue.</p>
+          </div>
+        `
+      }).catch(err => console.error('[MD/SDoC Submission Email Notification Error]:', err));
+    }
 
     res.json({ success: true });
   } catch (err) { next(err); }
