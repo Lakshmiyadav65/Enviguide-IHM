@@ -11,9 +11,18 @@ import {
     ChevronDown,
     ChevronLeft,
     Menu as MenuIcon,
-    Lock
+    Lock,
+    ClipboardCheck,
+    Building2,
+    UserCog,
+    Package,
+    AlertOctagon,
+    KeyRound,
+    Users,
+    ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import ihmLogo from '../assets/ihm_logo.webp';
 import './Sidebar.css';
 
 interface MenuChild {
@@ -75,12 +84,12 @@ const menuItems: MenuItem[] = [
         icon: MenuIcon,
         label: 'Menu',
         children: [
-            { path: '/menu/registered', label: 'Registered', requires: 'vessels_read' },
-            { path: '/menu/ownership', label: 'Registered Owner', requires: 'vessels_read' },
-            { path: '/menu/ownership-manager', label: 'Ship Manager', requires: 'vessels_read' },
-            { path: '/menu/supplier', label: 'Supplier', requires: 'settings_read' },
-            { path: '/menu/suspended', label: 'Suspended', requires: 'audits_read' },
-            { path: '/menu/suspected-keyword', label: 'Suspected Keyword', requires: 'settings_read' },
+            { path: '/menu/registered', icon: ClipboardCheck, label: 'Registered', requires: 'vessels_read' },
+            { path: '/menu/ownership', icon: Building2, label: 'Registered Owner', requires: 'vessels_read' },
+            { path: '/menu/ownership-manager', icon: UserCog, label: 'Ship Manager', requires: 'vessels_read' },
+            { path: '/menu/supplier', icon: Package, label: 'Supplier', requires: 'settings_read' },
+            { path: '/menu/suspended', icon: AlertOctagon, label: 'Suspended', requires: 'audits_read' },
+            { path: '/menu/suspected-keyword', icon: KeyRound, label: 'Suspected Keyword', requires: 'settings_read' },
         ]
     },
     {
@@ -99,8 +108,8 @@ const menuItems: MenuItem[] = [
         icon: Lock,
         label: 'Security',
         children: [
-            { path: '/security/users', label: 'Users', requires: 'security_read' },
-            { path: '/security/authorizations', label: 'Authorizations', requires: 'security_update' },
+            { path: '/security/users', icon: Users, label: 'Users', requires: 'security_read' },
+            { path: '/security/authorizations', icon: ShieldCheck, label: 'Authorizations', requires: 'security_update' },
         ]
     },
     { path: '/contact', icon: Mail, label: 'Contact Us' },
@@ -130,7 +139,7 @@ export default function Sidebar() {
     // existed before this feature shipped.
     const visibleMenu = useMemo<MenuItem[]>(() => {
         if (!user) return menuItems;
-        
+
         const role = (user.roleName || user.role || '').toLowerCase();
         const isOwnerOrManager = role === 'owner' || role === 'ship_owner' || role === 'ship_manager' || role.includes('owner') || role.includes('manager');
         const isVessel = role === 'vessel' || role.includes('vessel');
@@ -141,10 +150,10 @@ export default function Sidebar() {
                 if (item.path === '/dashboard') {
                     out.push({ ...item, label: 'Dashboard' });
                 } else if (item.path === '/vessels') {
-                    out.push({ 
-                        path: '/vessels/ship', 
-                        icon: item.icon, 
-                        label: 'Vessel' 
+                    out.push({
+                        path: '/vessels/ship',
+                        icon: item.icon,
+                        label: 'Vessel'
                     });
                 } else if (item.path === '/contact') {
                     out.push(item);
@@ -197,13 +206,7 @@ export default function Sidebar() {
         <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''} ${isLocked ? 'locked' : ''}`}>
             <div className="sidebar-header">
                 <div className="sidebar-logo">
-                    <div className="logo-icon">
-                        <Ship size={24} />
-                    </div>
-                    <div className="logo-text">
-                        <h2>IHM Platform</h2>
-                        <p className="logo-subtitle">Maritime Safety</p>
-                    </div>
+                    <img src={ihmLogo} alt="IHM Logo" className="sidebar-brand-logo" />
                 </div>
                 <button
                     className="sidebar-toggle-btn"
