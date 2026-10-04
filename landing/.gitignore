@@ -1,0 +1,22 @@
+# Environment and secrets
+.env
+.env.*
+*.env
+*.local
+
+# Dependencies & Build
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+.vite/
+**/.vite/
+
+# Logs & temp
+*.log
+.DS_Store
+Thumbs.db
+.vercel
+.env*

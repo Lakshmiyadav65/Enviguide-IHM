@@ -1,0 +1,2 @@
+# The nested EnviGuide platform isn't part of the landing site build, and holds its own .env secrets
+/Enviguide-IHM
