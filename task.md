@@ -15,3 +15,14 @@
 - `[x]` Frontend: Implement Manager/Owner conditional select dropdowns linked dynamically to the vessels database
 - `[x]` Frontend: Convert login credentials input to type text to accept username authentication
 - `[x]` Verification: Build backend and frontend to verify compilation
+- `[x]` Frontend: Redesign login with IHM logo, captioned slideshow with dots, and clearer invalid-credentials message (2026-10-05, `cd4aaca`)
+- `[x]` Frontend: Replace sidebar ship icon with IHM logo and add icons to Menu and Security items (2026-10-05, `cd4aaca`)
+- `[x]` Frontend: Add optional `VITE_LANDING_URL` redirect when login is opened outside the landing page's `/login` frame (2026-10-05, `cd4aaca`)
+- `[x]` Deploy: Build and deploy login and sidebar branding to production (ihm-enviguide.vercel.app, shown at maricomx.com/login) (2026-10-05)
+- `[x]` Landing: Email "Book a demo" requests to oceanledgerofficial@gmail.com via Resend (`/api/contact`) (2026-10-05)
+- `[x]` Landing: Move landing page to Vercel project `ihmm-landing-page` in Lakshmi's account, and point `maricomx.com` / `www.maricomx.com` to it (2026-10-05)
+- `[x]` Landing: Push landing page code to the `landing-page` branch under `landing/` (2026-10-05, `195e069`)
+- `[ ]` Landing: Verify `maricomx.com` in Resend and send from `noreply@maricomx.com`
+- `[ ]` Landing: Merge `landing-page` and connect `ihmm-landing-page` on Vercel to this repo (Root Directory `landing`)
+- `[ ]` Landing: Forward the remaining platform routes (`/admin/dashboard`, `/owner/dashboard`, `/fleet`, `/upload-po`, …) from maricomx.com
+- `[ ]` Security: Replace the Resend API key (it was shared in a chat session)
