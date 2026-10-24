@@ -12,11 +12,13 @@ import Testimonials from './Testimonials.jsx'
 import Faq from './Faq.jsx'
 import CtaBand from './CtaBand.jsx'
 
+import SocialBanner from '../../components/SocialBanner.jsx'
+
 export default function HomePage() {
   usePage({
-    title: 'OceanLedger IHMM: Keep Your Fleet Audit-Ready',
+    title: 'IHM Management Software for Ships & Fleets | MARICOMX',
     description:
-      'Digitize IHM Part I maintenance across your whole fleet. Auto-screen purchase orders for hazardous materials, collect MD/SDoC from suppliers, and generate class-ready compliance reports in minutes.',
+      'Simplify IHM Part I maintenance, purchase order screening, supplier MD/SDoC collection and fleet compliance reporting with MARICOMX. Book a demo.',
   })
 
   return (
@@ -32,6 +34,7 @@ export default function HomePage() {
         <Testimonials />
         <Faq />
         <CtaBand />
+        <SocialBanner />
       </main>
       <Footer />
       <ChatWidget />

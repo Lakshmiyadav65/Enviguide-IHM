@@ -1,0 +1,6 @@
+# https://www.maricomx.com robots.txt
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://www.maricomx.com/sitemap.xml

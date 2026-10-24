@@ -16,7 +16,7 @@ const MENUS = [
         items: [
           { to: '/#features', icon: ClockIcon, color: 'fc-teal', title: 'Hazmat Mapping', desc: 'Map materials to deck, area & equipment' },
           { to: '/#po-audits', icon: HouseIcon, color: 'fc-orange', title: 'PO Auditing', desc: 'Auto-screen purchase orders for hazmat' },
-          { to: '/#supplier-portal', icon: DocumentIcon, color: 'fc-purple', title: 'MD/SDoC Collection', desc: 'Collect declarations with email chase' },
+          { to: '/#supplier-portal', icon: DocumentIcon, color: 'fc-purple', title: 'MD/SDoC Collection', desc: 'Collect declarations without the email chase' },
         ],
       },
       {
@@ -53,15 +53,15 @@ const MENUS = [
       {
         label: 'Learn',
         items: [
-          { to: '#', icon: BookIcon, color: 'fc-blue', title: 'Documentation', desc: 'Platform guides & API reference' },
-          { to: '#', icon: ReportIcon, color: 'fc-teal', title: 'IHM Guidelines', desc: 'HKC & EU SRR explained' },
-          { to: '#', icon: ArticleIcon, color: 'fc-orange', title: 'Blog & Insights', desc: 'Latest trends in maritime compliance' },
+          { to: '/blogs', icon: ArticleIcon, color: 'fc-orange', title: 'Blog & Insights', desc: 'Practical IHM guides & compliance updates' },
+          { to: '/blogs/ihm-part-1-maintenance-checklist', icon: ReportIcon, color: 'fc-teal', title: 'IHM Part 1 Checklist', desc: 'Actionable review points for surveys' },
+          { to: '/blogs/hkc-vs-eu-srr-maritime-compliance', icon: BookIcon, color: 'fc-blue', title: 'HKC vs EU SRR Guide', desc: 'Regulatory compliance breakdown' },
         ],
       },
       {
         label: 'Support',
         items: [
-          { to: '#', icon: ClockIcon, color: 'fc-purple', title: 'Case Studies', desc: 'Customer success stories' },
+          { to: '/blogs/material-declaration-vs-sdoc-guide', icon: DocumentIcon, color: 'fc-purple', title: 'MD vs SDoC Explained', desc: 'Supplier documentation workflow' },
           { to: '/#faq', icon: InfoIcon, color: 'fc-green', title: 'Help Center & FAQ', desc: 'Common questions & answers' },
         ],
       },
@@ -118,8 +118,8 @@ export default function Nav({ variant = 'full', activeLink, showAccountPrompt = 
     <>
       <nav className={`nav${scrolled ? ' scrolled' : ''}`} id="main-nav">
         <div className="nav-inner">
-          <Link to="/" className="logo" aria-label="OceanLedger IHMM Home">
-            <img src="/ihm_logo.webp" alt="OceanLedger IHMM Logo" className="logo-img" width="200" height="52" fetchPriority="high" />
+          <Link to="/" className="logo" aria-label="MARICOMX OceanLedger Home">
+            <img src="/ihm_logo.webp" alt="OceanLedger by MARICOMX Logo" className="logo-img" width="200" height="52" fetchPriority="high" />
           </Link>
 
           {variant === 'full' ? (
@@ -128,6 +128,7 @@ export default function Nav({ variant = 'full', activeLink, showAccountPrompt = 
             <div className="nav-links">
               <Link to="/#features" className="nav-link">Features</Link>
               <Link to="/industries" className={`nav-link${activeLink === 'industries' ? ' active' : ''}`}>Industries</Link>
+              <Link to="/blogs" className={`nav-link${activeLink === 'blogs' ? ' active' : ''}`}>Blog</Link>
               <Link to="/#faq" className="nav-link">Resources</Link>
             </div>
           )}
@@ -156,7 +157,8 @@ export default function Nav({ variant = 'full', activeLink, showAccountPrompt = 
       <div ref={mobileMenuRef} className={`mobile-menu${menuOpen ? ' open' : ''}`} id="mobile-menu" aria-hidden={!menuOpen}>
         <Link className="nav-link" to="/#features" onClick={closeMenu}>Features</Link>
         <Link className="nav-link" to="/industries" onClick={closeMenu}>Industries</Link>
-        <Link className="nav-link" to="/#faq" onClick={closeMenu}>Resources</Link>
+        <Link className="nav-link" to="/blogs" onClick={closeMenu}>Blog &amp; Insights</Link>
+        <Link className="nav-link" to="/#faq" onClick={closeMenu}>Resources &amp; FAQ</Link>
         <div style={{ height: 1, background: '#e2e8f0', margin: '8px 0' }}></div>
         <Link className="btn-ghost" to="/login" id="mob-login" style={{ justifyContent: 'center' }} onClick={closeMenu}>Login</Link>
         <Link className="btn-primary" to="/book-demo" id="mob-get-started" style={{ justifyContent: 'center' }} onClick={closeMenu}>Book a Demo</Link>

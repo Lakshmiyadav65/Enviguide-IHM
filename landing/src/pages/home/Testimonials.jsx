@@ -32,8 +32,8 @@ export default function Testimonials() {
           <div className="eyebrow">Proven Results Across Global Fleets</div>
           <h2>Trusted by compliance &amp; fleet teams</h2>
           <p className="section-desc">
-            See how leading vessel managers, superintendents, and HSE directors maintain 100% audit readiness with
-            OceanLedger IHMM.
+            See how leading vessel managers, superintendents, and HSE directors maintain continuous, verifiable audit readiness with
+            OceanLedger by MARICOMX.
           </p>
           <div className="rating-row">
             <div className="stars">★★★★★</div>

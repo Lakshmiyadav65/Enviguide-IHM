@@ -44,7 +44,7 @@ const ROWS = [
     image: '/three_image.png',
     imageAlt: 'MD & SDoC Auto-Collection',
     eyebrow: 'MD & SDoC Collection',
-    title: 'Collect Material Declarations with the email chase',
+    title: 'Collect Material Declarations without the email chase',
     body: 'Send suppliers a secure upload link. They submit MD/SDoC documents through a branded portal with no login required, and everything files itself against the correct PO and vessel automatically.',
     checklist: [
       'Token-based public supplier upload',

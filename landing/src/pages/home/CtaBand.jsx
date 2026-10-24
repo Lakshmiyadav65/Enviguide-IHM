@@ -15,8 +15,8 @@ export default function CtaBand() {
         <div className="cta-video-overlay"></div>
       </div>
       <Reveal className="container cta-inner">
-        <h2>Ready to keep your fleet permanently audit-ready?</h2>
-        <p>Book a personalized demo or speak with our team about rolling OceanLedger IHMM out across your fleet.</p>
+        <h2>Ready to keep your fleet continuously audit-ready?</h2>
+        <p>Book a personalized demo or speak with our team about rolling OceanLedger by MARICOMX out across your fleet.</p>
         <div className="cta-actions">
           <Link to="/book-demo" className="btn-primary btn-lg" id="cta-trial">Book a Demo</Link>
           <Link to="/book-demo" className="btn-outline btn-lg" id="cta-sales">Talk to Our Team</Link>

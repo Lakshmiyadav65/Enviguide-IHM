@@ -23,12 +23,12 @@ export default function Hero() {
         <div className="hero-content">
           <div className="badge">
             <span className="badge-dot"></span>
-            IHM Compliance Platform
+            MARICOMX · OceanLedger IHM Platform
           </div>
-          <h1>Keep your fleet&apos;s Hazardous Material Inventory audit-ready, without the paperwork.</h1>
+          <h1>IHM Management Software for Smarter, Audit-Ready Fleets</h1>
           <p className="hero-desc">
-            Digitize IHM Part I maintenance across your whole fleet. Auto-screen purchase orders for hazardous
-            materials, collect MD/SDoC from suppliers, and generate class-ready compliance reports in minutes.
+            Manage Inventory of Hazardous Materials (IHM) Part I records, screen purchase orders, collect supplier declarations
+            and organise compliance reporting across your fleet from one digital platform.
           </p>
           <div className="hero-cta">
             <Link to="/book-demo" className="btn-primary btn-lg" id="hero-trial">
@@ -37,12 +37,12 @@ export default function Hero() {
               </svg>
               Book a Demo
             </Link>
-            <Link to="/book-demo" className="btn-outline btn-lg" id="hero-demo">
+            <a href="#features" className="btn-outline btn-lg" id="hero-features">
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                 <path d="M4 9h10M10 5l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Get Started
-            </Link>
+              Explore IHM Features
+            </a>
           </div>
           <div className="hero-micro">
             <span>✓ Fleet-wide setup</span>
@@ -50,7 +50,7 @@ export default function Hero() {
             <span>✓ MEPC Guidelines compliant</span>
           </div>
           <div className="trust-strip">
-            <span className="trust-label">Trusted by fleets worldwide</span>
+            <span className="trust-label">Engineered for commercial shipping &amp; fleet managers</span>
             <div className="trust-logos">
               {TRUST_LOGOS.map((name) => (
                 <div className="trust-logo" key={name}>{name}</div>
