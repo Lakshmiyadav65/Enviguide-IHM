@@ -27,7 +27,7 @@
 
 @media (max-width: 768px) {
     .dashboard-header {
-        left: 0;
+        left: 0 !important;
         height: 64px;
         padding: 0 16px;
     }
@@ -35,6 +35,12 @@
 
 body:has(.sidebar.collapsed) .dashboard-header {
     left: var(--sidebar-collapsed-width, 80px);
+}
+
+@media (max-width: 768px) {
+    body:has(.sidebar.collapsed) .dashboard-header {
+        left: 0 !important;
+    }
 }
 
 .header-background {

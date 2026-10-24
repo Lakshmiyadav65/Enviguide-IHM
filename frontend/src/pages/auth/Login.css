@@ -15,10 +15,11 @@
     -webkit-font-smoothing: antialiased;
 }
 
-/* Force Single Page / No Scroll */
+/* Force Single Page / Responsive Scroll Container */
 .login-viewport {
     display: flex;
     height: 100vh;
+    min-height: 100dvh;
     width: 100vw;
     overflow: hidden;
     font-family: 'Inter', sans-serif;
@@ -58,21 +59,56 @@
 
 .visual-caption {
     position: absolute;
-    bottom: 30px;
-    left: 30px;
+    bottom: 40px;
+    left: 40px;
+    right: 40px;
     z-index: 10;
 }
 
 .tiny-label {
-    color: white;
-    font-size: 10px;
-    font-weight: 700;
+    color: #38bdf8;
+    font-size: 11px;
+    font-weight: 800;
     letter-spacing: 2px;
     text-transform: uppercase;
-    opacity: 0.8;
+    display: inline-block;
+    margin-bottom: 6px;
 }
 
-/* Right Section: Auth Portal - More Compact */
+.slide-hero-title {
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.35;
+    letter-spacing: -0.3px;
+    margin-bottom: 16px;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.slide-dots {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.slide-dot {
+    width: 24px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.35);
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 0;
+}
+
+.slide-dot.active {
+    width: 40px;
+    background: #38bdf8;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
+}
+
+/* Right Section: Auth Portal */
 .form-side {
     flex: 1;
     display: flex;
@@ -82,11 +118,15 @@
     padding: 30px;
     background: var(--bg-v2);
     position: relative;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: 100%;
+    min-height: 100dvh;
 }
 
 .auth-content {
     width: 100%;
-    max-width: 380px;
+    max-width: 400px;
     animation: authFadeUp 0.6s ease-out;
 }
 
@@ -138,6 +178,26 @@
 
 .auth-header-v2 {
     margin-bottom: 24px;
+}
+
+.login-logo-wrap {
+    display: flex;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.login-logo-img {
+    height: 94px;
+    width: auto;
+    max-width: 360px;
+    object-fit: contain;
+    display: block;
+    filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.08));
+    transition: transform 0.25s ease;
+}
+
+.login-logo-img:hover {
+    transform: scale(1.02);
 }
 
 .brand-pill {
@@ -233,32 +293,130 @@
     opacity: 0.5;
 }
 
+/* Enhanced Input States */
 .input-row-v2 input {
     width: 100%;
     height: 48px;
     padding: 0 44px;
-    border: 1.5px solid #f1f5f9;
+    border: 1.5px solid #e2e8f0;
     border-radius: 10px;
     background: #fdfdfd;
     font-size: 14px;
+    color: var(--primary-black);
     transition: all 0.2s ease;
 }
 
 .input-row-v2 input:focus {
     outline: none;
     background: white;
-    border-color: var(--primary-black);
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    border-color: #00B0FA;
+    box-shadow: 0 0 0 3px rgba(0, 176, 250, 0.15);
+}
+
+.input-row-v2 input::placeholder {
+    color: #94a3b8;
 }
 
 .eye-btn {
     position: absolute;
-    right: 14px;
+    right: 12px;
     background: none;
     border: none;
     color: var(--muted-slate);
     cursor: pointer;
     display: flex;
+    padding: 6px;
+    border-radius: 6px;
+    transition: all 0.2s;
+}
+
+.eye-btn:hover {
+    color: var(--primary-black);
+    background: #f1f5f9;
+}
+
+/* User-Friendly Alert Boxes */
+.login-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    animation: alertSlideDown 0.3s ease-out;
+}
+
+@keyframes alertSlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.login-alert-error {
+    background: #fef2f2;
+    border: 1px solid #fee2e2;
+    color: #991b1b;
+}
+
+.login-alert-error .alert-icon {
+    color: #ef4444;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.login-alert-info {
+    background: #f0f9ff;
+    border: 1px solid #e0f2fe;
+    color: #0369a1;
+}
+
+.login-alert-info .alert-icon {
+    color: #0284c7;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.alert-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.alert-content strong {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.alert-content a {
+    color: #0284c7;
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.alert-close-btn {
+    background: none;
+    border: none;
+    color: inherit;
+    opacity: 0.6;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s;
+}
+
+.alert-close-btn:hover {
+    opacity: 1;
 }
 
 /* Utils - Fixed Remember Me Clickability */
@@ -266,7 +424,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 12px;
+    font-size: 13px;
 }
 
 .remember-v2 {
@@ -299,8 +457,8 @@
 }
 
 .remember-v2 input:checked~.mark {
-    background: var(--primary-black);
-    border-color: var(--primary-black);
+    background: #00B0FA;
+    border-color: #00B0FA;
 }
 
 .remember-v2 .mark:after {
@@ -317,16 +475,27 @@
     display: block;
 }
 
-.forgot-v2 {
-    color: var(--primary-black);
-    text-decoration: none;
+.forgot-v2-btn {
+    background: none;
+    border: none;
+    color: #0284c7;
+    cursor: pointer;
+    font-size: 12px;
     font-weight: 600;
+    padding: 4px 0;
+    transition: color 0.2s;
+    font-family: inherit;
+}
+
+.forgot-v2-btn:hover {
+    color: #0369a1;
+    text-decoration: underline;
 }
 
 /* Action Buttons */
 .btn-blocker {
     height: 52px;
-    background: var(--primary-black);
+    background: #000000;
     color: white;
     border: none;
     border-radius: 10px;
@@ -337,27 +506,50 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.btn-blocker:hover {
-    background: #27272a;
+.btn-blocker:hover:not(:disabled) {
+    background: #1e293b;
     transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
 }
 
-.btn-blocker::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-    transition: 0.5s;
+.btn-blocker:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
 }
 
-.btn-blocker:hover::after {
-    left: 100%;
+.btn-inner-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-arrow-icon {
+    transition: transform 0.2s ease;
+}
+
+.btn-blocker:hover:not(:disabled) .btn-arrow-icon {
+    transform: translateX(4px);
+}
+
+/* Security Assurance Badge */
+.security-assurance {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #64748b;
+    text-align: center;
+}
+
+.security-shield-icon {
+    color: #10b981;
+    flex-shrink: 0;
 }
 
 .btn-google-v2 {
@@ -454,28 +646,151 @@
     }
 }
 
-/* Responsive & Height Fixes */
+/* =========================================================
+   COMPREHENSIVE RESPONSIVE DESIGN (All Screens & Devices)
+   ========================================================= */
+
+/* Large Screens & 4K Displays (> 1600px) */
+@media (min-width: 1600px) {
+    .auth-content {
+        max-width: 440px;
+    }
+
+    .login-logo-img {
+        height: 104px;
+        max-width: 400px;
+    }
+
+    .auth-header-v2 h2 {
+        font-size: 30px;
+    }
+}
+
+/* Tablets and Medium Screens (<= 1024px) */
 @media (max-width: 1024px) {
     .visual-side {
         display: none;
     }
 
     .form-side {
-        padding: 30px;
+        flex: 1;
+        width: 100%;
+        max-width: 100%;
+        padding: 40px 30px;
+        justify-content: center;
+    }
+
+    .auth-content {
+        max-width: 420px;
     }
 }
 
-@media (max-height: 800px) {
+/* Mobile Devices (<= 768px) */
+@media (max-width: 768px) {
+    .login-viewport {
+        height: auto;
+        min-height: 100vh;
+        min-height: 100dvh;
+        overflow-y: auto;
+    }
+
+    .form-side {
+        padding: 28px 20px 24px;
+        justify-content: space-between;
+        min-height: 100vh;
+        min-height: 100dvh;
+    }
+
+    .auth-content {
+        width: 100%;
+        max-width: 100%;
+        margin: auto 0;
+        padding: 16px 0;
+    }
+
+    .login-logo-wrap {
+        margin-bottom: 20px;
+    }
+
+    .login-logo-img {
+        height: 74px;
+        max-width: 280px;
+    }
+
     .auth-header-v2 {
         margin-bottom: 20px;
     }
 
-    .premium-form {
-        gap: 12px;
+    .auth-header-v2 h2 {
+        font-size: 24px;
     }
 
-    .demo-access-banner {
-        margin-top: 20px;
+    .auth-header-v2 p {
+        font-size: 13px;
+    }
+
+    .input-row-v2 input {
+        height: 48px;
+        font-size: 16px; /* Prevents auto-zoom in iOS Safari */
+    }
+
+    .btn-blocker {
+        height: 50px;
+        font-size: 15px;
+    }
+
+    .auth-footer-v2 {
+        position: static;
+        margin-top: 24px;
+        text-align: center;
+        width: 100%;
+    }
+}
+
+/* Small Mobile Screens (<= 480px, e.g. iPhone SE, compact Androids) */
+@media (max-width: 480px) {
+    .form-side {
+        padding: 20px 16px;
+    }
+
+    .login-logo-img {
+        height: 60px;
+        max-width: 230px;
+    }
+
+    .auth-header-v2 h2 {
+        font-size: 22px;
+    }
+
+    .form-utils-v2 {
+        font-size: 11px;
+    }
+
+    .remember-v2 {
+        font-size: 11px;
+    }
+
+    .forgot-v2 {
+        font-size: 11px;
+    }
+}
+
+/* Viewport Height Adjustments (Laptops & Landscape Mobiles) */
+@media (max-height: 800px) and (min-width: 769px) {
+    .auth-header-v2 {
+        margin-bottom: 18px;
+    }
+
+    .login-logo-img {
+        height: 76px;
+    }
+
+    .login-logo-wrap {
+        margin-bottom: 16px;
+    }
+
+    .premium-form {
+        gap: 12px;
     }
 
     .auth-header-v2 h2 {
@@ -483,25 +798,39 @@
     }
 }
 
-@media (max-height: 700px) {
+@media (max-height: 680px) {
+    .form-side {
+        padding: 16px 20px;
+        justify-content: flex-start;
+    }
+
+    .auth-content {
+        margin: 0 auto;
+    }
+
     .auth-header-v2 {
         margin-bottom: 12px;
     }
 
-    .brand-pill {
-        margin-bottom: 12px;
+    .login-logo-img {
+        height: 52px;
+        max-width: 210px;
+    }
+
+    .login-logo-wrap {
+        margin-bottom: 10px;
     }
 
     .premium-form {
         gap: 10px;
     }
 
-    .demo-access-banner {
-        margin-top: 12px;
-        padding: 8px 12px;
-    }
-
     .auth-header-v2 h2 {
         font-size: 20px;
+    }
+
+    .auth-footer-v2 {
+        position: static;
+        margin-top: 16px;
     }
 }
