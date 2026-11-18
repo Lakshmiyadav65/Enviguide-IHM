@@ -4,11 +4,11 @@ const ROWS = [
   {
     id: 'po-audits',
     stageLabel: 'Purchase Order Screening',
-    image: '/two_image.png',
-    imageAlt: 'Purchase Order Screening',
-    eyebrow: 'Purchase Order Audits',
-    title: 'Auto-screen purchase orders for suspected hazmat',
-    body: 'Upload purchase orders by spreadsheet and let the system flag line items against your keyword list, so nothing hazardous slips onboard undocumented.',
+    image: '/two_image.webp',
+    imageAlt: 'Purchase Order Screening for Ship Hazardous Materials',
+    eyebrow: 'Automated Purchase Order Audits',
+    title: 'How to screen purchase orders for suspected ship hazmat?',
+    body: 'Automated purchase order screening is the process of checking ship requisitions against hazardous substance lists before delivery. OceanLedger scans PO line items in bulk, alerts superintendents to suspected items, and flags missing Material Declarations early so hazardous items never reach your ships uncertified.',
     checklist: [
       'Bulk PO upload (CSV / Excel)',
       'Keyword-based hazmat flagging',
@@ -23,11 +23,11 @@ const ROWS = [
     id: 'supplier-portal',
     reverse: true,
     stageLabel: 'Supplier Upload Flow',
-    image: '/four_image.png',
-    imageAlt: 'Supplier Upload Flow',
-    eyebrow: 'Supplier Portal',
-    title: 'A frictionless portal your suppliers will actually use',
-    body: 'Give suppliers a clean, branded experience to submit documentation. No account creation needed: just a secure link that accepts their documents and routes them automatically.',
+    image: '/four_image.webp',
+    imageAlt: 'Maritime Supplier Portal for IHM Documentation',
+    eyebrow: 'Frictionless Supplier Collaboration',
+    title: 'What is an IHM supplier portal for marine vendors?',
+    body: 'An IHM supplier portal is a secure web link where maritime vendors upload required Material Declarations and Statements of Compliance. Vendors submit verified certificates without passwords or logins. Documents route automatically to matching purchase orders, cutting email follow-ups by eighty percent.',
     checklist: [
       'Branded supplier-facing portal',
       'No supplier account required',
@@ -41,11 +41,11 @@ const ROWS = [
   {
     id: 'mdsdc',
     stageLabel: 'MD / SDoC Auto-Collection',
-    image: '/three_image.png',
-    imageAlt: 'MD & SDoC Auto-Collection',
-    eyebrow: 'MD & SDoC Collection',
-    title: 'Collect Material Declarations without the email chase',
-    body: 'Send suppliers a secure upload link. They submit MD/SDoC documents through a branded portal with no login required, and everything files itself against the correct PO and vessel automatically.',
+    image: '/three_image.webp',
+    imageAlt: 'Automated Material Declaration and SDoC Collection Flow',
+    eyebrow: 'MD & SDoC Auto-Collection',
+    title: 'How to automate Material Declaration (MD) & SDoC collection?',
+    body: 'Material Declaration and SDoC collection is an automated compliance workflow that requests and verifies supplier hazardous substance forms. When procurement teams place orders, the system sends token links to suppliers, monitors submission status, and stores validated documents directly in your ship hazardous material log.',
     checklist: [
       'Token-based public supplier upload',
       'Automated MD/SDoC request emails',
@@ -68,7 +68,15 @@ function FeatureRow({ id, reverse, stageLabel, image, imageAlt, eyebrow, title, 
   const visual = (
     <Reveal className="split-visual anim-stage-wrap" variant={reverse ? 'right' : 'left'}>
       <div className="anim-stage-label">{stageLabel}</div>
-      <img src={image} alt={imageAlt} className="anim-stage-img" />
+      <img
+        src={image}
+        alt={imageAlt}
+        className="anim-stage-img"
+        width="1672"
+        height="941"
+        loading="lazy"
+        decoding="async"
+      />
     </Reveal>
   )
   const copy = (

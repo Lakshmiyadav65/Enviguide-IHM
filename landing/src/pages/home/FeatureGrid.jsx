@@ -68,7 +68,7 @@ export default function FeatureGrid() {
         </Reveal>
         <div className="grid3">
           {FEATURES.map(({ icon: Icon, color, title, body }) => (
-            <Reveal className="feature-card" key={title}>
+            <Reveal as="article" className="feature-card" key={title}>
               <div className={`fc-icon-wrap ${color}`}>
                 <Icon size={20} />
               </div>

@@ -45,7 +45,7 @@ export default function Testimonials() {
 
         <div className="quotes-grid">
           {REVIEWS.map((review) => (
-            <Reveal className="quote-card" variant="zoom" key={review.name}>
+            <Reveal as="article" className="quote-card" variant="zoom" key={review.name}>
               <div className="quote-card-top">
                 <div className="stars">★★★★★</div>
                 <span className="verified-badge">

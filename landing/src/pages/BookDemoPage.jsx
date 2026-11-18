@@ -127,40 +127,99 @@ export default function BookDemoPage() {
                     <div className="form-row">
                       <div className="form-group">
                         <label htmlFor="firstname" className="form-label">First Name</label>
-                        <input type="text" id="firstname" className="form-control" placeholder="Jane" required />
+                        <input
+                          type="text"
+                          id="firstname"
+                          name="firstname"
+                          autoComplete="given-name"
+                          className="form-control"
+                          placeholder="Jane"
+                          required
+                          aria-required="true"
+                        />
                       </div>
                       <div className="form-group">
                         <label htmlFor="lastname" className="form-label">Last Name</label>
-                        <input type="text" id="lastname" className="form-control" placeholder="Doe" required />
+                        <input
+                          type="text"
+                          id="lastname"
+                          name="lastname"
+                          autoComplete="family-name"
+                          className="form-control"
+                          placeholder="Doe"
+                          required
+                          aria-required="true"
+                        />
                       </div>
                     </div>
 
                     <div className="form-group">
                       <label htmlFor="workemail" className="form-label">Email</label>
-                      <input type="email" id="workemail" className="form-control" placeholder="jane@company.com" required />
+                      <input
+                        type="email"
+                        id="workemail"
+                        name="workemail"
+                        autoComplete="email"
+                        className="form-control"
+                        placeholder="jane@company.com"
+                        required
+                        aria-required="true"
+                      />
                     </div>
 
                     <div className="form-group">
                       <label htmlFor="phone" className="form-label">Phone Number</label>
-                      <input type="tel" id="phone" className="form-control" placeholder="+1 (___) ___-____" required />
+                      <input
+                        type="tel"
+                        id="phone"
+                        name="phone"
+                        autoComplete="tel"
+                        className="form-control"
+                        placeholder="+1 (___) ___-____"
+                        required
+                        aria-required="true"
+                      />
                     </div>
 
                     <div className="form-group">
                       <label htmlFor="companyname" className="form-label">Company Name</label>
-                      <input type="text" id="companyname" className="form-control" placeholder="Acme Shipping Ltd." required />
+                      <input
+                        type="text"
+                        id="companyname"
+                        name="companyname"
+                        autoComplete="organization"
+                        className="form-control"
+                        placeholder="Acme Shipping Ltd."
+                        required
+                        aria-required="true"
+                      />
                     </div>
 
                     <div className="form-row">
                       <div className="form-group">
                         <label htmlFor="fleetsize" className="form-label">Fleet Size</label>
-                        <select id="fleetsize" className="form-control" required defaultValue="">
+                        <select
+                          id="fleetsize"
+                          name="fleetsize"
+                          className="form-control"
+                          required
+                          aria-required="true"
+                          defaultValue=""
+                        >
                           <option value="" disabled>Select range</option>
                           {FLEET_SIZES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
                       </div>
                       <div className="form-group">
                         <label htmlFor="userrole" className="form-label">Role</label>
-                        <select id="userrole" className="form-control" required defaultValue="">
+                        <select
+                          id="userrole"
+                          name="userrole"
+                          className="form-control"
+                          required
+                          aria-required="true"
+                          defaultValue=""
+                        >
                           <option value="" disabled>Select role</option>
                           {ROLES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                         </select>
@@ -169,7 +228,7 @@ export default function BookDemoPage() {
 
                     <div className="form-group">
                       <label htmlFor="countryflag" className="form-label">Country Flag (optional)</label>
-                      <select id="countryflag" className="form-control" defaultValue="">
+                      <select id="countryflag" name="countryflag" className="form-control" defaultValue="">
                         <option value="">Select Flag State (optional)</option>
                         {FLAG_STATES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
@@ -177,15 +236,23 @@ export default function BookDemoPage() {
 
                     <div className="form-group">
                       <label htmlFor="notes" className="form-label">What would you like to see? (optional)</label>
-                      <input type="text" id="notes" className="form-control" placeholder="e.g. supplier portal, PO auditing, reporting…" />
+                      <input
+                        type="text"
+                        id="notes"
+                        name="notes"
+                        className="form-control"
+                        placeholder="e.g. supplier portal, PO auditing, reporting…"
+                      />
                     </div>
 
                     <div className="form-group" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, margin: '16px 0 18px' }}>
                       <input
                         type="checkbox"
                         id="agree-terms"
+                        name="agree-terms"
                         style={{ width: 16, height: 16, marginTop: 2, accentColor: '#0099e6', cursor: 'pointer' }}
                         required
+                        aria-required="true"
                       />
                       <label htmlFor="agree-terms" style={{ fontSize: '0.82rem', color: '#475569', cursor: 'pointer', lineHeight: 1.4 }}>
                         I agree to be contacted about OceanLedger IHMM products and services
@@ -195,7 +262,7 @@ export default function BookDemoPage() {
                     {/* Honeypot: hidden from people, bots fill it in and get silently dropped */}
                     <div aria-hidden="true" style={{ position: 'absolute', left: -9999 }}>
                       <label htmlFor="website">Website</label>
-                      <input type="text" id="website" tabIndex={-1} autoComplete="off" />
+                      <input type="text" id="website" name="website" tabIndex={-1} autoComplete="off" />
                     </div>
 
                     {status === 'error' && (

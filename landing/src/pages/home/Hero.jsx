@@ -25,11 +25,17 @@ export default function Hero() {
             <span className="badge-dot"></span>
             MARICOMX · OceanLedger IHM Platform
           </div>
-          <h1>IHM Management Software for Smarter, Audit-Ready Fleets</h1>
+          <h1>IHM Management Software &amp; Fleet Hazmat Compliance Platform</h1>
           <p className="hero-desc">
             Manage Inventory of Hazardous Materials (IHM) Part I records, screen purchase orders, collect supplier declarations
-            and organise compliance reporting across your fleet from one digital platform.
+            and organise fleet compliance reporting from one digital platform.
           </p>
+          <div className="hero-definition-card" id="hero-definition">
+            <span className="def-tag">AEO Quick Answer</span>
+            <p className="def-text">
+              <strong>IHM management software is a</strong> digital maritime system that tracks and updates hazardous materials onboard commercial vessels. It automates purchase order screening, collects Material Declarations from suppliers, and generates class-approved Part I reports to meet Hong Kong Convention and EU Ship Recycling Regulation rules.
+            </p>
+          </div>
           <div className="hero-cta">
             <Link to="/book-demo" className="btn-primary btn-lg" id="hero-trial">
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">

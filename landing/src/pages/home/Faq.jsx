@@ -3,24 +3,28 @@ import Reveal from '../../components/Reveal.jsx'
 
 const FAQS = [
   {
-    q: 'How much time does OceanLedger IHMM save compared to manual processes?',
-    a: 'Fleet operators typically save 60–80% of the time spent on IHM maintenance when moving from paper-based or spreadsheet processes to OceanLedger IHMM. Beyond time savings, you significantly reduce the risk of costly port-state detentions and class survey findings caused by incomplete or outdated IHM records. Most customers report measurable efficiency gains within the first few months of deployment.',
+    q: 'What is IHM Part I maintenance for ships?',
+    a: 'IHM Part I maintenance is the continuous recording of hazardous materials installed on a ship throughout its working life. Fleet teams must update records whenever new equipment arrives or repairs occur, ensuring compliance with the Hong Kong Convention and EU Ship Recycling Regulation.',
+  },
+  {
+    q: 'How much time does OceanLedger IHM software save compared to manual processes?',
+    a: 'OceanLedger IHM software saves fleet operators sixty to eighty percent of compliance time. The platform replaces slow spreadsheets with automated purchase order scans and direct supplier uploads. This stops survey findings and port detentions before ships enter harbor.',
   },
   {
     q: 'Does it support Hong Kong Convention & EU SRR?',
-    a: 'Yes. OceanLedger IHMM is built from the ground up to support both the Hong Kong International Convention for the Safe and Environmentally Sound Recycling of Ships (HKC) and the EU Ship Recycling Regulation (EU SRR). Reports are formatted to meet the specific requirements of each framework, including mandatory annexes and material thresholds.',
+    a: 'Yes. OceanLedger supports both regulations by checking onboard substances against mandatory Hong Kong Convention and EU SRR substance tables. The software updates hazardous material quantities and produces approved Part I reports ready for classification surveyors and port inspectors.',
   },
   {
-    q: "Can it be customized to our fleet's workflow?",
-    a: 'Absolutely. You can customize the keyword library, approval workflows, notification templates and report formats. Role-based access control lets you tailor permissions for fleet managers, vessel officers, surveyors and external auditors. Our team also provides onboarding support to configure the system around your existing processes.',
-  },
-  {
-    q: 'How do suppliers submit MD/SDoC documents?',
-    a: 'Suppliers receive a secure, token-based link via email. They click the link and reach a branded upload portal where they can attach MD or SDoC documents without creating an account. Documents are automatically routed to the correct purchase order and vessel record. You get notified immediately upon submission, and can request clarifications directly through the portal.',
+    q: 'How do suppliers submit MD and SDoC documents?',
+    a: 'Suppliers submit Material Declarations and SDoC documents through a secure web link without creating an account. Once uploaded, documents are checked and attached to matching purchase orders and vessel records automatically within seconds.',
   },
   {
     q: 'Is it suitable for different vessel types?',
-    a: 'Yes. OceanLedger IHMM supports all commercially operated vessel types including bulk carriers, tankers, container ships, ro-ro vessels, offshore support vessels and passenger ships. The GA plan viewer and hazmat mapping system are flexible enough to accommodate any vessel layout and equipment configuration.',
+    a: 'Yes, OceanLedger supports all commercial vessels including bulk carriers, oil tankers, container ships, offshore vessels, and passenger liners. The system adapts to any ship layout, equipment list, and General Arrangement plan.',
+  },
+  {
+    q: 'Why is digital IHM management essential for modern ship operations?',
+    a: 'Digital IHM management is essential because manual tracking often leads to missing declarations, survey delays, and port-state detentions. Digital records give superintendents instant fleet visibility and guarantee compliant recycling documentation.',
   },
 ]
 
@@ -29,18 +33,18 @@ export default function Faq() {
   const [openIndex, setOpenIndex] = useState(null)
 
   return (
-    <section className="faq" id="faq">
+    <section className="faq" id="faq" aria-labelledby="faq-heading">
       <div className="container">
         <Reveal className="section-header center">
           <div className="eyebrow">Help &amp; guidance</div>
-          <h2>Frequently asked questions</h2>
+          <h2 id="faq-heading">Frequently asked questions</h2>
         </Reveal>
         <div className="faq-list">
           {FAQS.map((faq, index) => {
             const isOpen = openIndex === index
             const id = `faq${index + 1}`
             return (
-              <Reveal className={`faq-item${isOpen ? ' open' : ''}`} key={id}>
+              <Reveal as="article" className={`faq-item${isOpen ? ' open' : ''}`} key={id}>
                 <button className="faq-q" aria-expanded={isOpen} id={id} onClick={() => setOpenIndex(isOpen ? null : index)}>
                   {faq.q}
                   <span className="faq-icon">+</span>

@@ -147,7 +147,15 @@ export default function IndustriesPage() {
         <div className="container footer-inner">
           <div className="footer-brand">
             <Link to="/" className="logo">
-              <img src="/ihm_logo.webp" alt="OceanLedger IHMM Logo" className="logo-img" />
+              <img
+                src="/ihm_logo.webp"
+                alt="OceanLedger IHMM Logo"
+                className="logo-img"
+                width="200"
+                height="52"
+                loading="lazy"
+                decoding="async"
+              />
             </Link>
             <p>© 2026 OceanLedger IHMM. All rights reserved.</p>
           </div>

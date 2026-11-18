@@ -115,8 +115,9 @@ export default function Nav({ variant = 'full', activeLink, showAccountPrompt = 
   const closeMenu = () => setMenuOpen(false)
 
   return (
-    <>
-      <nav className={`nav${scrolled ? ' scrolled' : ''}`} id="main-nav">
+    <header className="site-header">
+      <a href="#main-content" className="skip-to-content">Skip to content</a>
+      <nav className={`nav${scrolled ? ' scrolled' : ''}`} id="main-nav" aria-label="Main Navigation">
         <div className="nav-inner">
           <Link to="/" className="logo" aria-label="MARICOMX OceanLedger Home">
             <img src="/ihm_logo.webp" alt="OceanLedger by MARICOMX Logo" className="logo-img" width="200" height="52" fetchPriority="high" />
@@ -163,7 +164,7 @@ export default function Nav({ variant = 'full', activeLink, showAccountPrompt = 
         <Link className="btn-ghost" to="/login" id="mob-login" style={{ justifyContent: 'center' }} onClick={closeMenu}>Login</Link>
         <Link className="btn-primary" to="/book-demo" id="mob-get-started" style={{ justifyContent: 'center' }} onClick={closeMenu}>Book a Demo</Link>
       </div>
-    </>
+    </header>
   )
 }
 

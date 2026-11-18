@@ -6,7 +6,7 @@ const TABS = [
     key: 'hazmat',
     label: 'Hazmat Mapping',
     stageLabel: 'Deck & Area Hazmat Map',
-    image: '/one_image.png',
+    image: '/one_image.webp',
     imageAlt: 'Deck & Area Hazmat Map',
     eyebrow: 'Hazardous Material Mapping',
     title: 'Map every hazardous material to deck, area & equipment',
@@ -22,7 +22,7 @@ const TABS = [
     key: 'po',
     label: 'PO Audits',
     stageLabel: 'Purchase Order Line-Item Screening',
-    image: '/two_image.png',
+    image: '/two_image.webp',
     imageAlt: 'Purchase Order Line-Item Screening',
     eyebrow: 'Purchase Order Audits',
     title: 'Auto-screen purchase orders for suspected hazmat',
@@ -37,7 +37,7 @@ const TABS = [
     key: 'mdsdc',
     label: 'MD & SDoC',
     stageLabel: 'MD / SDoC Auto-Collection',
-    image: '/three_image.png',
+    image: '/three_image.webp',
     imageAlt: 'MD & SDoC Collection',
     eyebrow: 'MD & SDoC Collection',
     title: 'Collect Material Declarations without the email chase',
@@ -52,7 +52,7 @@ const TABS = [
     key: 'supplier',
     label: 'Supplier Portal',
     stageLabel: 'Supplier Upload Flow',
-    image: '/four_image.png',
+    image: '/four_image.webp',
     imageAlt: 'Supplier Portal',
     eyebrow: 'Supplier Portal',
     title: 'A frictionless portal your suppliers will actually use',
@@ -67,7 +67,7 @@ const TABS = [
     key: 'reports',
     label: 'Compliance Reports',
     stageLabel: 'Class-Ready Report Export',
-    image: '/five_image.png',
+    image: '/five_image.webp',
     imageAlt: 'Compliance Reports',
     eyebrow: 'Compliance Reports',
     title: 'Generate class-ready compliance reports in minutes',
@@ -141,7 +141,15 @@ export default function FeatureTabs() {
             <div className="split">
               <div className="split-visual anim-stage-wrap">
                 <div className="anim-stage-label">{tab.stageLabel}</div>
-                <img src={tab.image} alt={tab.imageAlt} className="anim-stage-img" />
+                <img
+                  src={tab.image}
+                  alt={tab.imageAlt}
+                  className="anim-stage-img"
+                  width="1672"
+                  height="941"
+                  loading="lazy"
+                  decoding="async"
+                />
               </div>
               <div className="split-copy">
                 <div className="eyebrow">{tab.eyebrow}</div>

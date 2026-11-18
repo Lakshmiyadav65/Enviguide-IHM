@@ -287,9 +287,11 @@ export default function ChatWidget() {
             <input
               ref={inputRef}
               type="text"
+              name="message"
               className="chat-input"
               id="chatInput"
               placeholder="Ask anything about IHM compliance…"
+              aria-label="Ask questions about IHM compliance"
               autoComplete="off"
               maxLength={300}
               enterKeyHint="send"

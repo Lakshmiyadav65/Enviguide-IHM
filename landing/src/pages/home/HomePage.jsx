@@ -16,15 +16,15 @@ import SocialBanner from '../../components/SocialBanner.jsx'
 
 export default function HomePage() {
   usePage({
-    title: 'IHM Management Software for Ships & Fleets | MARICOMX',
+    title: 'IHM Management Software, Fleet Hazmat Compliance & Ship Tracking | MARICOMX OceanLedger',
     description:
-      'Simplify IHM Part I maintenance, purchase order screening, supplier MD/SDoC collection and fleet compliance reporting with MARICOMX. Book a demo.',
+      'Simplify IHM Part I maintenance, purchase order screening, supplier MD/SDoC collection and fleet compliance reporting with MARICOMX OceanLedger. Book a demo.',
   })
 
   return (
     <>
       <Nav />
-      <main>
+      <main id="main-content">
         <Hero />
         <FeatureTabs />
         <FeatureRows />
